@@ -1,0 +1,27 @@
+name: cuoti_doudui
+description: A Flutter project for Cuoti DouDui.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 🌟 新增的图片资源注册区域
+  # 注意：assets 前面有 2 个空格，- 号前面有 4 个空格
+  assets:
+    - assets/images/splash_bg.png
