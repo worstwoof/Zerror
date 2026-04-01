@@ -26,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller.forward();
 
     // 🌟 2. 重新开启 Timer，设置 2.5 秒后自动跳转到 LoginScreen
-    Timer(const Duration(milliseconds: 2500), () {
+    Timer(const Duration(milliseconds: 5000), () {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );

@@ -1,55 +1,48 @@
 import 'package:flutter/material.dart';
-import 'screen/base/splash_screen.dart';
+import 'screen/base/splash_screen.dart'; // 确保路径正确
+
+// 🌟 1. 定义一个全局的主题通知器，默认跟随系统
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 void main() {
-  runApp(const DouDuiApp());
+  runApp(const ZerrorApp());
 }
 
-class DouDuiApp extends StatelessWidget {
-  const DouDuiApp({super.key});
+class ZerrorApp extends StatelessWidget {
+  const ZerrorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 1. 定义核心颜色
-    const Color primaryColor = Color(0xFF6A8A71); // 鼠尾草绿
-    const Color secondaryColor = Color(0xFF8A9A85); // 薄荷灰绿
-    const Color backgroundColor = Color(0xFFF8F9F6); // 燕麦白
-    const Color textColorPrimary = Color(0xFF2C362F); // 深松木灰
-    const Color textColorSecondary = Color(0xFF8A928C); // 晨雾灰
+    // 🌟 2. 使用 ValueListenableBuilder 监听主题变化
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp(
+          title: '知芽 Zerror',
+          debugShowCheckedModeBanner: false,
 
-    return MaterialApp(
-      title: '知芽 Zerror',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: backgroundColor,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primaryColor,
-          primary: primaryColor,
-          secondary: secondaryColor,
-          surface: backgroundColor,
-        ),
-        // 2. 全局卡片样式重写 (极轻微阴影，纯白底色)
-        cardTheme: CardThemeData( // 🌟 修复：改为 CardThemeData
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            // 🌟 修复：改为 withValues(alpha: 0.1)
-            side: BorderSide(color: Colors.grey.withValues(alpha: 0.1), width: 1),
+          // 🌟 3. 将模式绑定到通知器
+          themeMode: currentMode,
+
+          // 浅色主题配置
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: const Color(0xFF70A88D),
+            scaffoldBackgroundColor: const Color(0xFFF0F4F2),
+            useMaterial3: true,
           ),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-        // 3. 全局文本样式规范
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: textColorPrimary, height: 1.4), // H1
-          titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textColorPrimary, height: 1.4), // H2
-          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColorPrimary, height: 1.5), // H3
-          bodyMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: textColorPrimary, height: 1.6), // Body
-          bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: textColorSecondary), // Caption
-        ),
-      ),
-      home: const SplashScreen(), // 指向真正的首页
+
+          // 深色主题配置
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: const Color(0xFF70A88D),
+            scaffoldBackgroundColor: const Color(0xFF1E2823),
+            useMaterial3: true,
+          ),
+
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

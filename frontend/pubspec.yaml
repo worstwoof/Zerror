@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:
@@ -28,6 +29,8 @@ flutter:
     - assets/images/splash_bg.png
     - assets/images/auth_bg.png # 🌟 新增这一行
     - assets/images/logo.png
+    - assets/images/background_dark.png
+    - assets/images/background_light.png
 
 # 🌟 2. 在文件最底部，贴上这段专属配置（注意不要缩进，顶格写）
 flutter_native_splash:
