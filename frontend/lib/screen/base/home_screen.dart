@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 选项 1：拍照录入 (最高优先级，使用主色调)
+              // 选项 1：拍照录入
               _buildBottomSheetButton(
                 icon: Icons.camera_alt_rounded,
                 title: '拍照录入',
@@ -219,8 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 textColor: Colors.white,
                 iconColor: Colors.white,
                 onTap: () {
-                  Navigator.pop(context);
-                  // TODO: 调用系统相机
+                  Navigator.pop(context); // 先关闭底部弹窗
+                  _pickImage(context, ImageSource.camera); // 🌟 呼叫相机
                 },
               ),
               const SizedBox(height: 16),
@@ -234,8 +234,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 textColor: textColor,
                 iconColor: primaryColor,
                 onTap: () {
-                  Navigator.pop(context);
-                  // TODO: 打开图库
+                  Navigator.pop(context); // 先关闭底部弹窗
+                  _pickImage(context, ImageSource.gallery); // 🌟 呼叫相册
                 },
               ),
               const SizedBox(height: 16),
