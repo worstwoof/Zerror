@@ -1,5 +1,5 @@
-name: cuoti_doudui
-description: A Flutter project for Cuoti DouDui.
+name: zerror
+description: A Flutter project for zerror.
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -17,6 +17,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_native_splash: ^2.4.0  # 🌟 1. 引入启动页生成工具
 
 flutter:
   uses-material-design: true
@@ -25,3 +26,12 @@ flutter:
   # 注意：assets 前面有 2 个空格，- 号前面有 4 个空格
   assets:
     - assets/images/splash_bg.png
+    - assets/images/auth_bg.png # 🌟 新增这一行
+    - assets/images/logo.png
+
+# 🌟 2. 在文件最底部，贴上这段专属配置（注意不要缩进，顶格写）
+flutter_native_splash:
+  color: "#1A2421" # 强制底色为你森林背景的深松木绿
+  # Android 12+ 专属霸道配置，强制覆盖它的默认行为
+  android_12:
+    color: "#1A2421"
