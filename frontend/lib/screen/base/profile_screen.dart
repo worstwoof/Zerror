@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'edit_profile_screen.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -38,7 +38,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: Icon(Icons.edit_note_rounded, color: textColor),
             onPressed: () {
-              // TODO: 编辑个人资料
+              // 🌟 2. 替换 TODO：执行页面跳转
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EditProfileScreen(),
+                ),
+              );
             },
           ),
         ],
@@ -66,37 +72,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 1. 顶部用户档案区域
                   Column(
                     children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          const CircleAvatar(
-                            radius: 48,
-                            backgroundColor: Colors.white24,
-                            backgroundImage: NetworkImage('https://picsum.photos/200'), // 你的头像占位
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: primaryGreen,
-                              shape: BoxShape.circle,
-                              // 边框颜色改用纯透明或半透明黑，因为背景不再是纯色了
-                              border: Border.all(color: Colors.black26, width: 3),
+                      // 🌟 1. 带有微光边框的头像放在最顶部
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          // 增加与编辑页面完全一致的半透明微光边框
+                          border: Border.all(color: Colors.white.withOpacity(0.15), width: 2),
+                          // 加一点极其微弱的阴影，让头像在复杂背景上更立体
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 10,
+                              spreadRadius: 2,
                             ),
-                            child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const CircleAvatar(
+                          radius: 48,
+                          backgroundColor: Colors.black26,
+                          backgroundImage: NetworkImage('https://picsum.photos/200'), // 你的头像占位
+                        ),
                       ),
+
                       const SizedBox(height: 16),
+
+                      // 🌟 2. 昵称
                       Text(
                         'Zander',
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
                       ),
+
                       const SizedBox(height: 4),
+
+                      // 🌟 3. ID
                       Text(
                         'ID: zerror_001',
                         style: TextStyle(fontSize: 14, color: subTextColor),
                       ),
+
                       const SizedBox(height: 12),
+
+                      // 🌟 4. 个性签名 (保持你原来的设计)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         decoration: BoxDecoration(

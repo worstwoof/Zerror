@@ -143,9 +143,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         children: [
           Row(
             children: [
-              ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(File(widget.imagePath), width: 50, height: 50, fit: BoxFit.cover)),
-              const SizedBox(width: 12),
-              // AI 自动生成的标签
+              // 🌟 核心修复：增加判断！只有路径不为空时，才渲染图片和右侧的间距
+              if (widget.imagePath.isNotEmpty) ...[
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(File(widget.imagePath), width: 50, height: 50, fit: BoxFit.cover)
+                ),
+                const SizedBox(width: 12),
+              ],
+
+              // AI 自动生成的标签 (无论有无图片，标签都正常显示)
               Expanded(
                 child: Wrap(
                   spacing: 8,
@@ -158,9 +165,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ],
           ),
           const SizedBox(height: 12),
+
+          // 题目文字区域
           TextField(
             controller: _questionController,
-            maxLines: null,
+            maxLines: null, // 允许自动换行，防止文字溢出
             style: TextStyle(color: textColor, fontSize: 15),
             decoration: const InputDecoration(border: InputBorder.none, isDense: true),
           ),

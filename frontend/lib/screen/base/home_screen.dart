@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-
+import 'weakness_practice_screen.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
 import 'data_dashboard_screen.dart';
@@ -11,6 +11,8 @@ import 'settings_screen.dart';
 import '../capture/error_preview_screen.dart';
 import 'error_archive_screen.dart';
 import 'smart_quiz_screen.dart';
+import 'manual_entry_screen.dart'; // 根据你的实际路径调整
+import 'smart_review_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -239,18 +241,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 底部导航栏专属的玻璃拟态生成器
+  // 底部导航栏专属的玻璃拟态生成器
   Widget _buildGlassmorphism({required Widget child, double? width, double? height, BorderRadiusGeometry? borderRadius}) {
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16), // 保持模糊度不变
         child: Container(
           width: width,
           height: height,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
+            // 🌟 核心修改：将原本的白色半透明改为深色半透明
+            // 这里使用一个比主背景 0xFF1E2823 更深的颜色，配合 60% 的不透明度，让底部的毛玻璃显得深邃且通透
+            color: const Color(0xFF121A16).withOpacity(0.6),
             borderRadius: borderRadius ?? BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.15), width: 0.5),
+            // 将边框的白光稍微调暗（0.15 改为 0.08），避免在深色底上显得太突兀，保留一丝精致的边缘高光即可
+            border: Border.all(color: Colors.white.withOpacity(0.08), width: 0.5),
           ),
           child: child,
         ),
@@ -283,9 +289,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
               const SizedBox(height: 40),
-              _buildTaskCard(title: '今日智能复习', subtitle: '根据艾宾浩斯记忆曲线，\n今天有 15 道错题需要巩固。', illustrationIcon: Icons.menu_book_rounded, btnText: '开始复习'),
+              _buildTaskCard(
+                  title: '今日智能复习',
+                  subtitle: '根据艾宾浩斯记忆曲线，\n今天有 15 道错题需要巩固。',
+                  illustrationIcon: Icons.menu_book_rounded,
+                  btnText: '开始复习',
+                  onTap: () {
+                    // 🌟 增加跳转逻辑
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SmartReviewScreen())
+                    );
+                  }
+              ),
               const SizedBox(height: 24),
-              _buildTaskCard(title: '攻克薄弱点', subtitle: 'AI 分析发现「线性代数」\n是你近期的主要丢分项。', illustrationIcon: Icons.psychology_rounded, btnText: '去练练'),
+              _buildTaskCard(
+                  title: '攻克薄弱点',
+                  subtitle: 'AI 分析发现「线性代数」\n是你近期的主要丢分项。',
+                  illustrationIcon: Icons.psychology_rounded,
+                  btnText: '去练练',
+                  onTap: () {
+                    // 🌟 增加跳转到攻克薄弱点页面
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WeaknessPracticeScreen())
+                    );
+                  }
+              ),
             ],
           ),
         ),
@@ -299,8 +329,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Container(
             // 自动适配刘海屏/状态栏高度，并增加下间距
             padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 12,
-              bottom: 12,
+              top: MediaQuery.of(context).padding.top,
+              bottom: 5,
               left: 24,
               right: 24,
             ),
@@ -393,22 +423,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 任务卡片 (保持你的实心质感设计)
-  Widget _buildTaskCard({required String title, required String subtitle, required IconData illustrationIcon, required String btnText}) {
+  // 🌟 更新后的任务卡片：增加了 onTap 参数接收，修复了废弃语法警告
+  Widget _buildTaskCard({
+    required String title,
+    required String subtitle,
+    required IconData illustrationIcon,
+    required String btnText,
+    VoidCallback? onTap, // 👈 核心修复 1：在这里声明接收 onTap 参数
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap, // 👈 核心修复 2：将传入的点击事件绑定给整个卡片
         borderRadius: BorderRadius.circular(24),
-        highlightColor: Colors.white.withOpacity(0.1),
-        splashColor: Colors.white.withOpacity(0.1),
+        highlightColor: Colors.white.withValues(alpha: 0.1),
+        splashColor: Colors.white.withValues(alpha: 0.1),
         child: Container(
           padding: const EdgeInsets.all(24.0),
           decoration: BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [primaryGreen.withOpacity(0.9), primaryGreen]),
+            gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [primaryGreen.withValues(alpha: 0.9), primaryGreen]
+            ),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 6)),
-              BoxShadow(color: Colors.white.withOpacity(0.15), blurRadius: 0, spreadRadius: 1, offset: const Offset(0, 1)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 6)),
+              BoxShadow(color: Colors.white.withValues(alpha: 0.15), blurRadius: 0, spreadRadius: 1, offset: const Offset(0, 1)),
             ],
           ),
           child: Row(
@@ -423,11 +464,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Text(subtitle, style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.white70)),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: onTap, // 👈 核心修复 3：也将点击事件绑定给按钮
                       icon: Text(btnText, style: const TextStyle(fontSize: 14)),
                       label: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: btnDarkGreen, foregroundColor: Colors.white, elevation: 0,
+                        backgroundColor: btnDarkGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
@@ -437,7 +480,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               Expanded(
                 flex: 2,
-                child: Container(height: 120, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24), child: Icon(illustrationIcon, size: 60, color: Colors.white)),
+                child: Container(
+                    height: 120,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.24)),
+                    child: Icon(illustrationIcon, size: 60, color: Colors.white)
+                ),
               ),
             ],
           ),
@@ -471,7 +518,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 16),
             _buildBottomSheetButton(icon: Icons.photo_library_rounded, title: '从相册导入', subtitle: '选择已有的试卷或截图', bgColor: textColor.withOpacity(0.05), textColor: textColor, iconColor: primaryColor, onTap: () { Navigator.pop(sheetContext); _pickImage(context, ImageSource.gallery); }),
             const SizedBox(height: 16),
-            _buildBottomSheetButton(icon: Icons.edit_note_rounded, title: '手动记录', subtitle: '支持 LaTeX 数学公式输入', bgColor: textColor.withOpacity(0.05), textColor: textColor, iconColor: primaryColor, onTap: () { Navigator.pop(sheetContext); }),
+            _buildBottomSheetButton(
+              icon: Icons.edit_note_rounded,
+              title: '手动记录',
+              subtitle: '支持 LaTeX 数学公式输入',
+              bgColor: textColor.withOpacity(0.05),
+              textColor: textColor,
+              iconColor: primaryColor,
+              onTap: () {
+                Navigator.pop(sheetContext); // 🌟 先收起底部的菜单
+                Navigator.push( // 🌟 然后跳转到手动录入页
+                  context,
+                  MaterialPageRoute(builder: (context) => const ManualEntryScreen()),
+                );
+              },
+            ),
           ],
         ),
       ),
