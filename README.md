@@ -16,21 +16,6 @@
 
 ---
 
-## ✨ 核心魔法 (Core Features)
-
-- 📸 **极速招募 (AIGC 智能解析)**
-  - 调用底层影像 OCR 能力，一键上传。
-  - LLM 深度诊断：精准剥离核心考点、高频错因，并生成专属“情绪治愈寄语”。
-- 🧬 **战队基地 (多模态视觉生成)**
-  - 结合 Stable Diffusion 技术，将枯燥的错题自动具象化为高颜值的“知识植物/战队精灵”。
-  - 生成高颜值「知植闪卡」，随复习进度动态演化（种子 -> 发芽 -> 觉醒）。
-- ⚔️ **特训营 (个性化跨语境衍生)**
-  - LLM 提取底层逻辑，将硬核知识包装进用户的兴趣语境（如：电子竞技、科幻电影、明星饭圈），生成定制化衍生题，实现无痛“举一反三”。
-- 📱 **深度融入 vivo 生态**
-  - **OriginOS 原子组件**：战队精灵直达桌面，小窗轻量复习，建立强习惯粘性。
-  - **Jovi 意图直达**：支持语音一键唤起错题收录。
-
----
 
 ## 🏗️ 全栈工程目录说明 (Monorepo Architecture)
 
@@ -52,16 +37,22 @@ cuoti-doudui-repo/
 │   │   └── app/src/main/java/com/cuotidoudui/
 │   │       ├── originos_widget/  # 🌟 vivo 专属：OriginOS 桌面原子组件原生 Kotlin 代码
 │   │       └── intent/           # 🌟 vivo 专属：Jovi 语音意图识别接入层
-│   ├── assets/                   # 静态资源 (战队精灵缺省图、Lottie 动态开花特效)
+│   ├── assets/                   # 静态资源管理
+│   │   └── images/               # 存放应用 Logo、多状态启动页与暗调微质感背景图 (auth_bg 等)
 │   └── lib/                      # Flutter UI 与跨平台业务逻辑
-│       ├── core/                 # 主题配置、全局常量、原生通信通道 (MethodChannel)
-│       ├── data/                 # API 请求封装 (Dio)、本地缓存 (Hive) 与数据模型
-│       ├── state/                # 状态管理 (维持登录态与战队精灵的实时数据)
-│       └── screens/              # 核心视图层
-│           ├── capture/          # 【招募台】相机拍照、图片裁剪、错题上传 UI
-│           ├── base/             # 【战队基地】瀑布流展示已生成的知识精灵与复习进度
-│           ├── training/         # 【特训营】展示兴趣衍生题、AI 导师微课视频 UI
-│           └── detail/           # 【档案室】单张知植闪卡的翻转与交互 UI
+│       ├── core/                 # 核心基座：主题配置、全局常量、原生通信通道 (MethodChannel)
+│       ├── data/                 # 数据驱动层：API 请求封装 (Dio)、本地缓存与数据模型
+│       └── screen/               # 核心视图层 (UI 渲染与状态分发)
+│           ├── base/             # 👑 核心主干业务模块集合
+│           │   # 包含：
+│           │   # 1. 基础导航与档案：home_screen (主页), profile_screen (个人中心)
+│           │   # 2. 身份与安全：login_screen, register_screen (鉴权链路)
+│           │   # 3. 游戏化特训系统：weakness_practice (闯关地图), level_*, final_exam (沉浸式模考)
+│           │   # 4. 智能引擎接口：smart_review (艾宾浩斯记忆闪卡), manual_entry (沉浸式 LaTeX 录入)
+│           │   # 5. 数据面板：data_dashboard_screen (学情可视化)
+│           ├── capture/          # 📸 错题捕捉与 OCR 录入流 (包含：error_preview, error_edit)
+│           ├── detail/           # 🗂️ 档案室详情展示视图
+│           └── training/         # ⚔️ 专属训练模式相关扩展视图
 │
 ├── backend/                      # ⚙️ 后端高并发服务 (FastAPI)
 │   ├── app/
@@ -95,46 +86,8 @@ cuoti-doudui-repo/
 ├── docker-compose.yml            # 🐳 容器编排配置 (一键拉起 PostgreSQL 和 Redis 基础组件)
 └── .env.example                  # 环境变量配置模板 (用于存放数据库密码、大模型 API Key)
 ```
-## 🚀 极速启动 (Quick Start)
 
-1. 环境准备
-确保已安装 Docker & docker-compose
-
-确保已安装 Flutter SDK (v3.x+)
-
-复制 .env.example 并重命名为 .env，填入你的大模型 API Key 和数据库密码。
-
-2. 启动后端与异步队列
-```
-Bash
-# 一键拉起 PostgreSQL, Redis, FastAPI 和 Celery Worker
-docker-compose up -d --build
-```
-API 文档将自动运行在: http://localhost:8000/docs
-
-3. 启动客户端
-```
-Bash
-cd frontend
-flutter pub get
-flutter run
-```
-## 👨‍💻 硬核 5 人小队作战指北 (The Squad)
-[1号位] UI/UX & Flutter 开发：负责 frontend/lib/screens 下的所有交互实现，把控错题都队的超高颜值与丝滑体验。
-
-[2号位] 客户端主程 & 生态对接：死守 frontend/android 阵地，解决相机调用卡顿，攻克 OriginOS 桌面组件的跨进程数据同步。
-
-[3号位] 后端架构师：镇守 backend/，通过 Redis + Celery 抹平大模型的生成延迟，确保前端体验不卡死。
-
-[4号位] LLM 逻辑炼丹师：在 ai_engine/llm_logic/ 中调教 LangChain，确保 AI 输出的解析“说人话”，衍生题“逻辑严密且不崩坏”。
-
-[5号位] 视觉与多模态合成师：在 ai_engine/vision_synthesis/ 中调教 Stable Diffusion，保证每一张生成的知识精灵都不含恐怖谷效应，并且排版合成完美。
+---
 
 "我们不制造标准答案，我们只负责让灵感发芽。" —— Cuoti DouDui Team
 
-
-***
-
-这份 README 将你们的技术护城河（异步任务处理、LangChain 链路、视觉合成算法、OriginOS 原生接入）展示得淋漓尽致。
-
-现在整个仓库的基础设施已经彻底完工。为了让前端和后端能立刻分头写代码（而不至于因为参数名不同而吵架），*
