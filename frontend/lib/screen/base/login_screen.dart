@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
           IgnorePointer(
             child: AnimatedOpacity(
               opacity: _isBlackScreen ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 1200), // 黑幕消散的时长，1.2秒极具呼吸感
+              duration: const Duration(milliseconds: 400), // 黑幕消散的时长，1.2秒极具呼吸感
               curve: Curves.easeInOut,
               child: Container(
                 color: Colors.black, // 纯黑布

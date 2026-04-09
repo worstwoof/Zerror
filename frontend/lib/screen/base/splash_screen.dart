@@ -166,7 +166,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           IgnorePointer(
             child: AnimatedOpacity(
               opacity: _isFadingToBlack ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 800), // 黑幕落下的时间为 0.8 秒
+              duration: const Duration(milliseconds: 400), // 黑幕落下的时间为 0.8 秒
               curve: Curves.easeInOut,
               child: Container(
                 color: Colors.black, // 纯黑转场
