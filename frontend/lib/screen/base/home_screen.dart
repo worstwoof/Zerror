@@ -7,6 +7,9 @@ import 'settings_screen.dart'; // 🌟 引入设置页
 import 'dart:io'; // 🌟 用于处理文件路径
 import 'package:image_picker/image_picker.dart'; // 🌟 引入相机/相册插件
 import '../capture/error_preview_screen.dart'; // 🌟 引入预览页
+import 'error_archive_screen.dart'; // 🌟 引入错题档案页
+import 'smart_quiz_screen.dart'; // 🌟 引入智能组卷页
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -31,11 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color currentTextColor = isDarkMode ? Colors.white : Colors.black87;
     final Color currentSubTextColor = isDarkMode ? Colors.white70 : Colors.black54;
 
-    // 将页面存入列表
+// 将页面存入列表
     final List<Widget> pages = [
-      _buildHomeTab(currentTextColor, currentSubTextColor, isDarkMode), // 第 0 页：主页
-      _buildAddTab(currentTextColor),                                   // 第 1 页：录入 (占位)
-      const ProfileScreen(),                                            // 第 2 页：个人中心
+      // 🌟 修改：把 currentBgColor 作为第四个参数传进去
+      _buildHomeTab(currentTextColor, currentSubTextColor, isDarkMode, currentBgColor),
+      _buildAddTab(currentTextColor),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
@@ -50,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
             DrawerHeader(
               decoration: BoxDecoration(
                 color: currentBgColor,
-                border: Border(bottom: BorderSide(color: currentTextColor.withOpacity(0.12))),
+                border: Border(bottom: BorderSide(color: currentTextColor.withValues(alpha:0.12))),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
             ),
 
-            Divider(color: currentTextColor.withOpacity(0.12), thickness: 1, height: 32),
+            Divider(color: currentTextColor.withValues(alpha:0.12), thickness: 1, height: 32),
 
             _buildDrawerItem(icon: Icons.help_outline_rounded, title: '帮助与反馈', color: currentTextColor, onTap: () {}),
             _buildDrawerItem(icon: Icons.logout_rounded, title: '退出登录', color: Colors.redAccent, onTap: () {
@@ -135,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _currentIndex,
 
           selectedItemColor: currentTextColor,
-          unselectedItemColor: currentSubTextColor.withOpacity(0.38),
+          unselectedItemColor: currentSubTextColor.withValues(alpha:0.38),
           showSelectedLabels: false,
           showUnselectedLabels: false,
 
@@ -179,12 +183,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 // 🌟 新增：底部弹出的录入动作菜单
+  // 🌟 新增：底部弹出的录入动作菜单
   void _showAddActionSheet(BuildContext context, Color bgColor, Color textColor, Color primaryColor) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent, // 透明背景以显示圆角
-      isScrollControlled: true, // 允许自适应高度
-      builder: (context) {
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      // 🌟 修改 1：把这里的参数名从 context 改成 sheetContext，防止覆盖主页的 context
+      builder: (sheetContext) {
         return Container(
           padding: const EdgeInsets.only(top: 24, bottom: 40, left: 24, right: 24),
           decoration: BoxDecoration(
@@ -192,22 +198,13 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min, // 高度包裹内容
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 顶部小滑块指示器
               Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                width: 40, height: 4, margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(color: textColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(2)),
               ),
-              Text(
-                '收录新错题',
-                style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              Text('收录新错题', style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
 
               // 选项 1：拍照录入
@@ -219,8 +216,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 textColor: Colors.white,
                 iconColor: Colors.white,
                 onTap: () {
-                  Navigator.pop(context); // 先关闭底部弹窗
-                  _pickImage(context, ImageSource.camera); // 🌟 呼叫相机
+                  // 🌟 修改 2：用 sheetContext 关闭弹窗
+                  Navigator.pop(sheetContext);
+                  // 🌟 修改 3：用一直活着的主页 context 去呼叫相机！
+                  _pickImage(context, ImageSource.camera);
                 },
               ),
               const SizedBox(height: 16),
@@ -230,12 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.photo_library_rounded,
                 title: '从相册导入',
                 subtitle: '选择已有的试卷或截图',
-                bgColor: textColor.withOpacity(0.05),
+                bgColor: textColor.withValues(alpha:0.05),
                 textColor: textColor,
                 iconColor: primaryColor,
                 onTap: () {
-                  Navigator.pop(context); // 先关闭底部弹窗
-                  _pickImage(context, ImageSource.gallery); // 🌟 呼叫相册
+                  Navigator.pop(sheetContext); // 🌟 同理
+                  _pickImage(context, ImageSource.gallery); // 🌟 同理
                 },
               ),
               const SizedBox(height: 16),
@@ -245,11 +244,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.edit_note_rounded,
                 title: '手动记录',
                 subtitle: '支持 LaTeX 数学公式输入',
-                bgColor: textColor.withOpacity(0.05),
+                bgColor: textColor.withValues(alpha:0.05),
                 textColor: textColor,
                 iconColor: primaryColor,
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext); // 🌟 同理
                   // TODO: 跳转手动输入页
                 },
               ),
@@ -280,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: iconColor, size: 24),
@@ -292,11 +291,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(title, style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12)),
+                  Text(subtitle, style: TextStyle(color: textColor.withValues(alpha:0.6), fontSize: 12)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: textColor.withOpacity(0.3)),
+            Icon(Icons.chevron_right_rounded, color: textColor.withValues(alpha:0.3)),
           ],
         ),
       ),
@@ -304,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   // ==================== 提取的页面组件 ====================
 
-  Widget _buildHomeTab(Color currentTextColor, Color currentSubTextColor, bool isDarkMode) {
+  Widget _buildHomeTab(Color currentTextColor, Color currentSubTextColor, bool isDarkMode, Color currentBgColor) {
     return Stack(
       children: [
         Positioned.fill(
@@ -342,13 +341,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Text('今天准备攻克哪些知识盲区？', style: TextStyle(fontSize: 18, color: currentSubTextColor)),
                 const SizedBox(height: 32),
+                // 🌟 修改：把第三个按钮改成“错题档案”，并加入跳转逻辑
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildQuickActionItem(Icons.camera_alt_rounded, '拍照录入', currentTextColor),
-                    _buildQuickActionItem(Icons.bolt_rounded, '智能组卷', currentTextColor),
-                    _buildQuickActionItem(Icons.pie_chart_rounded, '错因分析', currentTextColor),
-                    _buildQuickActionItem(Icons.account_tree_rounded, '知识图谱', currentTextColor),
+                    _buildQuickActionItem(Icons.camera_alt_rounded, '拍照录入', currentTextColor, onTap: () {
+                      _showAddActionSheet(context, currentBgColor, currentTextColor, primaryGreen);
+                    }),
+                    _buildQuickActionItem(Icons.bolt_rounded, '智能组卷', currentTextColor, onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SmartQuizScreen()));
+                    }),
+                    _buildQuickActionItem(Icons.folder_special_rounded, '错题档案', currentTextColor, onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const ErrorArchiveScreen()));
+                    }),
+                    _buildQuickActionItem(Icons.account_tree_rounded, '知识图谱', currentTextColor, onTap: () {}),
                   ],
                 ),
                 const SizedBox(height: 40),
@@ -369,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.camera_rounded, size: 80, color: primaryGreen.withOpacity(0.5)),
+          Icon(Icons.camera_rounded, size: 80, color: primaryGreen.withValues(alpha:0.5)),
           const SizedBox(height: 16),
           Text('错题录入功能开发中...', style: TextStyle(color: textColor, fontSize: 18)),
         ],
@@ -381,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDrawerItem({required IconData icon, required String title, required Color color, required VoidCallback onTap}) {
     return ListTile(
-      leading: Icon(icon, color: color.withOpacity(0.8), size: 24),
+      leading: Icon(icon, color: color.withValues(alpha:0.8), size: 24),
       title: Text(title, style: TextStyle(color: color, fontSize: 16)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 24.0),
       onTap: () {
@@ -391,17 +397,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActionItem(IconData iconData, String label, Color textColor) {
-    return Column(
-      children: [
-        Container(
-          width: 70, height: 70,
-          decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(20)),
-          child: Icon(iconData, color: Colors.white, size: 32),
-        ),
-        const SizedBox(height: 12),
-        Text(label, style: TextStyle(color: textColor, fontSize: 14)),
-      ],
+  // 🌟 修改：增加了 onTap 参数，并用 InkWell 包裹以支持点击涟漪效果
+  Widget _buildQuickActionItem(IconData iconData, String label, Color textColor, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 70, height: 70,
+            decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(20)),
+            child: Icon(iconData, color: Colors.white, size: 32),
+          ),
+          const SizedBox(height: 12),
+          Text(label, style: TextStyle(color: textColor, fontSize: 14)),
+        ],
+      ),
     );
   }
 

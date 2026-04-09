@@ -18,8 +18,11 @@ class _LoginFormScreenState extends State<LoginFormScreen> {
     String password = _passwordController.text.trim();
 
     if (username == 'zerror' && password == '123456') {
-      Navigator.of(context).pushReplacement(
+      // 🌟 终极魔法：进入主页，并把底下的所有登录页统统销毁！
+      Navigator.pushAndRemoveUntil(
+        context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (Route<dynamic> route) => false, // false 代表清空之前所有的路由
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

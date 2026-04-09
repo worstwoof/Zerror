@@ -31,6 +31,13 @@ flutter:
     - assets/images/logo.png
     - assets/images/background_dark.png
     - assets/images/background_light.png
+    - assets/images/logo.webp
+    - assets/images/splash_bg1.png
+    - assets/images/splash_bg2.png
+    - assets/images/splash_bg3.png
+    - assets/images/splash_bg4.png
+    - assets/images/splash_bg5.png
+    - assets/images/splash_bg6.png
 
 # 🌟 2. 在文件最底部，贴上这段专属配置（注意不要缩进，顶格写）
 flutter_native_splash:

@@ -1,10 +1,42 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'error_edit_screen.dart'; // 🌟 引入刚写的编辑页
 
-class ErrorPreviewScreen extends StatelessWidget {
-  final String imagePath; // 接收拍下来或选中的图片路径
+class ErrorPreviewScreen extends StatefulWidget {
+  final String imagePath;
 
   const ErrorPreviewScreen({super.key, required this.imagePath});
+
+  @override
+  State<ErrorPreviewScreen> createState() => _ErrorPreviewScreenState();
+}
+
+class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
+  bool _isRecognizing = false; // 控制加载动画的状态
+
+  // 模拟调用 AI 大模型 OCR 的过程
+  Future<void> _startOCR() async {
+    setState(() { _isRecognizing = true; });
+
+    // 假装后端 AI 在努力识别，转圈等 2 秒
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+    setState(() { _isRecognizing = false; });
+
+    // 🌟 识别完成，带上识别出的文字，跳入编辑页！
+    // 这里我们先写死一段文本作为占位符，以后替换成真实 API 返回的数据
+    String mockExtractedText = "设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。\n求证：A 的伴随矩阵 A* 的特征值。";
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => ErrorEditScreen(
+          imagePath: widget.imagePath,
+          initialText: mockExtractedText,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +45,7 @@ class ErrorPreviewScreen extends StatelessWidget {
     final primaryGreen = const Color(0xFF70A88D);
 
     return Scaffold(
-      backgroundColor: Colors.black, // 预览页背景通常用纯黑，更沉浸
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -22,20 +54,17 @@ class ErrorPreviewScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // 1. 图片展示区
           Expanded(
-            child: InteractiveViewer( // 允许用户双指放大缩小图片
+            child: InteractiveViewer(
               minScale: 0.5,
               maxScale: 4.0,
               child: Image.file(
-                File(imagePath),
+                File(widget.imagePath),
                 fit: BoxFit.contain,
                 width: double.infinity,
               ),
             ),
           ),
-
-          // 2. 底部操作区
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             decoration: BoxDecoration(
@@ -44,10 +73,9 @@ class ErrorPreviewScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // 重拍/重选 按钮
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _isRecognizing ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: isDarkMode ? Colors.white : Colors.black87,
                       side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.black12),
@@ -58,19 +86,9 @@ class ErrorPreviewScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // 确认识别 按钮
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: 接入 AI OCR 识别逻辑
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('正在呼叫 AI 提取题目... (功能开发中)'),
-                          backgroundColor: primaryGreen,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
+                    onPressed: _isRecognizing ? null : _startOCR, // 🌟 点击调用识别函数
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                       foregroundColor: Colors.white,
@@ -78,7 +96,12 @@ class ErrorPreviewScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text('提取文字', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: _isRecognizing
+                        ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    )
+                        : const Text('提取文字', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
