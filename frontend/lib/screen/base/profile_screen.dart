@@ -26,10 +26,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent, // AppBar 完全透明
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         iconTheme: IconThemeData(color: textColor),
+
+        // 🌟 新增：左上角设置侧边栏按钮
+        leading: IconButton(
+          icon: Icon(Icons.notes_rounded, color: textColor), // 使用和主页原先一样的菜单图标
+          onPressed: () {
+            // 魔法在这里：通过 context 向上寻找主页（HomeScreen）的 Scaffold 并打开它的侧边栏！
+            Scaffold.of(context).openDrawer();
+          },
+        ),
+
         title: Text(
           '个人中心',
           style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
