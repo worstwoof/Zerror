@@ -1,4 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
+import '../../core/theme.dart';
 
 class SmartReviewScreen extends StatefulWidget {
   const SmartReviewScreen({super.key});
@@ -7,37 +11,38 @@ class SmartReviewScreen extends StatefulWidget {
   State<SmartReviewScreen> createState() => _SmartReviewScreenState();
 }
 
-class _SmartReviewScreenState extends State<SmartReviewScreen> with SingleTickerProviderStateMixin {
-  final Color primaryGreen = const Color(0xFF70A88D);
-  final Color cardBg = const Color(0xFF2A352F);
+class _SmartReviewScreenState extends State<SmartReviewScreen> {
+  final Color primaryGreen = AppPalette.matchaMist;
+  final Color cardBg = AppPalette.kombuGreen;
 
   int _currentIndex = 0;
-  bool _isAnswerRevealed = false; // 控制是否展开了答案
+  bool _isAnswerRevealed = false;
 
-  // 模拟基于艾宾浩斯曲线今天需要复习的错题数据
   final List<Map<String, dynamic>> _reviewList = [
     {
-      'tags': ['线性代数', '矩阵特征值', '一阶复习'],
-      'question': '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。\n求证：A 的伴随矩阵 A* 的特征值为 |A|/λi。',
-      'myAnswer': 'A* = A^(-1) * |A|，然后我就不会推了...',
-      'aiAnalysis': '核心考点在于理解伴随矩阵与逆矩阵的关系。遇到此类问题，优先联想定义式 A*A = |A|E。因为 A 可逆，所以 A* = |A|A⁻¹。A 的特征值为 λ，则 A⁻¹ 的特征值为 1/λ，因此 A* 的特征值为 |A|/λ。',
+      'tags': ['线性代数', '矩阵特征值', '一轮复习'],
+      'question':
+          '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。求证：A 的伴随矩阵 A* 的特征值为 |A|/λi。',
+      'myAnswer': 'A* = A^(-1) * |A|，然后我就不会往下推了。',
+      'aiAnalysis':
+          '关键是把伴随矩阵和逆矩阵联系起来。因为 A 可逆，所以 A* = |A|A^-1。若 A 的特征值为 λ，则 A^-1 的特征值为 1/λ，因此 A* 的特征值就是 |A|/λ。',
     },
     {
-      'tags': ['离散数学', '图论', '二阶复习'],
+      'tags': ['离散数学', '图论', '二轮复习'],
       'question': '什么是欧拉回路？一个无向连通图具有欧拉回路的充要条件是什么？',
       'myAnswer': '经过所有边一次且仅一次的回路。条件是所有顶点的度数都是偶数。',
-      'aiAnalysis': '回答基本正确！补充细节：无向连通图 G 有欧拉回路 <=> G 是连通的且没有奇度顶点。注意区分欧拉路径（可以有2个奇度顶点）和欧拉回路。',
-    }
+      'aiAnalysis':
+          '你的结论基本正确。更完整地说：无向连通图存在欧拉回路，当且仅当图连通且所有顶点度数都为偶数。要注意区分欧拉路径与欧拉回路。',
+    },
   ];
 
   void _nextQuestion() {
     if (_currentIndex < _reviewList.length - 1) {
       setState(() {
         _currentIndex++;
-        _isAnswerRevealed = false; // 切换到下一题时，重置为未展开状态
+        _isAnswerRevealed = false;
       });
     } else {
-      // 复习完成
       _showCompletionDialog();
     }
   }
@@ -49,27 +54,42 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> with SingleTicker
       builder: (context) => AlertDialog(
         backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Icon(Icons.verified_rounded, color: Color(0xFF70A88D), size: 48),
-        content: const Text('太棒了！\n今日的 15 道错题已全部巩固完毕，知识的小树苗又长大了一点。',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 16, height: 1.5)
+        title: const Icon(
+          Icons.verified_rounded,
+          color: AppPalette.almondCream,
+          size: 48,
+        ),
+        content: const Text(
+          '今天的重点复习已经完成。\n这轮错题已经重新巩固过一遍了。',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 16,
+            height: 1.5,
+          ),
         ),
         actions: [
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(vertical: 16)
+                backgroundColor: AppPalette.almondCream,
+                foregroundColor: AppPalette.night,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               onPressed: () {
-                Navigator.pop(context); // 关弹窗
-                Navigator.pop(context); // 回主页
+                Navigator.pop(context);
+                Navigator.pop(context);
               },
-              child: const Text('返回首页', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              child: const Text(
+                '返回首页',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -87,116 +107,200 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> with SingleTicker
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: const Icon(Icons.close_rounded, color: AppPalette.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
           children: [
-            const Text('智能复习', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text(
+              '今日智能复习',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('${_currentIndex + 1} / ${_reviewList.length}', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+            Text(
+              '${_currentIndex + 1} / ${_reviewList.length}',
+              style: TextStyle(
+                color: AppPalette.textSecondary.withValues(alpha: 0.8),
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
         centerTitle: true,
       ),
       body: Stack(
         children: [
-          // 背景
-          Positioned.fill(child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover)),
-          Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
-
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: AppPalette.appBackground),
+            ),
+          ),
+          Positioned.fill(
+            child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0x28324A36),
+                    Color(0xCC171712),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -70,
+            right: -30,
+            child: _buildAmbientBlob(
+              220,
+              AppPalette.matchaMist.withValues(alpha: 0.12),
+            ),
+          ),
+          Positioned(
+            bottom: 160,
+            left: -60,
+            child: _buildAmbientBlob(
+              200,
+              AppPalette.pineGreen.withValues(alpha: 0.14),
+            ),
+          ),
           SafeArea(
             child: Column(
               children: [
-                // 顶部进度条
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-                      minHeight: 6,
-                    ),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                  child: _buildTopSummary(progress),
                 ),
-
-                // 核心卡片区域
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 280),
                       curve: Curves.easeInOut,
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: cardBg.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        color: cardBg.withValues(alpha: 0.86),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: AppPalette.pastelGrey.withValues(alpha: 0.1),
+                        ),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10)),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
                         ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 标签
                           Wrap(
                             spacing: 8,
-                            children: (currentData['tags'] as List<String>).map((tag) => Chip(
-                              label: Text(tag, style: TextStyle(color: primaryGreen, fontSize: 12)),
-                              backgroundColor: primaryGreen.withValues(alpha: 0.15),
-                              side: BorderSide.none,
-                              padding: EdgeInsets.zero,
-                            )).toList(),
+                            runSpacing: 8,
+                            children: (currentData['tags'] as List<String>)
+                                .map(
+                                  (tag) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 7,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: primaryGreen.withValues(alpha: 0.14),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: TextStyle(
+                                        color: primaryGreen,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           ),
-                          const SizedBox(height: 20),
-
-                          // 原题展示
-                          const Text('❓ 题目', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                          const SizedBox(height: 22),
+                          const Text(
+                            '本题回忆目标',
+                            style: TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
                           const SizedBox(height: 8),
-                          Text(currentData['question'], style: const TextStyle(color: Colors.white, fontSize: 17, height: 1.6)),
-
-                          const SizedBox(height: 32),
-
-                          // 答案与解析区域 (根据状态切换)
+                          Text(
+                            currentData['question'],
+                            style: const TextStyle(
+                              color: AppPalette.textPrimary,
+                              fontSize: 17,
+                              height: 1.7,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
                           AnimatedCrossFade(
-                            firstChild: _buildRevealButton(), // 未展开时的遮罩按钮
-                            secondChild: _buildAnswerSection(currentData), // 展开后的答案解析
-                            crossFadeState: _isAnswerRevealed ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                            duration: const Duration(milliseconds: 300),
+                            firstChild: _buildRevealButton(),
+                            secondChild: _buildAnswerSection(currentData),
+                            crossFadeState: _isAnswerRevealed
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 280),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-
-                // 底部操作区 (仅在展开答案后显示)
-                AnimatedOpacity(
-                  opacity: _isAnswerRevealed ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: IgnorePointer(
-                    ignoring: !_isAnswerRevealed,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                      child: Column(
-                        children: [
-                          const Text('根据记忆情况给这题打个分吧', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  child: _isAnswerRevealed
+                      ? Container(
+                          key: const ValueKey('feedback'),
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 26),
+                          child: Column(
                             children: [
-                              _buildFeedbackButton('忘记了', Colors.redAccent, () => _nextQuestion()),
-                              _buildFeedbackButton('有点模糊', Colors.orangeAccent, () => _nextQuestion()),
-                              _buildFeedbackButton('完全掌握', primaryGreen, () => _nextQuestion()),
+                              const Text(
+                                '这题现在的记忆状态怎么样？',
+                                style: TextStyle(
+                                  color: AppPalette.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildFeedbackButton(
+                                    '忘记了',
+                                    const Color(0xFFE17D6B),
+                                    () => _nextQuestion(),
+                                  ),
+                                  _buildFeedbackButton(
+                                    '有点模糊',
+                                    AppPalette.honeyOrange,
+                                    () => _nextQuestion(),
+                                  ),
+                                  _buildFeedbackButton(
+                                    '完全掌握',
+                                    primaryGreen,
+                                    () => _nextQuestion(),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        )
+                      : const SizedBox(height: 26, key: ValueKey('empty')),
                 ),
               ],
             ),
@@ -206,74 +310,245 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> with SingleTicker
     );
   }
 
-  // 遮罩按钮：点击查看解析
+  Widget _buildTopSummary(double progress) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    '今日计划',
+                    style: TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: const TextStyle(
+                      color: AppPalette.almondCream,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '先回忆，再看解析，让复习更像一次主动提取。',
+                style: TextStyle(
+                  color: AppPalette.textSecondary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppPalette.almondCream,
+                  ),
+                  minHeight: 8,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRevealButton() {
     return GestureDetector(
       onTap: () => setState(() => _isAnswerRevealed = true),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 32),
+        padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 18),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1), style: BorderStyle.solid),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          ),
         ),
         child: Column(
           children: [
-            Icon(Icons.visibility_rounded, color: primaryGreen, size: 32),
-            const SizedBox(height: 12),
-            const Text('点击查看回忆结果与 AI 解析', style: TextStyle(color: Colors.white70, fontSize: 15)),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: primaryGreen.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.visibility_rounded,
+                color: primaryGreen,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              '点击查看回忆结果与 AI 解析',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '先想一遍，再对照答案，会记得更牢。',
+              style: TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // 答案与解析内容区
   Widget _buildAnswerSection(Map<String, dynamic> data) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(color: Colors.white12),
-        const SizedBox(height: 16),
-        const Text('📝 当时错解', style: TextStyle(color: Colors.white54, fontSize: 14)),
-        const SizedBox(height: 8),
-        Text(data['myAnswer'], style: const TextStyle(color: Colors.white70, fontSize: 15, decoration: TextDecoration.lineThrough)),
-
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Icon(Icons.auto_awesome, color: primaryGreen, size: 18),
-            const SizedBox(width: 6),
-            const Text('知芽 AI 解析', style: TextStyle(color: Color(0xFF70A88D), fontSize: 14, fontWeight: FontWeight.bold)),
-          ],
+        Divider(color: Colors.white.withValues(alpha: 0.08)),
+        const SizedBox(height: 18),
+        const Text(
+          '你的原始回忆',
+          style: TextStyle(
+            color: AppPalette.textSecondary,
+            fontSize: 13,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: primaryGreen.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Text(data['aiAnalysis'], style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.6)),
+          child: Text(
+            data['myAnswer'],
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 15,
+              height: 1.6,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppPalette.honeyOrange, AppPalette.almondCream],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: AppPalette.night,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              '知芽 AI 解析',
+              style: TextStyle(
+                color: AppPalette.almondCream,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: primaryGreen.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: primaryGreen.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Text(
+            data['aiAnalysis'],
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 15,
+              height: 1.7,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  // 底部反馈按钮构建器
-  Widget _buildFeedbackButton(String label, Color color, VoidCallback onTap) {
+  Widget _buildFeedbackButton(
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          border: Border.all(color: color.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(12),
+          color: color.withValues(alpha: 0.14),
+          border: Border.all(color: color.withValues(alpha: 0.36)),
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmbientBlob(double size, Color color) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: color, blurRadius: 120, spreadRadius: 16),
+          ],
+        ),
       ),
     );
   }

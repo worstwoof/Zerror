@@ -1,144 +1,108 @@
 import 'package:flutter/material.dart';
+
+import '../../core/theme.dart';
 import 'edit_profile_screen.dart';
+
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.onOpenDrawer});
+
+  final VoidCallback? onOpenDrawer;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final Color primaryGreen = const Color(0xFF70A88D);
+  final Color primaryGreen = AppPalette.matchaMist;
 
   @override
   Widget build(BuildContext context) {
-    // 🌟 既然全局锁定了深色模式，直接写死深色色值，去掉冗余判断
-    final Color textColor = Colors.white;
-    final Color subTextColor = Colors.white70;
-    final Color cardColor = Colors.white12;
+    const textColor = AppPalette.textPrimary;
+    const subTextColor = AppPalette.textSecondary;
+    final cardColor = AppPalette.pastelGrey.withValues(alpha: 0.08);
 
     return Scaffold(
-      // 🌟 1. Scaffold 背景设为透明，让底下的 Stack 显露出来
       backgroundColor: Colors.transparent,
-
-      // 🌟 2. 关键属性：让 body 的内容延伸穿透到 AppBar 的背后
       extendBodyBehindAppBar: true,
-
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor),
-
-        // 🌟 新增：左上角设置侧边栏按钮
-        leading: IconButton(
-          icon: Icon(Icons.notes_rounded, color: textColor), // 使用和主页原先一样的菜单图标
-          onPressed: () {
-            // 魔法在这里：通过 context 向上寻找主页（HomeScreen）的 Scaffold 并打开它的侧边栏！
-            Scaffold.of(context).openDrawer();
-          },
+        iconTheme: const IconThemeData(color: textColor),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.notes_rounded, color: textColor),
+            onPressed: widget.onOpenDrawer,
+          ),
         ),
-
-        title: Text(
-          '个人中心',
-          style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600),
-        ),
+        title: const Text('个人中心', style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
-            icon: Icon(Icons.edit_note_rounded, color: textColor),
+            icon: const Icon(Icons.edit_note_rounded, color: textColor),
             onPressed: () {
-              // 🌟 2. 替换 TODO：执行页面跳转
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EditProfileScreen(),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()));
             },
           ),
         ],
       ),
-
-      // 🌟 3. 使用 Stack 来铺设背景和内容
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 第一层：全屏背景图 (复用你在首页用的 background_dark.png)
-          Image.asset(
-            'assets/images/auth_bg.png',
-            fit: BoxFit.cover,
+          const DecoratedBox(decoration: BoxDecoration(gradient: AppPalette.appBackground)),
+          Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppPalette.kombuGreen.withValues(alpha: 0.14),
+                  AppPalette.night.withValues(alpha: 0.72),
+                ],
+              ),
+            ),
           ),
-
-          // 第二层：微微的暗色遮罩 (可选)。为了保证前景白色文字的清晰度，加一层极淡的黑膜
-          Container(color: Colors.black.withOpacity(0.15)),
-
-          // 第三层：滑动内容区。🌟 必须套上 SafeArea，防止头像顶进刘海屏里
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // 1. 顶部用户档案区域
                   Column(
                     children: [
-                      // 🌟 1. 带有微光边框的头像放在最顶部
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          // 增加与编辑页面完全一致的半透明微光边框
-                          border: Border.all(color: Colors.white.withOpacity(0.15), width: 2),
-                          // 加一点极其微弱的阴影，让头像在复杂背景上更立体
+                          border: Border.all(color: AppPalette.almondCream.withValues(alpha: 0.35), width: 2),
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            ),
+                            BoxShadow(color: AppPalette.honeyOrange.withValues(alpha: 0.14), blurRadius: 14, spreadRadius: 2),
                           ],
                         ),
                         child: const CircleAvatar(
                           radius: 48,
                           backgroundColor: Colors.black26,
-                          backgroundImage: NetworkImage('https://picsum.photos/200'), // 你的头像占位
+                          backgroundImage: NetworkImage('https://picsum.photos/200'),
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
-                      // 🌟 2. 昵称
-                      Text(
-                        'Zander',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-                      ),
-
+                      const Text('Zander', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
                       const SizedBox(height: 4),
-
-                      // 🌟 3. ID
-                      Text(
-                        'ID: zerror_001',
-                        style: TextStyle(fontSize: 14, color: subTextColor),
-                      ),
-
+                      const Text('ID: zerror_001', style: TextStyle(fontSize: 14, color: subTextColor)),
                       const SizedBox(height: 12),
-
-                      // 🌟 4. 个性签名 (保持你原来的设计)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         decoration: BoxDecoration(
-                          color: primaryGreen.withOpacity(0.15),
+                          color: AppPalette.almondCream.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '🌱 学习就像种树，让错误再次发芽',
+                          '学习就像种树，让错误重新长出理解',
                           style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 40),
-
-                  // 2. 核心学习数据横排看板
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -148,39 +112,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
-
-                  // 3. 功能菜单列表
-                  Container(
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildMenuItem(Icons.workspace_premium_rounded, '我的成就', textColor, subTextColor, hasNotification: true),
-                        Divider(color: textColor.withOpacity(0.1), height: 1, indent: 56),
-                        _buildMenuItem(Icons.flag_circle_rounded, '学习目标设定', textColor, subTextColor),
-                        Divider(color: textColor.withOpacity(0.1), height: 1, indent: 56),
-                        _buildMenuItem(Icons.favorite_rounded, '我的收藏', textColor, subTextColor),
-                      ],
-                    ),
-                  ),
+                  _buildMenuGroup(cardColor, [
+                    _buildMenuItem(Icons.workspace_premium_rounded, '我的成就', textColor, subTextColor, hasNotification: true),
+                    Divider(color: textColor.withValues(alpha: 0.1), height: 1, indent: 56),
+                    _buildMenuItem(Icons.flag_circle_rounded, '学习目标设定', textColor, subTextColor),
+                    Divider(color: textColor.withValues(alpha: 0.1), height: 1, indent: 56),
+                    _buildMenuItem(Icons.favorite_rounded, '我的收藏', textColor, subTextColor),
+                  ]),
                   const SizedBox(height: 24),
-
-                  // 4. 第二组菜单
-                  Container(
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildMenuItem(Icons.notifications_active_rounded, '消息通知', textColor, subTextColor),
-                        Divider(color: textColor.withOpacity(0.1), height: 1, indent: 56),
-                        _buildMenuItem(Icons.security_rounded, '隐私与安全', textColor, subTextColor),
-                      ],
-                    ),
-                  ),
+                  _buildMenuGroup(cardColor, [
+                    _buildMenuItem(Icons.notifications_active_rounded, '消息通知', textColor, subTextColor),
+                    Divider(color: textColor.withValues(alpha: 0.1), height: 1, indent: 56),
+                    _buildMenuItem(Icons.security_rounded, '隐私与安全', textColor, subTextColor),
+                  ]),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -191,7 +135,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 数据统计小卡片保持不变
+  Widget _buildMenuGroup(Color cardColor, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppPalette.laurelGreen.withValues(alpha: 0.12)),
+      ),
+      child: Column(children: children),
+    );
+  }
+
   Widget _buildStatCard(String title, String value, String unit, Color cardColor, Color textColor, Color subTextColor) {
     return Expanded(
       child: Container(
@@ -200,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppPalette.laurelGreen.withValues(alpha: 0.12)),
         ),
         child: Column(
           children: [
@@ -221,7 +176,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 菜单列表项保持不变
   Widget _buildMenuItem(IconData icon, String title, Color textColor, Color subTextColor, {bool hasNotification = false}) {
     return ListTile(
       leading: Icon(icon, color: primaryGreen, size: 26),
@@ -239,9 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(Icons.arrow_forward_ios_rounded, color: subTextColor, size: 16),
         ],
       ),
-      onTap: () {
-        // TODO: 菜单点击跳转逻辑
-      },
+      onTap: () {},
     );
   }
 }
