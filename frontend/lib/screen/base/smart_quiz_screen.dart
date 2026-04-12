@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'quiz_paper_screen.dart'; // 🌟 引入刚写的试卷页
+
+import '../../core/app_state.dart';
+import '../../core/app_ui.dart';
+import '../../core/theme.dart';
+import 'quiz_paper_screen.dart';
+
 class SmartQuizScreen extends StatefulWidget {
   const SmartQuizScreen({super.key});
 
@@ -8,256 +13,292 @@ class SmartQuizScreen extends StatefulWidget {
 }
 
 class _SmartQuizScreenState extends State<SmartQuizScreen> {
-  final Color primaryGreen = const Color(0xFF70A88D);
+  final List<String> _selectedSubjects = ['全部学科'];
 
-  // 组卷配置状态
-  final List<String> _subjects = ['全部学科', '线性代数', 'Java', '数据结构', '考研政治'];
-  final List<String> _selectedSubjects = ['线性代数']; // 默认选中
+  int _questionCount = 15;
+  int _selectedStrategy = 0;
+  bool _isGenerating = false;
 
-  int _questionCount = 15; // 默认 15 题
-  int _selectedStrategy = 0; // 0: 艾宾浩斯, 1: 薄弱点突击, 2: 综合模拟
+  static const List<(String, String, IconData)> _strategies = [
+    ('抗遗忘复习', '优先抓取处于临界遗忘点的历史错题', Icons.timeline_rounded),
+    ('薄弱点突破', '集中攻克近期错误率最高的知识点', Icons.flash_on_rounded),
+    ('举一反三拓展', '围绕已有错题自动生成变式训练', Icons.hub_rounded),
+  ];
 
-  bool _isGenerating = false; // 控制 AI 生成动画状态
-
-  // 模拟 AI 组卷过程
   Future<void> _startGenerate() async {
     setState(() => _isGenerating = true);
-
-    // 模拟等待 2.5 秒
-    await Future.delayed(const Duration(milliseconds: 2500));
-
+    await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
     setState(() => _isGenerating = false);
-
-    // 🌟 修改：组卷成功后，直接用 pushReplacement 跳入试卷页
-    // (用 Replacement 是因为通常做题时按返回键不应该回到“生成中”的页面)
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => QuizPaperScreen(questionCount: _questionCount),
+        builder: (_) => QuizPaperScreen(
+          questionCount: _questionCount,
+          selectedSubjects: List<String>.from(_selectedSubjects),
+          strategyLabel: _strategies[_selectedStrategy].$1,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? const Color(0xFF1E2823) : const Color(0xFFF0F4F2);
-    final textColor = isDarkMode ? Colors.white : const Color(0xFF2C362F);
-    final cardColor = isDarkMode ? Colors.white12 : Colors.white;
+    final store = AppStateScope.of(context);
+    final subjects = ['全部学科', ...store.subjectOptions.where((item) => item != '全部')];
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor),
-        title: Text('AI 智能组卷', style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600)),
-      ),
-      body: _isGenerating
-          ? _buildGeneratingState(textColor)
-          : _buildConfigForm(textColor, cardColor),
-
-      // 底部生成按钮
-      bottomNavigationBar: _isGenerating ? null : Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: bgColor,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: _startGenerate,
-          icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-          label: const Text('开始生成专属试卷', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryGreen,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 0,
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        title: const Text(
+          'AI 智能组卷',
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
+      body: AppSurface(
+        padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
+        child: _isGenerating ? _buildGeneratingState() : _buildConfigForm(subjects),
+      ),
+      bottomNavigationBar: _isGenerating
+          ? null
+          : Container(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              decoration: BoxDecoration(
+                color: AppPalette.night.withValues(alpha: 0.94),
+                border: Border(
+                  top: BorderSide(
+                    color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: AppPrimaryButton(
+                  label: '开始生成专属试卷',
+                  icon: Icons.auto_awesome,
+                  onPressed: _startGenerate,
+                ),
+              ),
+            ),
     );
   }
 
-  // ============== 状态 1：AI 组卷加载中 ==============
-  Widget _buildGeneratingState(Color textColor) {
+  Widget _buildGeneratingState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: primaryGreen),
-          const SizedBox(height: 24),
-          Text('AI 正在调取错题档案...', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('正在根据你的遗忘曲线匹配最佳题目', style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 13)),
-        ],
+      child: AppPanel(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            CircularProgressIndicator(color: AppPalette.almondCream),
+            SizedBox(height: 24),
+            Text(
+              'AI 正在调取错题档案...',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '正在根据你的复习节奏和薄弱点匹配最合适的题目',
+              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ============== 状态 2：配置表单 ==============
-  Widget _buildConfigForm(Color textColor, Color cardColor) {
+  Widget _buildConfigForm(List<String> subjects) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 模块 1：题量配置 ---
-          Text('组卷题量', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+          const AppSectionTitle(
+            title: '组卷题量',
+            subtitle: '控制练习强度和完成时长',
+            icon: Icons.tune_rounded,
+          ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
+          AppPanel(
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('练习强度', style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 14)),
-                    Text('$_questionCount 题', style: TextStyle(color: primaryGreen, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text(
+                      '练习强度',
+                      style: TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '$_questionCount 题',
+                      style: const TextStyle(
+                        color: AppPalette.almondCream,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: primaryGreen,
-                    inactiveTrackColor: primaryGreen.withOpacity(0.2),
-                    thumbColor: primaryGreen,
-                    overlayColor: primaryGreen.withOpacity(0.1),
-                    valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                  ),
-                  child: Slider(
-                    value: _questionCount.toDouble(),
-                    min: 5,
-                    max: 50,
-                    divisions: 9,
-                    label: '$_questionCount',
-                    onChanged: (value) => setState(() => _questionCount = value.toInt()),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('快速测验', style: TextStyle(color: textColor.withOpacity(0.4), fontSize: 12)),
-                    Text('深度模拟', style: TextStyle(color: textColor.withOpacity(0.4), fontSize: 12)),
-                  ],
+                Slider(
+                  value: _questionCount.toDouble(),
+                  min: 5,
+                  max: 50,
+                  divisions: 9,
+                  activeColor: AppPalette.matchaMist,
+                  inactiveColor: AppPalette.matchaMist.withValues(alpha: 0.2),
+                  label: '$_questionCount',
+                  onChanged: (value) {
+                    setState(() => _questionCount = value.toInt());
+                  },
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
-
-          // --- 模块 2：选择学科 ---
-          Text('选择范围 (可多选)', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 28),
+          const AppSectionTitle(
+            title: '选择范围',
+            subtitle: '可以多选，也可以直接覆盖全部学科',
+            icon: Icons.category_rounded,
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: _subjects.map((subject) {
+            children: subjects.map((subject) {
               final isSelected = _selectedSubjects.contains(subject);
               return FilterChip(
                 label: Text(subject),
                 selected: isSelected,
-                selectedColor: primaryGreen.withOpacity(0.2),
-                backgroundColor: cardColor,
-                checkmarkColor: primaryGreen,
-                labelStyle: TextStyle(color: isSelected ? primaryGreen : textColor.withOpacity(0.7)),
-                side: BorderSide(color: isSelected ? primaryGreen.withOpacity(0.5) : Colors.transparent),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                selectedColor: AppPalette.matchaMist.withValues(alpha: 0.18),
+                backgroundColor: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                checkmarkColor: AppPalette.matchaMist,
+                labelStyle: TextStyle(
+                  color: isSelected ? AppPalette.matchaMist : AppPalette.textSecondary,
+                ),
+                side: BorderSide(
+                  color: isSelected
+                      ? AppPalette.matchaMist.withValues(alpha: 0.4)
+                      : Colors.transparent,
+                ),
                 onSelected: (selected) {
                   setState(() {
                     if (subject == '全部学科') {
-                      selected ? _selectedSubjects.replaceRange(0, _selectedSubjects.length, ['全部学科']) : _selectedSubjects.clear();
+                      if (selected) {
+                        _selectedSubjects
+                          ..clear()
+                          ..add('全部学科');
+                      } else {
+                        _selectedSubjects.clear();
+                      }
+                      return;
+                    }
+
+                    _selectedSubjects.remove('全部学科');
+                    if (selected) {
+                      _selectedSubjects.add(subject);
                     } else {
-                      _selectedSubjects.remove('全部学科');
-                      selected ? _selectedSubjects.add(subject) : _selectedSubjects.remove(subject);
+                      _selectedSubjects.remove(subject);
+                    }
+
+                    if (_selectedSubjects.isEmpty) {
+                      _selectedSubjects.add('全部学科');
                     }
                   });
                 },
               );
             }).toList(),
           ),
-          const SizedBox(height: 32),
-
-          // --- 模块 3：AI 组卷策略 ---
-          Text('AI 抽题策略', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          _buildStrategyCard(
-            index: 0,
-            title: '艾宾浩斯抗遗忘',
-            subtitle: '优先抽取处于“遗忘临界点”的历史错题',
-            icon: Icons.timeline_rounded,
-            textColor: textColor,
-            cardColor: cardColor,
-          ),
-          const SizedBox(height: 12),
-          _buildStrategyCard(
-            index: 1,
-            title: '高频薄弱点突击',
-            subtitle: '集中突破你近期错误率最高的知识点',
+          const SizedBox(height: 28),
+          const AppSectionTitle(
+            title: 'AI 抽题策略',
+            subtitle: '选一个更符合当前状态的出题方式',
             icon: Icons.psychology_rounded,
-            textColor: textColor,
-            cardColor: cardColor,
           ),
-          const SizedBox(height: 12),
-          _buildStrategyCard(
-            index: 2,
-            title: '举一反三拓展',
-            subtitle: 'AI 自动生成现有错题的变形题进行考核',
-            icon: Icons.hub_rounded,
-            textColor: textColor,
-            cardColor: cardColor,
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          ...List.generate(_strategies.length, (index) {
+            final item = _strategies[index];
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == _strategies.length - 1 ? 0 : 12),
+              child: _strategyCard(index, item.$1, item.$2, item.$3),
+            );
+          }),
         ],
       ),
     );
   }
 
-  // 构建单选的策略卡片
-  Widget _buildStrategyCard({
-    required int index, required String title, required String subtitle,
-    required IconData icon, required Color textColor, required Color cardColor,
-  }) {
-    final bool isSelected = _selectedStrategy == index;
-
+  Widget _strategyCard(int index, String title, String subtitle, IconData icon) {
+    final isSelected = _selectedStrategy == index;
     return InkWell(
       onTap: () => setState(() => _selectedStrategy = index),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryGreen.withOpacity(0.1) : cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? primaryGreen : Colors.transparent, width: 1.5),
-        ),
+      borderRadius: BorderRadius.circular(22),
+      child: AppPanel(
+        color: isSelected
+            ? AppPalette.matchaMist.withValues(alpha: 0.10)
+            : AppPalette.pastelGrey.withValues(alpha: 0.07),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: isSelected ? primaryGreen : textColor.withOpacity(0.05),
-                shape: BoxShape.circle,
+                color: isSelected
+                    ? AppPalette.matchaMist
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: isSelected ? Colors.white : textColor.withOpacity(0.5), size: 24),
+              child: Icon(
+                icon,
+                color: isSelected ? AppPalette.night : AppPalette.textSecondary,
+              ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(color: textColor, fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 12, height: 1.3)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
                 ],
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check_circle_rounded, color: primaryGreen, size: 24)
-            else
-              Icon(Icons.circle_outlined, color: textColor.withOpacity(0.2), size: 24),
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              color: isSelected
+                  ? AppPalette.matchaMist
+                  : AppPalette.textSecondary.withValues(alpha: 0.3),
+            ),
           ],
         ),
       ),

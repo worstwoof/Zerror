@@ -1,64 +1,42 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'quiz_result_screen.dart'; // 🌟 引入刚写的测验报告页
-class QuizPaperScreen extends StatefulWidget {
-  final int questionCount; // 接收生成的题量
 
-  const QuizPaperScreen({super.key, this.questionCount = 15});
+import 'package:flutter/material.dart';
+
+import '../../core/theme.dart';
+import 'quiz_result_screen.dart';
+
+class QuizPaperScreen extends StatefulWidget {
+  const QuizPaperScreen({
+    super.key,
+    this.questionCount = 15,
+    this.selectedSubjects = const [],
+    this.strategyLabel = '抗遗忘复习',
+  });
+
+  final int questionCount;
+  final List<String> selectedSubjects;
+  final String strategyLabel;
 
   @override
   State<QuizPaperScreen> createState() => _QuizPaperScreenState();
 }
 
 class _QuizPaperScreenState extends State<QuizPaperScreen> {
-  final Color primaryGreen = const Color(0xFF70A88D);
+  late final PageController _pageController;
+  final Map<int, dynamic> _userAnswers = {};
+  final Set<int> _markedQuestions = {};
 
-  late PageController _pageController;
-  int _currentIndex = 0;
-
-  // 计时器相关
   Timer? _timer;
+  int _currentIndex = 0;
   int _secondsElapsed = 0;
-
-  // 用户答题数据状态
-  final Map<int, dynamic> _userAnswers = {}; // 存储每题的答案
-  final Set<int> _markedQuestions = {}; // 存储被“标记存疑”的题号
-
-  // 模拟 AI 生成的考卷数据
-  late List<Map<String, dynamic>> _mockQuestions;
+  late List<Map<String, dynamic>> _questions;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _questions = _buildQuestions();
     _startTimer();
-
-    // 初始化模拟试卷数据 (包含选择题和简答题)
-    _mockQuestions = [
-      {
-        'type': '单选题', 'subject': '线性代数',
-        'content': '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。A 的伴随矩阵 A* 的特征值是？',
-        'options': ['λ1, λ2, λ3', '1/λ1, 1/λ2, 1/λ3', '|A|/λ1, |A|/λ2, |A|/λ3', '|A|λ1, |A|λ2, |A|λ3'],
-        'answerType': 'choice'
-      },
-      {
-        'type': '简答题', 'subject': '数据结构',
-        'content': '在 C++ 中编写 KMP 模式匹配算法时，请简述 next 数组的作用，以及当发生失配时，模式串指针 j 的回溯逻辑是什么？',
-        'answerType': 'text'
-      },
-      {
-        'type': '代码题', 'subject': 'Java',
-        'content': '在 3D 彩票模拟系统中，如何使用 Interface（接口）实现不同的抽奖策略？请写出核心接口和实现类的结构设计。',
-        'answerType': 'text'
-      },
-      // 模拟凑够传入的题量
-      ...List.generate(widget.questionCount - 3, (index) => {
-        'type': '判断题', 'subject': '综合考察',
-        'content': '这是 AI 生成的第 ${index + 4} 道拓展变形题，用于巩固你的薄弱环节。',
-        'options': ['正确', '错误'],
-        'answerType': 'choice'
-      })
-    ];
   }
 
   @override
@@ -68,48 +46,122 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     super.dispose();
   }
 
+  List<Map<String, dynamic>> _buildQuestions() {
+    final selected = widget.selectedSubjects.where((item) => item != '全部学科').toList();
+    final primarySubject = selected.isNotEmpty ? selected.first : '线性代数';
+
+    final base = <Map<String, dynamic>>[
+      {
+        'type': '单选题',
+        'subject': primarySubject,
+        'topic': '矩阵特征值与相似对角化',
+        'content': '设矩阵 A 的特征值为 λ1、λ2、λ3，且 A 可逆。A 的伴随矩阵 A* 的特征值应为哪一组？',
+        'options': ['λ1, λ2, λ3', '1/λ1, 1/λ2, 1/λ3', '|A|/λ1, |A|/λ2, |A|/λ3', '|A|λ1, |A|λ2, |A|λ3'],
+        'correctIndex': 2,
+        'correctAnswer': '|A|/λ1, |A|/λ2, |A|/λ3',
+        'reasonHint': '伴随矩阵与逆矩阵关系没串起来',
+        'analysisHint': '先写出 A* = |A|A^-1，再把 A^-1 的特征值 1/λi 代进去。',
+        'answerType': 'choice',
+      },
+      {
+        'type': '简答题',
+        'subject': '数据结构',
+        'topic': 'KMP next 数组构造',
+        'content': '在 KMP 算法中，next 数组的作用是什么？失配后为什么能直接跳转？',
+        'correctAnswer': 'next 数组记录最长相等前后缀长度，失配后跳到对应前缀位置继续比较。',
+        'keywords': ['前后缀', '跳转', 'next'],
+        'reasonHint': '边界条件和跳转逻辑不够稳',
+        'analysisHint': '记住 next 的本质是最长相等前后缀长度，跳转不是凭空跳，而是利用已知相等部分。',
+        'answerType': 'text',
+      },
+      {
+        'type': '代码题',
+        'subject': 'Java',
+        'topic': '策略模式与接口抽象',
+        'content': '如何用接口把不同业务策略统一调度，避免 if-else 分支不断膨胀？',
+        'correctAnswer': '抽象策略接口，由具体实现承载不同规则，上下文只依赖接口完成调用。',
+        'keywords': ['接口', '策略', '上下文'],
+        'reasonHint': '抽象层次和职责边界不够清晰',
+        'analysisHint': '重点不是写出某个类名，而是先拆出策略接口，再让调用方只依赖接口。',
+        'answerType': 'text',
+      },
+    ];
+
+    final extras = List.generate(
+      (widget.questionCount - base.length).clamp(0, 100),
+      (index) => <String, dynamic>{
+        'type': '判断题',
+        'subject': selected.isNotEmpty ? selected[index % selected.length] : '综合考察',
+        'topic': '错题迁移训练',
+        'content': '这是基于「${widget.strategyLabel}」自动生成的第 ${index + 4} 道变式练习，用来继续回收你的薄弱点。',
+        'options': ['正确', '错误'],
+        'correctIndex': index.isEven ? 0 : 1,
+        'correctAnswer': index.isEven ? '正确' : '错误',
+        'reasonHint': '对变式题的判断还不够稳定',
+        'analysisHint': '这类题重点看你能不能把原错题中的结论迁移到新表述里。',
+        'answerType': 'choice',
+      },
+    );
+
+    return [...base, ...extras];
+  }
+
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) setState(() => _secondsElapsed++);
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _secondsElapsed++);
+      }
     });
   }
 
   String _formatTime(int seconds) {
-    final int m = seconds ~/ 60;
-    final int s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    final minutes = seconds ~/ 60;
+    final remain = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remain.toString().padLeft(2, '0')}';
   }
 
-// 提交交卷
   void _submitPaper() {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E2823) : Colors.white,
-        title: const Text('确认交卷？'),
-        content: Text('你已作答 ${_userAnswers.length}/${_mockQuestions.length} 题，耗时 ${_formatTime(_secondsElapsed)}。'),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppPalette.kombuGreen,
+        title: const Text(
+          '确认交卷？',
+          style: TextStyle(color: AppPalette.textPrimary),
+        ),
+        content: Text(
+          '你已作答 ${_userAnswers.length}/${_questions.length} 题，用时 ${_formatTime(_secondsElapsed)}。',
+          style: const TextStyle(color: AppPalette.textSecondary),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('继续答题', style: TextStyle(color: primaryGreen))
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              '继续答题',
+              style: TextStyle(color: AppPalette.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // 1. 关闭这个确认弹窗
-
-              // 🌟 2. 核心修改：将当前的“试卷页”替换为“成绩报告页”，并把数据传过去
+              Navigator.pop(dialogContext);
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => QuizResultScreen(
-                    totalQuestions: _mockQuestions.length,
+                  builder: (_) => QuizResultScreen(
+                    totalQuestions: _questions.length,
                     answeredCount: _userAnswers.length,
                     timeSpent: _formatTime(_secondsElapsed),
+                    questions: _questions,
+                    userAnswers: Map<int, dynamic>.from(_userAnswers),
+                    strategyLabel: widget.strategyLabel,
                   ),
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppPalette.almondCream,
+              foregroundColor: AppPalette.night,
+            ),
             child: const Text('确认交卷'),
           ),
         ],
@@ -119,95 +171,139 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? const Color(0xFF161E1A) : const Color(0xFFF8FAF9);
-    final textColor = isDarkMode ? Colors.white : const Color(0xFF2C362F);
-
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: AppPalette.night,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor),
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
         title: Column(
           children: [
-            Text('智能组卷测验', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              '智能组卷测验',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(_formatTime(_secondsElapsed), style: TextStyle(color: primaryGreen, fontSize: 13, fontFamily: 'monospace')),
+            Text(
+              _formatTime(_secondsElapsed),
+              style: const TextStyle(
+                color: AppPalette.almondCream,
+                fontSize: 13,
+                fontFamily: 'monospace',
+              ),
+            ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: _submitPaper,
-            child: Text('交卷', style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 16)),
+            child: const Text(
+              '交卷',
+              style: TextStyle(
+                color: AppPalette.almondCream,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // 顶部答题卡进度条
-          _buildQuestionNavigator(textColor),
-
-          // 核心答题区 (支持左右滑动)
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _mockQuestions.length,
-              onPageChanged: (index) => setState(() => _currentIndex = index),
-              itemBuilder: (context, index) {
-                return _buildQuestionCard(_mockQuestions[index], index, textColor, isDarkMode);
-              },
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: AppPalette.appBackground),
             ),
           ),
-
-          // 底部控制栏
-          _buildBottomBar(textColor, isDarkMode),
+          Positioned.fill(
+            child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
+          ),
+          Positioned.fill(
+            child: Container(color: AppPalette.night.withValues(alpha: 0.72)),
+          ),
+          Column(
+            children: [
+              _buildQuestionNavigator(),
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _questions.length,
+                  onPageChanged: (index) => setState(() => _currentIndex = index),
+                  itemBuilder: (context, index) {
+                    return _buildQuestionCard(_questions[index], index);
+                  },
+                ),
+              ),
+              _buildBottomBar(),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  // ================= 组件：顶部答题导航 =================
-  Widget _buildQuestionNavigator(Color textColor) {
+  Widget _buildQuestionNavigator() {
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _mockQuestions.length,
+        itemCount: _questions.length,
         itemBuilder: (context, index) {
           final isCurrent = _currentIndex == index;
           final isAnswered = _userAnswers.containsKey(index);
           final isMarked = _markedQuestions.contains(index);
 
           Color bubbleColor = Colors.transparent;
-          Color txtColor = textColor.withValues(alpha: 0.5);
-          Border? border = Border.all(color: textColor.withValues(alpha: 0.1));
+          Color textColor = AppPalette.textSecondary;
+          Border? border = Border.all(
+            color: Colors.white.withValues(alpha: 0.10),
+          );
 
           if (isCurrent) {
-            bubbleColor = primaryGreen;
-            txtColor = Colors.white;
+            bubbleColor = AppPalette.matchaMist;
+            textColor = AppPalette.night;
             border = null;
           } else if (isMarked) {
-            bubbleColor = Colors.orange.withValues(alpha: 0.2);
-            txtColor = Colors.orange;
-            border = Border.all(color: Colors.orange);
+            bubbleColor = AppPalette.honeyOrange.withValues(alpha: 0.20);
+            textColor = AppPalette.honeyOrange;
+            border = Border.all(color: AppPalette.honeyOrange);
           } else if (isAnswered) {
-            bubbleColor = primaryGreen.withValues(alpha: 0.2);
-            txtColor = primaryGreen;
-            border = Border.all(color: primaryGreen.withValues(alpha: 0.5));
+            bubbleColor = AppPalette.matchaMist.withValues(alpha: 0.18);
+            textColor = AppPalette.matchaMist;
+            border = Border.all(
+              color: AppPalette.matchaMist.withValues(alpha: 0.40),
+            );
           }
 
           return GestureDetector(
-            onTap: () => _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+            onTap: () => _pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            ),
             child: Container(
               width: 40,
               margin: const EdgeInsets.only(right: 8),
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: bubbleColor, shape: BoxShape.circle, border: border),
-              child: Text('${index + 1}', style: TextStyle(color: txtColor, fontWeight: FontWeight.bold)),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                shape: BoxShape.circle,
+                border: border,
+              ),
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           );
         },
@@ -215,9 +311,8 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     );
   }
 
-  // ================= 组件：单道题的渲染卡片 =================
-  Widget _buildQuestionCard(Map<String, dynamic> question, int index, Color textColor, bool isDarkMode) {
-    final cardColor = isDarkMode ? const Color(0xFF1E2823) : Colors.white;
+  Widget _buildQuestionCard(Map<String, dynamic> question, int index) {
+    final cardColor = AppPalette.kombuGreen.withValues(alpha: 0.88);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -225,57 +320,59 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 5))],
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 题目标签
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(6)),
-                  child: Text(question['type'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppPalette.matchaMist,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    question['type'] as String,
+                    style: const TextStyle(
+                      color: AppPalette.night,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
-                Text(question['subject'], style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 13)),
+                Expanded(
+                  child: Text(
+                    '${question['subject']} · ${question['topic']}',
+                    style: const TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),
-
-            // 题目正文
-            Text(question['content'], style: TextStyle(color: textColor, fontSize: 17, height: 1.6, fontWeight: FontWeight.w500)),
+            Text(
+              question['content'] as String,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 17,
+                height: 1.6,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             const SizedBox(height: 32),
-
-            // 答题区 (根据题目类型动态渲染)
             if (question['answerType'] == 'choice')
-              ...List.generate((question['options'] as List).length, (optIndex) {
-                final optionText = question['options'][optIndex];
-                final isSelected = _userAnswers[index] == optIndex;
-                final prefixes = ['A', 'B', 'C', 'D'];
-
-                return InkWell(
-                  onTap: () => setState(() => _userAnswers[index] = optIndex),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? primaryGreen.withValues(alpha: 0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isSelected ? primaryGreen : textColor.withValues(alpha: 0.1), width: isSelected ? 2 : 1),
-                    ),
-                    child: Row(
-                      children: [
-                        Text('${prefixes[optIndex]}.  ', style: TextStyle(color: isSelected ? primaryGreen : textColor.withValues(alpha: 0.5), fontSize: 16, fontWeight: FontWeight.bold)),
-                        Expanded(child: Text(optionText, style: TextStyle(color: textColor, fontSize: 15))),
-                      ],
-                    ),
-                  ),
-                );
-              })
+              ..._buildChoiceOptions(question, index)
             else
               TextField(
                 maxLines: 8,
@@ -288,14 +385,22 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                     }
                   });
                 },
-                controller: TextEditingController(text: _userAnswers[index] ?? ''),
-                style: TextStyle(color: textColor, fontSize: 15, height: 1.5),
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 15,
+                  height: 1.5,
+                ),
                 decoration: InputDecoration(
-                  hintText: '点击此处输入你的推导过程或笔记 (支持 LaTeX 语法)...\n例如: f(x) = \\int_{0}^{x} t dt',
-                  hintStyle: TextStyle(color: textColor.withValues(alpha: 0.3)),
+                  hintText: '点击此处输入你的推导过程或笔记...',
+                  hintStyle: TextStyle(
+                    color: AppPalette.textSecondary.withValues(alpha: 0.50),
+                  ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  fillColor: Colors.white.withValues(alpha: 0.04),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
           ],
@@ -304,41 +409,127 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     );
   }
 
-  // ================= 组件：底部控制栏 =================
-  Widget _buildBottomBar(Color textColor, bool isDarkMode) {
-    final bool isMarked = _markedQuestions.contains(_currentIndex);
+  List<Widget> _buildChoiceOptions(Map<String, dynamic> question, int index) {
+    final options = (question['options'] as List<dynamic>).cast<String>();
+    const prefixes = ['A', 'B', 'C', 'D'];
+
+    return List.generate(options.length, (optIndex) {
+      final optionText = options[optIndex];
+      final isSelected = _userAnswers[index] == optIndex;
+
+      return InkWell(
+        onTap: () => setState(() => _userAnswers[index] = optIndex),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppPalette.matchaMist.withValues(alpha: 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected
+                  ? AppPalette.matchaMist
+                  : Colors.white.withValues(alpha: 0.10),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(
+                '${prefixes[optIndex]}.  ',
+                style: TextStyle(
+                  color: isSelected
+                      ? AppPalette.matchaMist
+                      : AppPalette.textSecondary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  optionText,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildBottomBar() {
+    final isMarked = _markedQuestions.contains(_currentIndex);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E2823) : Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        color: AppPalette.night.withValues(alpha: 0.94),
+        border: Border(
+          top: BorderSide(
+            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          ),
+        ),
       ),
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 上一题
             IconButton(
-              onPressed: _currentIndex > 0 ? () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut) : null,
-              icon: Icon(Icons.arrow_back_ios_rounded, color: _currentIndex > 0 ? textColor : textColor.withValues(alpha: 0.2)),
+              onPressed: _currentIndex > 0
+                  ? () => _pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      )
+                  : null,
+              icon: Icon(
+                Icons.arrow_back_ios_rounded,
+                color: _currentIndex > 0
+                    ? AppPalette.textPrimary
+                    : AppPalette.textSecondary.withValues(alpha: 0.3),
+              ),
             ),
-
-            // 标记存疑按钮
             TextButton.icon(
               onPressed: () {
                 setState(() {
-                  isMarked ? _markedQuestions.remove(_currentIndex) : _markedQuestions.add(_currentIndex);
+                  if (isMarked) {
+                    _markedQuestions.remove(_currentIndex);
+                  } else {
+                    _markedQuestions.add(_currentIndex);
+                  }
                 });
               },
-              icon: Icon(isMarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, color: isMarked ? Colors.orange : textColor.withValues(alpha: 0.5)),
-              label: Text(isMarked ? '已存疑' : '标记存疑', style: TextStyle(color: isMarked ? Colors.orange : textColor.withValues(alpha: 0.5))),
+              icon: Icon(
+                isMarked
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                color: isMarked ? AppPalette.honeyOrange : AppPalette.textSecondary,
+              ),
+              label: Text(
+                isMarked ? '已存疑' : '标记存疑',
+                style: TextStyle(
+                  color: isMarked ? AppPalette.honeyOrange : AppPalette.textSecondary,
+                ),
+              ),
             ),
-
-            // 下一题
             IconButton(
-              onPressed: _currentIndex < _mockQuestions.length - 1 ? () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut) : null,
-              icon: Icon(Icons.arrow_forward_ios_rounded, color: _currentIndex < _mockQuestions.length - 1 ? textColor : textColor.withValues(alpha: 0.2)),
+              onPressed: _currentIndex < _questions.length - 1
+                  ? () => _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      )
+                  : null,
+              icon: Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: _currentIndex < _questions.length - 1
+                    ? AppPalette.textPrimary
+                    : AppPalette.textSecondary.withValues(alpha: 0.3),
+              ),
             ),
           ],
         ),

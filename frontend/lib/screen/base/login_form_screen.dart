@@ -170,12 +170,12 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
                         width: double.infinity,
                         height: 56,
                         decoration: BoxDecoration(
-                          gradient: AppPalette.heroGradient,
+                          color: AppPalette.almondCream,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: AppPalette.honeyOrange.withValues(alpha: 0.24),
-                              blurRadius: 16,
+                              color: AppPalette.almondCream.withValues(alpha: 0.18),
+                              blurRadius: 14,
                               offset: const Offset(0, 6),
                             ),
                           ],

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
 import '../../core/theme.dart';
 import 'advanced_challenge_screen.dart';
 import 'final_exam_screen.dart';
@@ -19,7 +20,6 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
   final Color bgDark = AppPalette.night;
   final Color primaryGreen = AppPalette.matchaMist;
   final Color cardBg = AppPalette.kombuGreen;
-  final Color currentTextColor = AppPalette.textPrimary;
   final Color currentSubTextColor = AppPalette.textSecondary;
 
   int _currentActiveLevel = 1;
@@ -59,6 +59,11 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final store = AppStateScope.of(context);
+    final focusSubject =
+        store.weakestSubject == '暂无' ? '综合复盘' : store.weakestSubject;
+    final focusTopic = store.weakestTopic;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
@@ -129,9 +134,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeroSummary(),
+                  _buildHeroSummary(store, focusSubject, focusTopic),
                   const SizedBox(height: 28),
-                  _buildAiDiagnosisCard(),
+                  _buildAiDiagnosisCard(store, focusSubject, focusTopic),
                   const SizedBox(height: 36),
                   Row(
                     children: [
@@ -162,7 +167,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            '按阶段推进，逐步从概念到综合应用',
+                            '按阶段推进，逐步从回忆到综合应用',
                             style: TextStyle(
                               color: AppPalette.textSecondary,
                               fontSize: 12,
@@ -175,26 +180,26 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                   const SizedBox(height: 22),
                   _buildPracticeNode(
                     level: 1,
-                    title: '概念扫盲：什么是特征值？',
-                    subtitle: '3 分钟动画讲解 + 2 道概念判断题，先把基础概念讲透。',
+                    title: '概念回温：重新讲透「$focusTopic」',
+                    subtitle: '先用短讲解和判断题，把最容易混淆的定义重新压实。',
                     icon: Icons.play_circle_fill_rounded,
                   ),
                   _buildPracticeNode(
                     level: 2,
-                    title: '基础演练：特征多项式计算',
-                    subtitle: '5 道针对性练习，专治展开顺序和计算粗心。',
+                    title: '基础演练：围绕 $focusSubject 补 5 题',
+                    subtitle: '把失分最高的计算或推理步骤单独拆开，先把手感找回来。',
                     icon: Icons.edit_document,
                   ),
                   _buildPracticeNode(
                     level: 3,
-                    title: '进阶挑战：伴随矩阵与特征值',
-                    subtitle: '3 道综合题，把多个知识点真正串起来。',
+                    title: '变式挑战：跨题型迁移到综合题',
+                    subtitle: '让你把同一考点从熟悉题迁移到新题里，避免只会做原题。',
                     icon: Icons.workspace_premium_rounded,
                   ),
                   _buildPracticeNode(
                     level: 4,
-                    title: '终极测试：线性代数综合卷',
-                    subtitle: '全真模拟检验这轮训练的最终效果。',
+                    title: '收尾检测：用一组小卷确认掌握度',
+                    subtitle: '最后用限时检测验证这轮训练是否真正把错误回收掉。',
                     icon: Icons.flag_rounded,
                     isLast: true,
                   ),
@@ -254,7 +259,11 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     );
   }
 
-  Widget _buildHeroSummary() {
+  Widget _buildHeroSummary(
+    AppStore store,
+    String focusSubject,
+    String focusTopic,
+  ) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
@@ -267,7 +276,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
               end: Alignment.bottomRight,
               colors: [
                 AppPalette.pineGreen.withValues(alpha: 0.92),
-                AppPalette.kombuGreen.withValues(alpha: 0.9),
+                AppPalette.kombuGreen.withValues(alpha: 0.90),
               ],
             ),
             borderRadius: BorderRadius.circular(28),
@@ -299,9 +308,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  const Text(
-                    '当前进度 1 / 4',
-                    style: TextStyle(
+                  Text(
+                    '当前进度 $_currentActiveLevel / 4',
+                    style: const TextStyle(
                       color: AppPalette.textSecondary,
                       fontSize: 12,
                     ),
@@ -309,9 +318,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 ],
               ),
               const SizedBox(height: 18),
-              const Text(
-                '这次我们不刷题海，\n只精准攻克真正拖分的点。',
-                style: TextStyle(
+              Text(
+                '这次先攻克「$focusSubject」里的关键断点。',
+                style: const TextStyle(
                   color: AppPalette.textPrimary,
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -319,9 +328,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                '围绕「矩阵特征值」拆成 4 个短关卡，让你每一步都知道在解决什么问题。',
-                style: TextStyle(
+              Text(
+                '当前有 ${store.weakestSubjectPendingCount} 道待复习错题集中在这个模块，其中「$focusTopic」占了 ${store.weakestTopicPendingCount} 道。我们先把最影响正确率的环节拆开处理。',
+                style: const TextStyle(
                   color: AppPalette.textSecondary,
                   fontSize: 14,
                   height: 1.6,
@@ -334,14 +343,18 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     );
   }
 
-  Widget _buildAiDiagnosisCard() {
+  Widget _buildAiDiagnosisCard(
+    AppStore store,
+    String focusSubject,
+    String focusTopic,
+  ) {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: AppPalette.pastelGrey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.1),
+          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
         ),
       ),
       child: Column(
@@ -366,11 +379,11 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       '知芽 AI 诊断',
                       style: TextStyle(
                         color: AppPalette.textPrimary,
@@ -378,10 +391,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '目标靶向：线性代数 - 矩阵特征值',
-                      style: TextStyle(
+                      '目标指向：$focusSubject · $focusTopic',
+                      style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 13,
                       ),
@@ -392,9 +405,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
             ],
           ),
           const SizedBox(height: 18),
-          const Text(
-            '过去两周的 12 道相关错题里，你在特征多项式展开和代数变形上失分最多。我们把训练压缩成 4 段短流程，优先补掉最影响正确率的计算环节。',
-            style: TextStyle(
+          Text(
+            '过去一轮错题里，你在「$focusTopic」上的丢分最集中。我们把训练压缩成 4 段短流程，先清概念，再补计算和迁移应用，让错因从“会看不会做”变成“看见就能拆”。',
+            style: const TextStyle(
               color: AppPalette.textPrimary,
               fontSize: 14,
               height: 1.65,
@@ -404,10 +417,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: const [
-              _InsightChip(label: '错因集中在展开顺序'),
-              _InsightChip(label: '综合题迁移不稳定'),
-              _InsightChip(label: '建议先补概念再强化'),
+            children: [
+              _InsightChip(label: '薄弱模块：$focusSubject'),
+              _InsightChip(label: '核心考点：$focusTopic'),
+              _InsightChip(label: '待回收：${store.weakestSubjectPendingCount} 道'),
             ],
           ),
         ],
@@ -422,17 +435,17 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     required IconData icon,
     bool isLast = false,
   }) {
-    final bool isCompleted = level < _currentActiveLevel;
-    final bool isActive = level == _currentActiveLevel;
-    final bool isLocked = level > _currentActiveLevel;
+    final isCompleted = level < _currentActiveLevel;
+    final isActive = level == _currentActiveLevel;
+    final isLocked = level > _currentActiveLevel;
 
-    final Color nodeColor = isCompleted
+    final nodeColor = isCompleted
         ? AppPalette.almondCream
         : (isActive ? primaryGreen : Colors.white.withValues(alpha: 0.18));
-    final Color cardColor = isActive
+    final cardColor = isActive
         ? primaryGreen.withValues(alpha: 0.12)
         : AppPalette.pastelGrey.withValues(alpha: 0.05);
-    final Color textColor = isLocked
+    final textColor = isLocked
         ? AppPalette.textSecondary.withValues(alpha: 0.5)
         : AppPalette.textPrimary;
 
@@ -450,7 +463,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                       ? AppPalette.almondCream
                       : isActive
                           ? primaryGreen.withValues(alpha: 0.18)
-                          : cardBg.withValues(alpha: 0.9),
+                          : cardBg.withValues(alpha: 0.90),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: nodeColor,
@@ -599,17 +612,17 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     required bool isActive,
     required bool isLocked,
   }) {
-    final String label = isCompleted
+    final label = isCompleted
         ? '已完成'
         : isActive
             ? '进行中'
             : '未解锁';
-    final Color bgColor = isCompleted
+    final bgColor = isCompleted
         ? AppPalette.almondCream.withValues(alpha: 0.18)
         : isActive
             ? primaryGreen.withValues(alpha: 0.18)
             : Colors.white.withValues(alpha: 0.06);
-    final Color textColor = isCompleted
+    final textColor = isCompleted
         ? AppPalette.almondCream
         : isActive
             ? primaryGreen

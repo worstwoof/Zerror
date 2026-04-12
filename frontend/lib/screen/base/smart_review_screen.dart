@@ -2,7 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
 import '../../core/theme.dart';
+import 'learning_plan_screen.dart';
+import 'weakness_practice_screen.dart';
 
 class SmartReviewScreen extends StatefulWidget {
   const SmartReviewScreen({super.key});
@@ -18,40 +21,29 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
   int _currentIndex = 0;
   bool _isAnswerRevealed = false;
 
-  final List<Map<String, dynamic>> _reviewList = [
-    {
-      'tags': ['线性代数', '矩阵特征值', '一轮复习'],
-      'question':
-          '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。求证：A 的伴随矩阵 A* 的特征值为 |A|/λi。',
-      'myAnswer': 'A* = A^(-1) * |A|，然后我就不会往下推了。',
-      'aiAnalysis':
-          '关键是把伴随矩阵和逆矩阵联系起来。因为 A 可逆，所以 A* = |A|A^-1。若 A 的特征值为 λ，则 A^-1 的特征值为 1/λ，因此 A* 的特征值就是 |A|/λ。',
-    },
-    {
-      'tags': ['离散数学', '图论', '二轮复习'],
-      'question': '什么是欧拉回路？一个无向连通图具有欧拉回路的充要条件是什么？',
-      'myAnswer': '经过所有边一次且仅一次的回路。条件是所有顶点的度数都是偶数。',
-      'aiAnalysis':
-          '你的结论基本正确。更完整地说：无向连通图存在欧拉回路，当且仅当图连通且所有顶点度数都为偶数。要注意区分欧拉路径与欧拉回路。',
-    },
-  ];
+  void _handleFeedback(
+    AppStore store,
+    ErrorRecord item,
+    ReviewFeedback feedback,
+  ) {
+    store.applyReviewFeedback(item.id, feedback);
 
-  void _nextQuestion() {
-    if (_currentIndex < _reviewList.length - 1) {
+    if (_currentIndex < store.smartReviewQueue.length - 1) {
       setState(() {
         _currentIndex++;
         _isAnswerRevealed = false;
       });
-    } else {
-      _showCompletionDialog();
+      return;
     }
+
+    _showCompletionDialog();
   }
 
   void _showCompletionDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Icon(
@@ -60,7 +52,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
           size: 48,
         ),
         content: const Text(
-          '今天的重点复习已经完成。\n这轮错题已经重新巩固过一遍了。',
+          '今天的重点复习已经完成。这轮错题已经重新巩固过一遍了。',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppPalette.textPrimary,
@@ -69,26 +61,60 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
           ),
         ),
         actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppPalette.almondCream,
-                foregroundColor: AppPalette.night,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppPalette.almondCream,
+                    foregroundColor: AppPalette.night,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const WeaknessPracticeScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    '继续攻克薄弱点',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text(
-                '返回首页',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppPalette.textPrimary,
+                    side: BorderSide(
+                      color: AppPalette.pastelGrey.withValues(alpha: 0.18),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const LearningPlanScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('回到学习计划'),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -97,8 +123,29 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentData = _reviewList[_currentIndex];
-    final progress = (_currentIndex + 1) / _reviewList.length;
+    final store = AppStateScope.of(context);
+    final reviewList = store.smartReviewQueue;
+
+    if (reviewList.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppPalette.night,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+          title: const Text('今日智能复习'),
+        ),
+        body: const Center(
+          child: Text(
+            '当前没有待复习错题',
+            style: TextStyle(color: AppPalette.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    final current = reviewList[_currentIndex.clamp(0, reviewList.length - 1)];
+    final progress = (_currentIndex + 1) / reviewList.length;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -122,7 +169,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${_currentIndex + 1} / ${_reviewList.length}',
+              '${_currentIndex + 1} / ${reviewList.length}',
               style: TextStyle(
                 color: AppPalette.textSecondary.withValues(alpha: 0.8),
                 fontSize: 12,
@@ -131,6 +178,39 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
           ],
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(
+              current.isFavorite
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: current.isFavorite
+                  ? AppPalette.almondCream
+                  : AppPalette.textPrimary,
+            ),
+            onPressed: () {
+              final wasFavorite = current.isFavorite;
+              store.toggleFavorite(current.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(wasFavorite ? '已取消收藏' : '已加入我的收藏'),
+                  duration: const Duration(milliseconds: 1200),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: AppPalette.textPrimary),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('已生成这道错题的复盘分享卡片'),
+                  duration: Duration(milliseconds: 1200),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -144,14 +224,11 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
           ),
           Positioned.fill(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0x28324A36),
-                    Color(0xCC171712),
-                  ],
+                  colors: [Color(0x28324A36), Color(0xCC171712)],
                 ),
               ),
             ),
@@ -177,7 +254,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                  child: _buildTopSummary(progress),
+                  child: _buildTopSummary(progress, reviewList.length),
                 ),
                 Expanded(
                   child: SingleChildScrollView(
@@ -206,28 +283,26 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: (currentData['tags'] as List<String>)
-                                .map(
-                                  (tag) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: primaryGreen.withValues(alpha: 0.14),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      tag,
-                                      style: TextStyle(
-                                        color: primaryGreen,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                            children: current.tags.map((tag) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: primaryGreen.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    color: primaryGreen,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                )
-                                .toList(),
+                                ),
+                              );
+                            }).toList(),
                           ),
                           const SizedBox(height: 22),
                           const Text(
@@ -239,7 +314,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            currentData['question'],
+                            current.question,
                             style: const TextStyle(
                               color: AppPalette.textPrimary,
                               fontSize: 17,
@@ -250,7 +325,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                           const SizedBox(height: 28),
                           AnimatedCrossFade(
                             firstChild: _buildRevealButton(),
-                            secondChild: _buildAnswerSection(currentData),
+                            secondChild: _buildAnswerSection(current),
                             crossFadeState: _isAnswerRevealed
                                 ? CrossFadeState.showSecond
                                 : CrossFadeState.showFirst,
@@ -278,29 +353,43 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                               ),
                               const SizedBox(height: 16),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: [
                                   _buildFeedbackButton(
                                     '忘记了',
                                     const Color(0xFFE17D6B),
-                                    () => _nextQuestion(),
+                                    () => _handleFeedback(
+                                      store,
+                                      current,
+                                      ReviewFeedback.forgot,
+                                    ),
                                   ),
                                   _buildFeedbackButton(
                                     '有点模糊',
                                     AppPalette.honeyOrange,
-                                    () => _nextQuestion(),
+                                    () => _handleFeedback(
+                                      store,
+                                      current,
+                                      ReviewFeedback.fuzzy,
+                                    ),
                                   ),
                                   _buildFeedbackButton(
                                     '完全掌握',
                                     primaryGreen,
-                                    () => _nextQuestion(),
+                                    () => _handleFeedback(
+                                      store,
+                                      current,
+                                      ReviewFeedback.mastered,
+                                    ),
                                   ),
                                 ],
                               ),
                             ],
                           ),
                         )
-                      : const SizedBox(height: 26, key: ValueKey('empty')),
+                      : const SizedBox(
+                          height: 26,
+                          key: ValueKey('empty'),
+                        ),
                 ),
               ],
             ),
@@ -310,7 +399,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
     );
   }
 
-  Widget _buildTopSummary(double progress) {
+  Widget _buildTopSummary(double progress, int totalCount) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
@@ -349,9 +438,9 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
-                '先回忆，再看解析，让复习更像一次主动提取。',
-                style: TextStyle(
+              Text(
+                '当前还有 $totalCount 道重点错题等待巩固，先回忆，再看解析。',
+                style: const TextStyle(
                   color: AppPalette.textSecondary,
                   fontSize: 13,
                   height: 1.5,
@@ -406,7 +495,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
             ),
             const SizedBox(height: 14),
             const Text(
-              '点击查看回忆结果与 AI 解析',
+              '点击查看回忆结果和 AI 解析',
               style: TextStyle(
                 color: AppPalette.textPrimary,
                 fontSize: 15,
@@ -415,10 +504,11 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              '先想一遍，再对照答案，会记得更牢。',
+              '先想一遍，再对照答案，记忆会更牢。',
               style: TextStyle(
                 color: AppPalette.textSecondary,
-                fontSize: 12,
+                fontSize: 13,
+                height: 1.5,
               ),
             ),
           ],
@@ -427,88 +517,60 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
     );
   }
 
-  Widget _buildAnswerSection(Map<String, dynamic> data) {
+  Widget _buildAnswerSection(ErrorRecord current) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Divider(color: Colors.white.withValues(alpha: 0.08)),
-        const SizedBox(height: 18),
-        const Text(
-          '你的原始回忆',
-          style: TextStyle(
-            color: AppPalette.textSecondary,
-            fontSize: 13,
-          ),
+        _infoBlock(
+          title: '我的回忆',
+          content: current.myAnswer,
+          tint: AppPalette.honeyOrange.withValues(alpha: 0.12),
         ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            data['myAnswer'],
-            style: const TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 15,
-              height: 1.6,
-              decoration: TextDecoration.lineThrough,
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppPalette.honeyOrange, AppPalette.almondCream],
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: AppPalette.night,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              '知芽 AI 解析',
-              style: TextStyle(
-                color: AppPalette.almondCream,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: primaryGreen.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: primaryGreen.withValues(alpha: 0.14),
-            ),
-          ),
-          child: Text(
-            data['aiAnalysis'],
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 15,
-              height: 1.7,
-            ),
-          ),
+        const SizedBox(height: 14),
+        _infoBlock(
+          title: 'AI 解析',
+          content: current.aiAnalysis,
+          tint: primaryGreen.withValues(alpha: 0.12),
         ),
       ],
+    );
+  }
+
+  Widget _infoBlock({
+    required String title,
+    required String content,
+    required Color tint,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -517,21 +579,23 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
     Color color,
     VoidCallback onTap,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
-          border: Border.all(color: color.withValues(alpha: 0.36)),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color.withValues(alpha: 0.16),
+            foregroundColor: color,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
       ),
@@ -546,7 +610,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(color: color, blurRadius: 120, spreadRadius: 16),
+            BoxShadow(color: color, blurRadius: 120, spreadRadius: 12),
           ],
         ),
       ),
