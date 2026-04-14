@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import '../../data/ai_api_client.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/theme.dart';
+import '../../data/ai_api_client.dart';
 import '../base/error_detail_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
@@ -23,27 +23,7 @@ class ErrorEditScreen extends StatefulWidget {
 }
 
 class _ErrorEditScreenState extends State<ErrorEditScreen> {
-  final Color primaryGreen = const Color(0xFF70A88D);
   final AiApiClient _apiClient = const AiApiClient();
-  late TextEditingController _questionController;
-  late TextEditingController _reflectionController;
-
-  bool _isAiThinking = true; // 控制 AI 分析的加载状态
-  String _selectedErrorReason = ''; // 记录选中的错因
-  String _subject = '通用';
-  String _solutionSummary = '';
-  String _mistakeDiagnosis = '';
-  String _reviewFocus = '';
-  List<int> _reviewSchedule = const [];
-  List<String> _knowledgePoints = const [];
-  List<String> _solutionSteps = const [];
-  List<SimilarQuestionItem> _similarQuestions = const [];
-  String? _analysisError;
-
-  bool _isAiThinking = true;
-  bool _showSimilarQuestions = false;
-  String _selectedErrorReason = '';
-
   final List<String> _errorReasons = const [
     '粗心大意',
     '概念模糊',
@@ -52,15 +32,47 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     '计算错误',
   ];
 
+  late final TextEditingController _questionController;
+  late final TextEditingController _reflectionController;
+
+  bool _isAiThinking = true;
+  String _selectedErrorReason = '';
+  String _subject = '通用';
+  String _solutionSummary = '';
+  String _mistakeDiagnosis = '';
+  String _reviewFocus = '';
+  List<int> _reviewSchedule = const [];
+  List<String> _knowledgePoints = const [];
+  List<String> _solutionSteps = const [];
+  List<SimilarQuestionItem> _similarQuestions = const [];
+  List<Map<String, dynamic>> _richArtifacts = const [];
+  String? _analysisError;
+
   @override
   void initState() {
     super.initState();
     _questionController = TextEditingController(text: widget.initialText);
     _reflectionController = TextEditingController();
-    _generateAiAnalysis(); // 进入页面即开始真实 AI 分析
+    _generateAiAnalysis();
+  }
+
+  @override
+  void dispose() {
+    _questionController.dispose();
+    _reflectionController.dispose();
+    super.dispose();
   }
 
   Future<void> _generateAiAnalysis() async {
+    final questionText = _questionController.text.trim();
+    if (questionText.isEmpty) {
+      setState(() {
+        _analysisError = '请先确认题目内容后再生成解析。';
+        _isAiThinking = false;
+      });
+      return;
+    }
+
     setState(() {
       _isAiThinking = true;
       _analysisError = null;
@@ -68,8 +80,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
     try {
       final result = await _apiClient.analyzeQuestion(
-        questionText: _questionController.text.trim(),
-        subject: _guessSubject(_questionController.text),
+        questionText: questionText,
+        subject: _guessSubject(questionText),
         wrongReasonHint: _selectedErrorReason,
       );
 
@@ -83,6 +95,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _reviewFocus = result.reviewFocus;
         _reviewSchedule = result.reviewSchedule;
         _similarQuestions = result.similarQuestions;
+        _richArtifacts = result.richArtifacts;
         _isAiThinking = false;
       });
     } on AiApiException catch (error) {
@@ -98,33 +111,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _isAiThinking = false;
       });
     }
-  }
-
-  String _guessSubject(String questionText) {
-    final content = questionText.toLowerCase();
-    if (content.contains('矩阵') || content.contains('特征值') || content.contains('函数') || content.contains('导数')) {
-      return '数学';
-    }
-    if (content.contains('受力') || content.contains('加速度') || content.contains('电路') || content.contains('速度')) {
-      return '物理';
-    }
-    if (content.contains('cache') || content.contains('cpu') || content.contains('算法') || content.contains('java')) {
-      return '计算机';
-    }
-    return '通用';
-  }
-
-  @override
-  void dispose() {
-    _questionController.dispose();
-    _reflectionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _simulateAiAnalysis() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isAiThinking = false);
   }
 
   void _saveToArchive() {
@@ -157,13 +143,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   NewErrorDraft _buildDraft(String question) {
-    final subject = _inferSubject(question);
+    final subject = _subject == '通用' ? _inferSubject(question) : _subject;
     final topic = _inferTopic(question, subject);
-    final reason = _selectedErrorReason.isNotEmpty
-        ? _selectedErrorReason
-        : '概念模糊';
+    final reason = _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
     final reflection = _reflectionController.text.trim();
-    final note = reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection;
+
+    final summaryParts = <String>[
+      if (_solutionSummary.isNotEmpty) _solutionSummary,
+      if (_mistakeDiagnosis.isNotEmpty) '错因诊断：$_mistakeDiagnosis',
+      if (_reviewFocus.isNotEmpty)
+        _reviewSchedule.isEmpty
+            ? '复习建议：$_reviewFocus'
+            : '复习建议：$_reviewFocus（${_reviewSchedule.join(' / ')} 天）',
+      if (_richArtifacts.isNotEmpty)
+        '扩展内容：已生成 ${_richArtifacts.length} 个学科增强模块，可在后续版本接入展示。',
+    ];
 
     return NewErrorDraft(
       subject: subject,
@@ -171,11 +165,25 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       question: question,
       reason: reason,
       tags: _buildTags(subject, topic),
-      myAnswer: note,
-      aiAnalysis: _buildAiAnalysis(subject, topic),
+      myAnswer: reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection,
+      aiAnalysis: summaryParts.isEmpty ? _buildFallbackAnalysis(subject, topic) : summaryParts.join('\n\n'),
       isFavorite: false,
       isMastered: false,
     );
+  }
+
+  String _guessSubject(String questionText) {
+    final content = questionText.toLowerCase();
+    if (content.contains('矩阵') || content.contains('特征值') || content.contains('函数') || content.contains('导数')) {
+      return '数学';
+    }
+    if (content.contains('受力') || content.contains('加速度') || content.contains('电路') || content.contains('速度')) {
+      return '物理';
+    }
+    if (content.contains('cache') || content.contains('cpu') || content.contains('算法') || content.contains('java')) {
+      return '计算机';
+    }
+    return '通用';
   }
 
   String _inferSubject(String question) {
@@ -192,10 +200,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (question.contains('贝叶斯') || question.contains('概率')) {
       return '概率论';
     }
-    return '综合复盘';
+    return _subject == '通用' ? '综合复盘' : _subject;
   }
 
   String _inferTopic(String question, String subject) {
+    if (_knowledgePoints.isNotEmpty) {
+      return _knowledgePoints.first;
+    }
     if (question.contains('特征值') || question.contains('伴随矩阵')) {
       return '矩阵特征值与相似对角化';
     }
@@ -216,10 +227,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       subject,
       topic,
       '新录入',
+      if (_selectedErrorReason.isNotEmpty) _selectedErrorReason,
     ];
   }
 
-  String _buildAiAnalysis(String subject, String topic) {
+  String _buildFallbackAnalysis(String subject, String topic) {
     return '这道题已归入「$subject」中的「$topic」。建议先弄清楚题目考的核心定义，再把关键推理步骤拆成 2 到 3 个可复述的小步骤，后续复习时更容易真正回收。';
   }
 
@@ -232,43 +244,25 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor),
-        title: Text('知芽 AI 解析', style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.w600)),
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        title: const Text(
+          '知芽 AI 解析',
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: _isAiThinking ? null : _generateAiAnalysis,
-            icon: Icon(Icons.refresh_rounded, color: textColor),
+            icon: const Icon(Icons.refresh_rounded, color: AppPalette.textPrimary),
             tooltip: '重新生成解析',
           ),
         ],
       ),
-      body: _isAiThinking
-          ? _buildLoadingState(textColor)
-          : _buildAnalysisDashboard(textColor, cardColor, isDarkMode),
-
-      // 底部悬浮的保存按钮
-      bottomNavigationBar: _isAiThinking ? null : Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: bgColor,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-        ),
-        child: ElevatedButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: const Text('🎉 错题已入库！知芽会在最佳遗忘点提醒你复习。'), backgroundColor: primaryGreen),
-            );
-            Navigator.pop(context); // 返回主页
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryGreen,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      ),
       body: AppSurface(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
         child: _isAiThinking ? _buildLoadingState() : _buildAnalysisDashboard(),
       ),
       bottomNavigationBar: _isAiThinking
@@ -300,17 +294,19 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       child: AppPanel(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            CircularProgressIndicator(color: AppPalette.almondCream),
-            SizedBox(height: 24),
-            Text(
+          children: [
+            const CircularProgressIndicator(color: AppPalette.almondCream),
+            const SizedBox(height: 24),
+            const Text(
               '知芽 AI 正在深度分析题目...',
               style: TextStyle(color: AppPalette.textPrimary, fontSize: 16),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              '正在生成归因、知识点和后续训练建议',
-              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+              _selectedErrorReason.isEmpty
+                  ? '正在生成归因、知识点和后续训练建议'
+                  : '正在结合“$_selectedErrorReason”重新分析',
+              style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -318,29 +314,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     );
   }
 
-  // ================= 模块 0：加载状态 =================
-  Widget _buildLoadingState(Color textColor) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: primaryGreen),
-          const SizedBox(height: 24),
-          Text('知芽 AI 正在深度剖析题目...', style: TextStyle(color: textColor, fontSize: 16)),
-          const SizedBox(height: 8),
-          Text(
-            _selectedErrorReason.isEmpty
-                ? '正在生成解答、归类知识点与拓展练习'
-                : '正在结合“$_selectedErrorReason”重新分析',
-            style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildAnalysisDashboard() {
+    final subject = _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
+    final topic = _inferTopic(_questionController.text, subject);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(top: 72, bottom: 96),
+      padding: const EdgeInsets.only(bottom: 96),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -382,27 +361,17 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 ),
                 const SizedBox(width: 12),
               ],
-
-              // AI 自动生成的标签 (无论有无图片，标签都正常显示)
               Expanded(
                 child: Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Chip(
-                      label: Text(_subject, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: primaryGreen.withOpacity(0.1),
-                      side: BorderSide.none,
-                    ),
-                    ..._knowledgePoints.take(2).map(
-                      (point) => Chip(
-                        label: Text(point, style: const TextStyle(fontSize: 12)),
-                        backgroundColor: primaryGreen.withOpacity(0.1),
-                        side: BorderSide.none,
-                      ),
-                    ),
+                    _buildTagChip(subject),
+                    _buildTagChip(topic),
+                    ..._knowledgePoints.take(2).map(_buildTagChip),
                   ],
                 ),
-              )
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -426,7 +395,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
-      color: primaryGreen.withValues(alpha: 0.08),
+      color: AppPalette.matchaMist.withValues(alpha: 0.08),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -435,23 +404,24 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.08),
+                color: const Color(0x22E17D6B),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                border: Border.all(color: const Color(0x55E17D6B)),
               ),
               child: Text(
                 'AI 解析暂时失败：$_analysisError',
-                style: TextStyle(color: textColor.withOpacity(0.85), height: 1.5),
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  height: 1.5,
+                ),
               ),
             ),
             const SizedBox(height: 16),
           ],
-          Row(
-            children: [
-              Icon(Icons.auto_awesome, color: primaryGreen, size: 20),
-              const SizedBox(width: 8),
-              Text('AI 独家解析', style: TextStyle(color: primaryGreen, fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
+          const AppSectionTitle(
+            title: 'AI 深度解析',
+            subtitle: '现在已经接入真实后端结果',
+            icon: Icons.auto_awesome,
           ),
           const SizedBox(height: 16),
           Container(
@@ -461,52 +431,84 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               color: AppPalette.night.withValues(alpha: 0.70),
               borderRadius: BorderRadius.circular(16),
             ),
+            alignment: Alignment.center,
+            child: const Text(
+              '预留：后续可接入动态板书 / HTML 扩展内容',
+              style: TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 13,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
-          // 解题思路总结
-          Text('💡 破题技巧', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+          _buildSectionLabel('💡 破题技巧'),
           const SizedBox(height: 6),
           Text(
             _solutionSummary.isEmpty ? '等待 AI 返回解析结果。' : _solutionSummary,
-            style: TextStyle(color: textColor.withOpacity(0.8), height: 1.5, fontSize: 14),
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              height: 1.5,
+              fontSize: 14,
+            ),
           ),
           if (_mistakeDiagnosis.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text('⚠️ 错因诊断', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+            _buildSectionLabel('⚠️ 错因诊断'),
             const SizedBox(height: 6),
             Text(
               _mistakeDiagnosis,
-              style: TextStyle(color: textColor.withOpacity(0.8), height: 1.5, fontSize: 14),
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                height: 1.5,
+                fontSize: 14,
+              ),
             ),
           ],
           if (_reviewFocus.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text('📅 复习建议', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+            _buildSectionLabel('📅 复习建议'),
             const SizedBox(height: 6),
             Text(
               _reviewSchedule.isEmpty
                   ? _reviewFocus
                   : '$_reviewFocus\n推荐节奏：${_reviewSchedule.join(' / ')} 天',
-              style: TextStyle(color: textColor.withOpacity(0.8), height: 1.5, fontSize: 14),
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                height: 1.5,
+                fontSize: 14,
+              ),
             ),
           ],
           const SizedBox(height: 12),
-          const Divider(),
-          // 详细步骤 (这里用 ExpansionTile 折叠，避免太长)
           Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              title: Text('查看详细推导步骤', style: TextStyle(color: primaryGreen, fontSize: 14)),
               tilePadding: EdgeInsets.zero,
+              iconColor: AppPalette.almondCream,
+              collapsedIconColor: AppPalette.almondCream,
+              title: const Text(
+                '查看详细推导步骤',
+                style: TextStyle(
+                  color: AppPalette.almondCream,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               children: [
-                Text(
-                  _solutionSteps.isEmpty ? '当前没有可展示的详细步骤。' : _solutionSteps.join('\n'),
-                  style: TextStyle(color: textColor.withOpacity(0.8), height: 1.6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _solutionSteps.isEmpty ? '当前没有可展示的详细步骤。' : _solutionSteps.join('\n'),
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      height: 1.6,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             '归档方向：$subject · $topic',
             style: const TextStyle(
@@ -514,29 +516,22 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _buildAiAnalysis(subject, topic),
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              height: 1.6,
-              fontSize: 14,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  // ================= 模块 3：举一反三 =================
-  Widget _buildSimilarQuestionsArea(Color textColor, Color cardColor) {
+  Widget _buildSimilarQuestionsArea(String topic) {
     if (_similarQuestions.isEmpty) {
       return SizedBox(
         width: double.infinity,
         child: OutlinedButton.icon(
           onPressed: _isAiThinking ? null : _generateAiAnalysis,
-          icon: Icon(Icons.hub_rounded, color: primaryGreen),
-          label: Text('重新生成举一反三练习', style: TextStyle(color: primaryGreen)),
+          icon: const Icon(Icons.hub_rounded, color: AppPalette.almondCream),
+          label: const Text(
+            '重新生成举一反三练习',
+            style: TextStyle(color: AppPalette.almondCream),
+          ),
           style: OutlinedButton.styleFrom(
             side: BorderSide(
               color: AppPalette.almondCream.withValues(alpha: 0.5),
@@ -556,12 +551,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         children: [
           const AppSectionTitle(
             title: '举一反三',
-            subtitle: '后续可以直接把这里接入智能组卷或薄弱点训练',
+            subtitle: '后续可以把这里接到智能组卷或薄弱点训练',
             icon: Icons.explore_rounded,
           ),
           const SizedBox(height: 14),
           Text(
-            '变式练习：围绕「$topic」再补一题，重点检查你是否能自己复述关键推理步骤。',
+            '变式练习围绕「$topic」继续展开，方便后续直接进入二次练习。',
             style: const TextStyle(
               color: AppPalette.textPrimary,
               fontSize: 14,
@@ -579,13 +574,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 children: [
                   Text(
                     '练习 ${index + 1}：${question.prompt}',
-                    style: TextStyle(color: textColor.withOpacity(0.9), fontSize: 14),
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
                   ),
                   if (question.answerOutline.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
                       '答案提纲：${question.answerOutline}',
-                      style: TextStyle(color: textColor.withOpacity(0.65), fontSize: 13, height: 1.4),
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ],
@@ -621,18 +624,17 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               return ChoiceChip(
                 label: Text(reason),
                 selected: isSelected,
-                selectedColor: primaryGreen,
+                selectedColor: AppPalette.matchaMist,
                 backgroundColor: Colors.white.withValues(alpha: 0.05),
                 labelStyle: TextStyle(
                   color: isSelected ? AppPalette.night : AppPalette.textPrimary,
                   fontSize: 13,
                 ),
                 side: BorderSide.none,
-                onSelected: (bool selected) {
-                  if (selected) {
-                    setState(() => _selectedErrorReason = reason);
-                    _generateAiAnalysis();
-                  }
+                onSelected: (selected) {
+                  if (!selected) return;
+                  setState(() => _selectedErrorReason = reason);
+                  _generateAiAnalysis();
                 },
               );
             }).toList(),
@@ -647,6 +649,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
             decoration: InputDecoration(
               hintText: '写下你自己的避坑笔记...',
+              hintStyle: const TextStyle(color: AppPalette.textSecondary),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.03),
               border: OutlineInputBorder(
@@ -660,11 +663,36 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _isAiThinking ? null : _generateAiAnalysis,
-              icon: Icon(Icons.auto_awesome, color: primaryGreen, size: 18),
-              label: Text('结合当前题目重新分析', style: TextStyle(color: primaryGreen)),
+              icon: const Icon(Icons.auto_awesome, color: AppPalette.matchaMist, size: 18),
+              label: const Text(
+                '结合当前题目重新分析',
+                style: TextStyle(color: AppPalette.matchaMist),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String label) {
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      backgroundColor: AppPalette.almondCream.withValues(alpha: 0.12),
+      side: BorderSide.none,
+      labelStyle: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontWeight: FontWeight.bold,
       ),
     );
   }

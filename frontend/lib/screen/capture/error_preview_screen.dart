@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../../data/ai_api_client.dart';
+import '../../core/theme.dart';
 import 'error_edit_screen.dart'; // 🌟 引入刚写的编辑页
 
 class ErrorPreviewScreen extends StatefulWidget {
