@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
 import '../base/error_detail_screen.dart';
@@ -13,10 +14,12 @@ class ErrorEditScreen extends StatefulWidget {
     super.key,
     required this.imagePath,
     required this.initialText,
+    this.initialAnalysis,
   });
 
   final String imagePath;
   final String initialText;
+  final AnalysisResult? initialAnalysis;
 
   @override
   State<ErrorEditScreen> createState() => _ErrorEditScreenState();
@@ -53,7 +56,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     super.initState();
     _questionController = TextEditingController(text: widget.initialText);
     _reflectionController = TextEditingController();
-    _generateAiAnalysis();
+    if (widget.initialAnalysis != null) {
+      _applyAnalysisResult(widget.initialAnalysis!);
+      _isAiThinking = false;
+    } else {
+      _generateAiAnalysis();
+    }
   }
 
   @override
@@ -87,15 +95,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
       if (!mounted) return;
       setState(() {
-        _subject = result.subject;
-        _knowledgePoints = result.knowledgePoints;
-        _solutionSummary = result.solutionSummary;
-        _solutionSteps = result.solutionSteps;
-        _mistakeDiagnosis = result.mistakeDiagnosis;
-        _reviewFocus = result.reviewFocus;
-        _reviewSchedule = result.reviewSchedule;
-        _similarQuestions = result.similarQuestions;
-        _richArtifacts = result.richArtifacts;
+        _applyAnalysisResult(result);
         _isAiThinking = false;
       });
     } on AiApiException catch (error) {
@@ -111,6 +111,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _isAiThinking = false;
       });
     }
+  }
+
+  void _applyAnalysisResult(AnalysisResult result) {
+    _subject = result.subject;
+    _knowledgePoints = result.knowledgePoints;
+    _solutionSummary = result.solutionSummary;
+    _solutionSteps = result.solutionSteps;
+    _mistakeDiagnosis = result.mistakeDiagnosis;
+    _reviewFocus = result.reviewFocus;
+    _reviewSchedule = result.reviewSchedule;
+    _similarQuestions = result.similarQuestions;
+    _richArtifacts = result.richArtifacts;
   }
 
   void _saveToArchive() {
@@ -388,6 +400,56 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               isDense: true,
             ),
           ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              ),
+            ),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _questionController,
+              builder: (context, value, _) {
+                final previewText = value.text.trim();
+                if (previewText.isEmpty) {
+                  return const Text(
+                    '这里会实时显示题干的 LaTeX 渲染效果。',
+                    style: TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 13,
+                    ),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '题干渲染预览',
+                      style: TextStyle(
+                        color: AppPalette.almondCream,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AppLatexText(
+                      previewText,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 14,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -440,10 +502,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ),
+          if (_richArtifacts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildRichArtifactsPreview(),
+          ],
           const SizedBox(height: 16),
           _buildSectionLabel('💡 破题技巧'),
           const SizedBox(height: 6),
-          Text(
+          AppLatexText(
             _solutionSummary.isEmpty ? '等待 AI 返回解析结果。' : _solutionSummary,
             style: const TextStyle(
               color: AppPalette.textPrimary,
@@ -455,7 +521,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             const SizedBox(height: 12),
             _buildSectionLabel('⚠️ 错因诊断'),
             const SizedBox(height: 6),
-            Text(
+            AppLatexText(
               _mistakeDiagnosis,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
@@ -468,7 +534,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             const SizedBox(height: 12),
             _buildSectionLabel('📅 复习建议'),
             const SizedBox(height: 6),
-            Text(
+            AppLatexText(
               _reviewSchedule.isEmpty
                   ? _reviewFocus
                   : '$_reviewFocus\n推荐节奏：${_reviewSchedule.join(' / ')} 天',
@@ -497,13 +563,32 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    _solutionSteps.isEmpty ? '当前没有可展示的详细步骤。' : _solutionSteps.join('\n'),
-                    style: const TextStyle(
-                      color: AppPalette.textPrimary,
-                      height: 1.6,
-                    ),
-                  ),
+                  child: _solutionSteps.isEmpty
+                      ? const Text(
+                          '当前没有可展示的详细步骤。',
+                          style: TextStyle(
+                            color: AppPalette.textPrimary,
+                            height: 1.6,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: _solutionSteps
+                              .map(
+                                (step) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: AppLatexText(
+                                    step,
+                                    style: const TextStyle(
+                                      color: AppPalette.textPrimary,
+                                      height: 1.6,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                 ),
               ],
             ),
@@ -572,7 +657,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  AppLatexText(
                     '练习 ${index + 1}：${question.prompt}',
                     style: const TextStyle(
                       color: AppPalette.textPrimary,
@@ -582,7 +667,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                   ),
                   if (question.answerOutline.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(
+                    AppLatexText(
                       '答案提纲：${question.answerOutline}',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
@@ -695,5 +780,154 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         fontWeight: FontWeight.bold,
       ),
     );
+  }
+
+  Widget _buildRichArtifactsPreview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionLabel('🧩 学科扩展'),
+        const SizedBox(height: 8),
+        ..._richArtifacts.map(_buildRichArtifactCard),
+      ],
+    );
+  }
+
+  Widget _buildRichArtifactCard(Map<String, dynamic> artifact) {
+    final type = (artifact['artifact_type'] ?? '').toString();
+    final title = (artifact['title'] ?? '').toString().trim();
+    final description = (artifact['description'] ?? '').toString().trim();
+    final mimeType = (artifact['mime_type'] ?? '').toString().trim();
+    final content = (artifact['content'] ?? '').toString().trim();
+
+    final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
+    final displayDescription = description.isEmpty
+        ? _fallbackArtifactDescription(type)
+        : description;
+    final previewText = _artifactPreviewText(type, mimeType, content);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _artifactIcon(type),
+                color: AppPalette.almondCream,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayTitle,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            displayDescription,
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          if (previewText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            AppLatexText(
+              previewText,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _artifactIcon(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return Icons.motion_photos_auto_rounded;
+      case 'chart_spec':
+        return Icons.show_chart_rounded;
+      case 'code_snippet':
+        return Icons.code_rounded;
+      case 'timeline':
+        return Icons.timeline_rounded;
+      case 'study_card':
+        return Icons.style_rounded;
+      default:
+        return Icons.extension_rounded;
+    }
+  }
+
+  String _fallbackArtifactTitle(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return '交互式演示内容';
+      case 'chart_spec':
+        return '图表可视化内容';
+      case 'code_snippet':
+        return '代码示例';
+      case 'timeline':
+        return '流程时间线';
+      case 'study_card':
+        return '复习卡片';
+      default:
+        return '扩展内容';
+    }
+  }
+
+  String _fallbackArtifactDescription(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return '已生成适合接入 WebView 的 HTML 内容，后续可用于播放学科演示动画。';
+      case 'chart_spec':
+        return '已生成结构化图表配置，后续可对接函数图像或统计图渲染。';
+      case 'code_snippet':
+        return '已生成关键代码与执行思路，适合编程题扩展展示。';
+      case 'timeline':
+        return '已生成流程型内容，后续可用于步骤推演或时序复盘。';
+      case 'study_card':
+        return '已生成可拆分展示的知识卡片，适合移动端碎片化复习。';
+      default:
+        return '已生成可扩展展示内容。';
+    }
+  }
+
+  String _artifactPreviewText(String type, String mimeType, String content) {
+    if (content.isEmpty) {
+      return '';
+    }
+    if (type == 'interactive_html' || mimeType == 'text/html') {
+      return '已生成 HTML 片段，可在后续版本中直接接入 WebView 展示交互动画。';
+    }
+
+    final singleLine = content.replaceAll('\n', ' ').trim();
+    if (singleLine.length <= 120) {
+      return singleLine;
+    }
+    return '${singleLine.substring(0, 120)}...';
   }
 }

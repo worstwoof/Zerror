@@ -80,14 +80,17 @@ async def analyze_image(
     try:
         ocr_result = vivo_client.ocr_image(image_bytes)
         normalized_text = normalize_ocr_text(ocr_result["raw_text"])
-        analysis = diagnostic_service.analyze_text(
+        analysis = diagnostic_service.analyze_image(
             AnalysisRequest(
                 question_text=normalized_text,
                 subject=subject,
                 user_answer=user_answer,
                 wrong_reason_hint=wrong_reason_hint,
                 enable_subject_extensions=enable_subject_extensions,
-            )
+            ),
+            image_bytes=image_bytes,
+            mime_type=image.content_type or "image/png",
+            ocr_draft=normalized_text,
         )
         response_payload = analysis.model_dump()
         response_payload["source"] = "image"

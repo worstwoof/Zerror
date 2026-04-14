@@ -85,6 +85,24 @@ class AnalysisResult {
   }
 }
 
+class ImageAnalysisPayload {
+  final String extractedText;
+  final AnalysisResult analysis;
+
+  const ImageAnalysisPayload({
+    required this.extractedText,
+    required this.analysis,
+  });
+
+  factory ImageAnalysisPayload.fromJson(Map<String, dynamic> json) {
+    final ocr = (json['ocr'] as Map<String, dynamic>?) ?? const {};
+    return ImageAnalysisPayload(
+      extractedText: (json['cleaned_question'] ?? ocr['normalized_text'] ?? '').toString(),
+      analysis: AnalysisResult.fromJson(json),
+    );
+  }
+}
+
 class AiApiClient {
   const AiApiClient();
 
@@ -132,6 +150,33 @@ class AiApiClient {
     }
 
     return AnalysisResult.fromJson(payload);
+  }
+
+  Future<ImageAnalysisPayload> analyzeImage({
+    required String imagePath,
+    String subject = '通用',
+    String wrongReasonHint = '',
+  }) async {
+    final request = http.MultipartRequest('POST', Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/image'))
+      ..fields['subject'] = subject
+      ..fields['user_answer'] = ''
+      ..fields['wrong_reason_hint'] = wrongReasonHint
+      ..fields['enable_subject_extensions'] = 'true'
+      ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final payload = _decodeJson(response);
+
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(payload));
+    }
+
+    final result = ImageAnalysisPayload.fromJson(payload);
+    if (result.extractedText.trim().isEmpty) {
+      throw const AiApiException('图片解析已返回，但 OCR 文本为空。');
+    }
+    return result;
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {

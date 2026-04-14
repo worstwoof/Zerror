@@ -18,12 +18,14 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
   final AiApiClient _apiClient = const AiApiClient();
   bool _isRecognizing = false; // 控制加载动画的状态
 
-  // 调用后端 OCR 接口，将识别结果带到编辑页。
+  // 直接调用图片解析接口，减少 OCR 误差在前端二次放大的问题。
   Future<void> _startOCR() async {
     setState(() { _isRecognizing = true; });
 
     try {
-      final extractedText = await _apiClient.extractTextFromImage(widget.imagePath);
+      final payload = await _apiClient.analyzeImage(
+        imagePath: widget.imagePath,
+      );
       if (!mounted) return;
       setState(() { _isRecognizing = false; });
 
@@ -31,7 +33,8 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
         MaterialPageRoute(
           builder: (context) => ErrorEditScreen(
             imagePath: widget.imagePath,
-            initialText: extractedText,
+            initialText: payload.extractedText,
+            initialAnalysis: payload.analysis,
           ),
         ),
       );
@@ -40,7 +43,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       setState(() { _isRecognizing = false; });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('OCR 识别失败：${error.message}'),
+          content: Text('图片解析失败：${error.message}'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -49,7 +52,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       setState(() { _isRecognizing = false; });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('OCR 识别失败，请检查本地后端是否已启动。'),
+          content: Text('图片解析失败，请检查本地后端是否已启动。'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -125,7 +128,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                             height: 20,
                             child: CircularProgressIndicator(color: AppPalette.night, strokeWidth: 2),
                           )
-                        : const Text('提取文字', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : const Text('分析题目', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
