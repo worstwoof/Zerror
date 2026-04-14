@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
-import '../../core/theme.dart';
-import 'error_edit_screen.dart';
+import '../../data/ai_api_client.dart';
+import 'error_edit_screen.dart'; // 🌟 引入刚写的编辑页
 
 class ErrorPreviewScreen extends StatefulWidget {
   const ErrorPreviewScreen({super.key, required this.imagePath});
@@ -15,23 +14,45 @@ class ErrorPreviewScreen extends StatefulWidget {
 }
 
 class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
-  bool _isRecognizing = false;
+  final AiApiClient _apiClient = const AiApiClient();
+  bool _isRecognizing = false; // 控制加载动画的状态
 
+  // 调用后端 OCR 接口，将识别结果带到编辑页。
   Future<void> _startOCR() async {
-    setState(() => _isRecognizing = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isRecognizing = false);
+    setState(() { _isRecognizing = true; });
 
-      const mockExtractedText = '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。求证：A 的伴随矩阵 A* 的特征值。';
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => ErrorEditScreen(
-          imagePath: widget.imagePath,
-          initialText: mockExtractedText,
+    try {
+      final extractedText = await _apiClient.extractTextFromImage(widget.imagePath);
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ErrorEditScreen(
+            imagePath: widget.imagePath,
+            initialText: extractedText,
+          ),
         ),
-      ),
-    );
+      );
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('OCR 识别失败：${error.message}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OCR 识别失败，请检查本地后端是否已启动。'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override

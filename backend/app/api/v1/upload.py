@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
+from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
+from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
+from backend.app.core.config import settings
+from backend.app.schemas.card_schema import (
+    AnalysisRequest,
+    AnalysisResponse,
+    ImageAnalysisResponse,
+    OCRResponse,
+)
+
+
+router = APIRouter(prefix="/api/v1", tags=["ai"])
+vivo_client = VivoLMClient(settings)
+diagnostic_service = DiagnosticService(vivo_client)
+
+
+def _ensure_credentials() -> None:
+    if not settings.has_vivo_credentials:
+        raise HTTPException(
+            status_code=503,
+            detail="VIVO_API_KEY 未配置，无法调用 vivo 蓝心接口。",
+        )
+
+
+@router.get("/health")
+def healthcheck() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "version": settings.app_version,
+    }
+
+
+@router.post("/analysis/text", response_model=AnalysisResponse)
+def analyze_text(request: AnalysisRequest) -> AnalysisResponse:
+    _ensure_credentials()
+    try:
+        return diagnostic_service.analyze_text(request)
+    except VivoAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/ocr/extract", response_model=OCRResponse)
+async def extract_text(image: UploadFile = File(...)) -> OCRResponse:
+    _ensure_credentials()
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="上传图片为空。")
+
+    try:
+        ocr_result = vivo_client.ocr_image(image_bytes)
+        normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+        return OCRResponse(
+            raw_text=ocr_result["raw_text"],
+            normalized_text=normalized_text,
+            blocks=ocr_result.get("blocks", []),
+        )
+    except VivoAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/analysis/image", response_model=ImageAnalysisResponse)
+async def analyze_image(
+    image: UploadFile = File(...),
+    subject: str = Form("通用"),
+    user_answer: str = Form(""),
+    wrong_reason_hint: str = Form(""),
+    enable_subject_extensions: bool = Form(True),
+) -> ImageAnalysisResponse:
+    _ensure_credentials()
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="上传图片为空。")
+
+    try:
+        ocr_result = vivo_client.ocr_image(image_bytes)
+        normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+        analysis = diagnostic_service.analyze_text(
+            AnalysisRequest(
+                question_text=normalized_text,
+                subject=subject,
+                user_answer=user_answer,
+                wrong_reason_hint=wrong_reason_hint,
+                enable_subject_extensions=enable_subject_extensions,
+            )
+        )
+        response_payload = analysis.model_dump()
+        response_payload["source"] = "image"
+        response_payload["ocr"] = OCRResponse(
+            raw_text=ocr_result["raw_text"],
+            normalized_text=normalized_text,
+            blocks=ocr_result.get("blocks", []),
+        )
+        return ImageAnalysisResponse(
+            **response_payload,
+        )
+    except VivoAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

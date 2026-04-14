@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>磁场中带电粒子加速演示 - 物理题可视化</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 10px; font-size: 1.5rem; color: #4db8ff; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        canvas {
+            background-color: #000;
+            border: 2px solid #444;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            float: right;
+            color: #4db8ff;
+            font-weight: bold;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+        }
+
+        .formula {
+            background: #333;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #ffcc00;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4db8ff;
+            border: none;
+            border-radius: 4px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover { background-color: #3399cc; }
+        button.reset { background-color: #ff6b6b; color: white; }
+        button.reset:hover { background-color: #cc5555; }
+
+        .status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>题目 5：磁场中力学装置加速带电粒子演示</h1>
+
+    <div class="container">
+        <canvas id="simCanvas" width="600" height="500"></canvas>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>磁感应强度 B <span id="val-B" class="value-display">1.0 T</span></label>
+                <input type="range" id="input-B" min="0.5" max="3.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <label>平板速度 v₁ <span id="val-v1" class="value-display">2.0 m/s</span></label>
+                <input type="range" id="input-v1" min="1.0" max="5.0" step="0.5" value="2.0">
+            </div>
+            <div class="control-group">
+                <label>粒子电量 q <span id="val-q" class="value-display">1.0 C</span></label>
+                <input type="range" id="input-q" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <label>粒子质量 m <span id="val-m" class="value-display">1.0 kg</span></label>
+                <input type="range" id="input-m" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <label>初始距离 d <span id="val-d" class="value-display">100 px</span></label>
+                <input type="range" id="input-d" min="50" max="200" step="10" value="100">
+            </div>
+
+            <button id="btn-toggle">暂停 / 继续</button>
+            <button id="btn-reset" class="reset">重置演示</button>
+
+            <div class="info-panel">
+                <div class="status" id="status-text">状态：准备开始</div>
+                <div class="formula" id="formula-t">t = √(2md / qv₁B)</div>
+                <div class="formula" id="formula-h">h = v₁ * t + ...</div>
+                <div style="font-size: 0.8rem; color: #888; margin-top:5px;">
+                    *注：为便于观察，时间流速已加快，且忽略重力。
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 物理参数 (映射到屏幕像素)
+    // 为了演示效果，我们设定一些比例尺，不完全对应真实SI单位，但符合物理规律
+    const SCALE_POS = 2; // 1 meter = 2 pixels (approx)
+    const SCALE_TIME = 0.05; // 模拟时间步长
+
+    let params = {
+        B: 1.0,
+        v1: 2.0,
+        q: 1.0,
+        m: 1.0,
+        d: 100 // pixels
+    };
+
+    let state = {
+        running: false,
+        time: 0,
+        particle: {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            onPlate: true,
+            trail: []
+        },
+        plate: {
+            y: 0,
+            width: 300,
+            height: 20
+        },
+        screen: {
+            x: 50
+        }
+    };
+
+    // 初始化
+    function init() {
+        resetSimulation();
+        draw();
+    }
+
+    function resetSimulation() {
+        state.running = false;
+        state.time = 0;
+        state.particle.onPlate = true;
+        state.particle.trail = [];
+        state.particle.vx = 0;
+        state.particle.vy = params.v1; // 初始竖直速度等于板速
+
+        // 初始位置：板在底部，粒子在板上距离左边缘 d 处
+        // 为了方便，我们让板向上运动。
+        // 设板初始 y 坐标为 400
+        state.plate.y = 400;
+
+        // 粒子初始 x 坐标：屏幕右侧一点，距离左边缘 d
+        // 假设板左边缘在 x=100 (为了留出空间给荧光屏)
+        // 粒子 x = 100 + d
+        state.particle.x = 100 + params.d;
+        state.particle.y = state.plate.y - 10; // 粒子在板面上
+
+        updateFormulas();
+        document.getElementById('status-text').innerText = "状态：准备开始";
+        document.getElementById('status-text').style.color = "#fff";
+    }
+
+    function updateFormulas() {
+        // 计算理论值
+        // a = q * v1 * B / m
+        // d = 0.5 * a * t^2  => t = sqrt(2d/a)
+        // 注意这里的 d 是像素，需要转换或者直接用像素单位计算加速度
+        // 为了演示一致性，我们在像素坐标系下计算
+
+        const a_pixel = (params.q * params.v1 * params.B / params.m) * 50; // 50是像素放大系数，为了让动画明显
+        const t_theory = Math.sqrt(2 * params.d / a_pixel);
+        const h_theory = params.v1 * t_theory * 50; // 竖直位移
+
+        document.getElementById('formula-t').innerHTML = `板上运动时间 t ≈ ${t_theory.toFixed(2)} s`;
+        document.getElementById('formula-h').innerHTML = `竖直位移 h ≈ ${h_theory.toFixed(1)} px`;
+    }
+
+    function update() {
+        if (!state.running) return;
+
+        state.time += SCALE_TIME;
+
+        // 1. 更新板的位置 (向上匀速)
+        // 速度 v1 (m/s) -> 像素/帧
+        const plateSpeedPixel = params.v1 * 20;
+        state.plate.y -= plateSpeedPixel * SCALE_TIME;
+
+        if (state.particle.onPlate) {
+            // 2. 粒子在板上
+            // 竖直方向：随板运动
+            state.particle.y = state.plate.y - 10;
+            state.particle.vy = plateSpeedPixel;
+
+            // 水平方向：受洛伦兹力加速
+            // F = q * v_y * B
+            // a = F / m
+            // 注意：这里 v_y 是相对于磁场的速度，即板的速度
+            const forceX = params.q * params.v1 * params.B;
+            const accX = (forceX / params.m) * 50; // 放大系数
+
+            state.particle.vx += accX * SCALE_TIME;
+            state.particle.x -= state.particle.vx * SCALE_TIME; // 向左运动
+
+            // 记录轨迹
+            state.particle.trail.push({x: state.particle.x, y: state.particle.y});
+
+            // 检查是否飞出 (x < 板左边缘)
+            // 板左边缘固定在 x=100
+            if (state.particle.x <= 100) {
+                state.particle.onPlate = false;
+                document.getElementById('status-text').innerText = "状态：已飞出平板，进入纯磁场";
+                document.getElementById('status-text').style.color = "#ffcc00";
+            }
+        } else {
+            // 3. 粒子离开板后
+            // 此时只受洛伦兹力，做匀速圆周运动
+            // 速度 v = sqrt(vx^2 + vy^2)
+            // 洛伦兹力提供向心力 qvB = mv^2/R => R = mv/qB
+
+            // 简化处理：为了演示“垂直入射”，我们手动模拟一段圆弧
+            // 实际上离开板瞬间，vx 向左，vy 向上。
+            // 洛伦兹力 F 指向左下方 (左手定则: B向里, v左上 -> F左下)
+            // 粒子会向左下方偏转。
+
+            const vTotal = Math.sqrt(state.particle.vx**2 + state.particle.vy**2);
+            const R = (params.m * vTotal) / (params.q * params.B) * 2; // 半径放大
+
+            // 简单的圆周运动更新 (数值积分)
+            // 力 F 垂直于 v
+            // Fx = -q * vy * B
+            // Fy = q * vx * B
+            // 注意方向：v = (vx, vy). B = (0, 0, -1) (向里为负z? 不，通常向里为负，但左手定则直接用)
+            // 左手定则：磁感线穿手心(向里)，四指指v。
+            // 此时 v 主要是向左(vx<0)，少量向上(vy>0)。
+            // v 向左 -> F 向下。
+            // v 向上 -> F 向左。
+            // 所以 Fx < 0, Fy < 0.
+
+            const fx = -params.q * state.particle.vy * params.B * 50;
+            const fy = params.q * state.particle.vx * params.B * 50; // vx是负数，所以fy是负数(向下)
+
+            const ax = fx / params.m;
+            const ay = fy / params.m;
+
+            state.particle.vx += ax * SCALE_TIME;
+            state.particle.vy += ay * SCALE_TIME;
+
+            state.particle.x += state.particle.vx * SCALE_TIME;
+            state.particle.y += state.particle.vy * SCALE_TIME;
+
+            state.particle.trail.push({x: state.particle.x, y: state.particle.y});
+
+            // 检查是否撞到屏幕 (x <= 50)
+            if (state.particle.x <= 50) {
+                state.running = false;
+                document.getElementById('status-text').innerText = "状态：垂直击中荧光屏！";
+                document.getElementById('status-text').style.color = "#00ff00";
+                drawImpact();
+            }
+        }
+    }
+
+    function drawImpact() {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.beginPath();
+        ctx.arc(state.particle.x, state.particle.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px Arial";
+        ctx.fillText("BANG!", state.particle.x - 20, state.particle.y - 20);
+    }
+
+    function draw() {
+        // 清空
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 画磁场背景 (叉叉)
+        ctx.fillStyle = "#333";
+        ctx.font = "14px monospace";
+        for(let i=0; i<canvas.width; i+=40) {
+            for(let j=0; j<canvas.height; j+=40) {
+                ctx.fillText("×", i, j);
+            }
+        }
+
+        // 2. 画荧光屏
+        ctx.fillStyle = "#555";
+        ctx.fillRect(state.screen.x - 5, 50, 10, 400);
+        ctx.fillStyle = "#aaa";
+        ctx.fillText("荧光屏", state.screen.x - 25, 250);
+
+        // 3. 画绝缘平板
+        ctx.fillStyle = "#8B4513"; // 棕色
+        ctx.fillRect(100, state.plate.y, 300, 20);
+        ctx.fillStyle = "#fff";
+        ctx.fillText("绝缘平板 (v₁)", 200, state.plate.y + 15);
+
+        // 画速度箭头 v1
+        drawArrow(ctx, 250, state.plate.y - 10, 250, state.plate.y - 40, "#4db8ff");
+
+        // 4. 画粒子轨迹
+        if (state.particle.trail.length > 1) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.moveTo(state.particle.trail[0].x, state.particle.trail[0].y);
+            for (let p of state.particle.trail) {
+                ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+        }
+
+        // 5. 画粒子
+        ctx.beginPath();
+        ctx.arc(state.particle.x, state.particle.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = state.particle.onPlate ? "#ff0000" : "#00ff00";
+        ctx.fill();
+
+        // 画粒子速度矢量
+        if (!state.particle.onPlate) {
+             drawArrow(ctx, state.particle.x, state.particle.y,
+                       state.particle.x + state.particle.vx * 2,
+                       state.particle.y + state.particle.vy * 2, "#00ff00");
+        }
+
+        // 6. 标注 d
+        ctx.beginPath();
+        ctx.moveTo(100, state.plate.y + 30);
+        ctx.lineTo(100 + params.d, state.plate.y + 30);
+        ctx.strokeStyle = "#fff";
+        ctx.stroke();
+        ctx.fillText("d", 100 + params.d/2 - 5, state.plate.y + 45);
+
+        // 7. 标注 h (动态)
+        if (state.time > 0) {
+            const currentH = 400 - state.particle.y; // 相对于初始位置
+            if (currentH > 10) {
+                ctx.beginPath();
+                ctx.moveTo(450, 400);
+                ctx.lineTo(450, state.particle.y);
+                ctx.strokeStyle = "#ff00ff";
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = "#ff00ff";
+                ctx.fillText("h", 455, (400 + state.particle.y)/2);
+            }
+        }
+
+        requestAnimationFrame(() => {
+            update();
+            draw();
+        });
+    }
+
+    function drawArrow(ctx, fromX, fromY, toX, toY, color) {
+        const headlen = 10;
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+
+        ctx.beginPath();
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    // 事件监听
+    document.getElementById('input-B').addEventListener('input', (e) => {
+        params.B = parseFloat(e.target.value);
+        document.getElementById('val-B').innerText = params.B.toFixed(1) + " T";
+        updateFormulas();
+    });
+    document.getElementById('input-v1').addEventListener('input', (e) => {
+        params.v1 = parseFloat(e.target.value);
+        document.getElementById('val-v1').innerText = params.v1.toFixed(1) + " m/s";
+        updateFormulas();
+    });
+    document.getElementById('input-q').addEventListener('input', (e) => {
+        params.q = parseFloat(e.target.value);
+        document.getElementById('val-q').innerText = params.q.toFixed(1) + " C";
+        updateFormulas();
+    });
+    document.getElementById('input-m').addEventListener('input', (e) => {
+        params.m = parseFloat(e.target.value);
+        document.getElementById('val-m').innerText = params.m.toFixed(1) + " kg";
+        updateFormulas();
+    });
+    document.getElementById('input-d').addEventListener('input', (e) => {
+        params.d = parseFloat(e.target.value);
+        document.getElementById('val-d').innerText = params.d.toFixed(0) + " px";
+        resetSimulation(); // 改变 d 需要重置
+        draw();
+    });
+
+    document.getElementById('btn-toggle').addEventListener('click', () => {
+        state.running = !state.running;
+        if(state.running && state.particle.x <= 50) resetSimulation(); // 如果已经结束，点击继续则重置
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', resetSimulation);
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>
