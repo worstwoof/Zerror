@@ -157,7 +157,10 @@ class AiApiClient {
     String subject = '通用',
     String wrongReasonHint = '',
   }) async {
-    final request = http.MultipartRequest('POST', Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/image'))
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/image'),
+    )
       ..fields['subject'] = subject
       ..fields['user_answer'] = ''
       ..fields['wrong_reason_hint'] = wrongReasonHint
@@ -183,19 +186,53 @@ class AiApiClient {
     if (response.bodyBytes.isEmpty) {
       return const {};
     }
+
     final decodedBody = utf8.decode(response.bodyBytes);
-    final dynamic parsed = jsonDecode(decodedBody);
-    if (parsed is Map<String, dynamic>) {
-      return parsed;
+    try {
+      final dynamic parsed = jsonDecode(decodedBody);
+      if (parsed is Map<String, dynamic>) {
+        return parsed;
+      }
+      if (parsed is List) {
+        return <String, dynamic>{'data': parsed};
+      }
+      return <String, dynamic>{'data': parsed.toString()};
+    } catch (_) {
+      return <String, dynamic>{'message': decodedBody};
     }
-    throw const AiApiException('接口返回的不是有效 JSON 对象。');
   }
 
-  String _extractErrorMessage(Map<String, dynamic> payload) {
-    final detail = payload['detail'];
-    if (detail is String && detail.trim().isNotEmpty) {
-      return detail;
+  String _extractErrorMessage(
+    Map<String, dynamic> payload, {
+    String fallback = '请求失败，请稍后重试。',
+  }) {
+    for (final key in const ['detail', 'message', 'msg', 'error']) {
+      final value = payload[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
     }
-    return '请求失败，请稍后重试。';
+
+    final nested = _asMap(payload['data']);
+    if (nested.isNotEmpty) {
+      for (final key in const ['detail', 'message', 'msg', 'error']) {
+        final value = nested[key];
+        if (value is String && value.trim().isNotEmpty) {
+          return value;
+        }
+      }
+    }
+
+    return fallback;
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
+    }
+    return const <String, dynamic>{};
   }
 }

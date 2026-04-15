@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
+  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120';
+
   static const String _apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
@@ -10,13 +12,10 @@ class AppConstants {
     if (_apiBaseUrlOverride.isNotEmpty) {
       return _apiBaseUrlOverride;
     }
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
+      return _defaultCloudApiBaseUrl;
     }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
-    }
-    return 'http://127.0.0.1:8000';
+    return _defaultCloudApiBaseUrl;
   }
 
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';
