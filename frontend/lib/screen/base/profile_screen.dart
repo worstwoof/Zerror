@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
+import '../../data/file_upload_client.dart';
 import 'achievements_screen.dart';
 import 'edit_profile_screen.dart';
 import 'favorites_screen.dart';
@@ -14,6 +16,8 @@ import 'share_center_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.onOpenDrawer});
+
+  static const FileUploadClient _fileUploadClient = FileUploadClient();
 
   final VoidCallback? onOpenDrawer;
 
@@ -613,9 +617,18 @@ class ProfileScreen extends StatelessWidget {
         imageQuality: 88,
       );
       if (!context.mounted || pickedFile == null) return;
-      store.setAvatarPath(pickedFile.path);
+      final uploaded = await _fileUploadClient.uploadFile(
+        filePath: pickedFile.path,
+        category: 'avatar',
+      );
+      store.setAvatarPath(uploaded.fileUrl);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('\u5934\u50cf\u5df2\u66f4\u65b0')),
+      );
+    } on FileUploadException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -630,6 +643,16 @@ class ProfileScreen extends StatelessWidget {
   Widget _avatarContent(AppStore store, {double iconSize = 28}) {
     final avatarPath = store.avatarPath;
     if (avatarPath != null) {
+      if (isRemoteMediaPath(avatarPath)) {
+        return Image.network(
+          avatarPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return _avatarFallback(iconSize: iconSize);
+          },
+        );
+      }
       return Image.file(
         File(avatarPath),
         fit: BoxFit.cover,

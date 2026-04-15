@@ -38,7 +38,7 @@ class UserProfileData {
     return UserProfileData(
       name: json['name'] as String? ?? 'Zander',
       userId: json['user_id'] as String? ?? 'zerror_001',
-      motto: json['motto'] as String? ?? '让错误再次发芽，让理解长出来',
+      motto: json['motto'] as String? ?? 'Turn mistakes into momentum.',
       email: json['email'] as String? ?? 'zander@example.com',
     );
   }
@@ -62,9 +62,9 @@ class DeviceSession {
   final bool isOnline;
 
   String get statusLabel {
-    if (isCurrent) return '当前使用中';
-    if (!isOnline) return '已退出';
-    return isTrusted ? '可信设备' : '在线设备';
+    if (isCurrent) return 'Current device';
+    if (!isOnline) return 'Signed out';
+    return isTrusted ? 'Trusted device' : 'Online device';
   }
 
   DeviceSession copyWith({
@@ -99,8 +99,8 @@ class DeviceSession {
   factory DeviceSession.fromJson(Map<String, dynamic> json) {
     return DeviceSession(
       id: json['id'] as String? ?? 'device',
-      name: json['name'] as String? ?? '未命名设备',
-      detail: json['detail'] as String? ?? '最近活跃',
+      name: json['name'] as String? ?? 'Unnamed device',
+      detail: json['detail'] as String? ?? 'Recently active',
       isCurrent: json['is_current'] as bool? ?? false,
       isTrusted: json['is_trusted'] as bool? ?? true,
       isOnline: json['is_online'] as bool? ?? true,
@@ -116,6 +116,7 @@ class AppPersistenceSnapshot {
     this.profile,
     this.passwordUpdatedAt,
     this.devices = const [],
+    this.errors = const [],
   });
 
   final Set<String> favoriteIds;
@@ -124,6 +125,7 @@ class AppPersistenceSnapshot {
   final UserProfileData? profile;
   final DateTime? passwordUpdatedAt;
   final List<DeviceSession> devices;
+  final List<Map<String, dynamic>> errors;
 
   Map<String, dynamic> toJson() {
     return {
@@ -133,6 +135,7 @@ class AppPersistenceSnapshot {
       'profile': profile?.toJson(),
       'password_updated_at': passwordUpdatedAt?.toIso8601String(),
       'devices': devices.map((item) => item.toJson()).toList(growable: false),
+      'errors': errors,
     };
   }
 
@@ -173,7 +176,18 @@ class AppPersistenceSnapshot {
               )
               .toList(growable: false)
           : const [],
+      errors: _toStringMapList(json['errors']),
     );
+  }
+
+  static List<Map<String, dynamic>> _toStringMapList(dynamic value) {
+    if (value is! List) {
+      return const [];
+    }
+    return value
+        .whereType<Map>()
+        .map((item) => item.map((key, mapValue) => MapEntry(key.toString(), mapValue)))
+        .toList(growable: false);
   }
 }
 

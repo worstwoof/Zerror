@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'core/app_state.dart';
-import 'core/local_app_repository.dart';
+import 'core/cloud_backed_app_repository.dart';
 import 'core/theme.dart';
 import 'screen/base/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final repository = await LocalAppRepository.create();
+  final repository = await CloudBackedAppRepository.create();
   final store = await AppStore.bootstrap(repository);
   runApp(ZerrorApp(store: store));
 }

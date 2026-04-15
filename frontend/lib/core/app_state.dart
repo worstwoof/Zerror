@@ -16,6 +16,7 @@ class ErrorRecord {
     required this.tags,
     required this.myAnswer,
     required this.aiAnalysis,
+    this.imageUrl,
     this.isMastered = false,
     this.isFavorite = false,
   });
@@ -29,12 +30,14 @@ class ErrorRecord {
   final List<String> tags;
   final String myAnswer;
   final String aiAnalysis;
+  final String? imageUrl;
   final bool isMastered;
   final bool isFavorite;
 
   ErrorRecord copyWith({
     bool? isMastered,
     bool? isFavorite,
+    String? imageUrl,
   }) {
     return ErrorRecord(
       id: id,
@@ -46,8 +49,44 @@ class ErrorRecord {
       tags: tags,
       myAnswer: myAnswer,
       aiAnalysis: aiAnalysis,
+      imageUrl: imageUrl ?? this.imageUrl,
       isMastered: isMastered ?? this.isMastered,
       isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subject': subject,
+      'topic': topic,
+      'question': question,
+      'reason': reason,
+      'date_label': dateLabel,
+      'tags': tags,
+      'my_answer': myAnswer,
+      'ai_analysis': aiAnalysis,
+      'image_url': imageUrl,
+      'is_mastered': isMastered,
+      'is_favorite': isFavorite,
+    };
+  }
+
+  factory ErrorRecord.fromJson(Map<String, dynamic> json) {
+    final rawTags = json['tags'];
+    return ErrorRecord(
+      id: json['id'] as String? ?? 'error-record',
+      subject: json['subject'] as String? ?? 'General',
+      topic: json['topic'] as String? ?? 'Review',
+      question: json['question'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      dateLabel: json['date_label'] as String? ?? '',
+      tags: rawTags is List ? rawTags.whereType<String>().toList(growable: false) : const [],
+      myAnswer: json['my_answer'] as String? ?? '',
+      aiAnalysis: json['ai_analysis'] as String? ?? '',
+      imageUrl: json['image_url'] as String?,
+      isMastered: json['is_mastered'] as bool? ?? false,
+      isFavorite: json['is_favorite'] as bool? ?? false,
     );
   }
 }
@@ -85,6 +124,7 @@ class NewErrorDraft {
     required this.tags,
     required this.myAnswer,
     required this.aiAnalysis,
+    this.imageUrl,
     this.isFavorite = false,
     this.isMastered = false,
     this.dateLabel,
@@ -97,6 +137,7 @@ class NewErrorDraft {
   final List<String> tags;
   final String myAnswer;
   final String aiAnalysis;
+  final String? imageUrl;
   final bool isFavorite;
   final bool isMastered;
   final String? dateLabel;
@@ -123,7 +164,7 @@ class AppStore extends ChangeNotifier {
     AppRepository? repository,
     AppPersistenceSnapshot? snapshot,
   })  : _repository = repository,
-        _errors = _applySnapshot(_seedErrors(), snapshot),
+        _errors = _restoreErrors(snapshot),
         _profile = snapshot?.profile ?? _defaultProfile,
         _avatarPath = snapshot?.avatarPath,
         _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
@@ -147,8 +188,17 @@ class AppStore extends ChangeNotifier {
   List<DeviceSession> _devices;
 
   static Future<AppStore> bootstrap(AppRepository repository) async {
-    final snapshot = await repository.loadSnapshot();
-    return AppStore.seeded(repository: repository, snapshot: snapshot);
+    AppPersistenceSnapshot? snapshot;
+    try {
+      snapshot = await repository.loadSnapshot();
+    } catch (error) {
+      debugPrint('Snapshot bootstrap failed: $error');
+    }
+    final store = AppStore.seeded(repository: repository, snapshot: snapshot);
+    if (snapshot == null || snapshot.errors.isEmpty) {
+      unawaited(store._persist());
+    }
+    return store;
   }
 
   static List<ErrorRecord> _seedErrors() {
@@ -265,6 +315,15 @@ class AppStore extends ChangeNotifier {
     ];
   }
 
+  static List<ErrorRecord> _restoreErrors(AppPersistenceSnapshot? snapshot) {
+    if (snapshot != null && snapshot.errors.isNotEmpty) {
+      return snapshot.errors
+          .map(ErrorRecord.fromJson)
+          .toList(growable: true);
+    }
+    return _applySnapshot(_seedErrors(), snapshot);
+  }
+
   static List<ErrorRecord> _applySnapshot(
     List<ErrorRecord> seed,
     AppPersistenceSnapshot? snapshot,
@@ -288,6 +347,7 @@ class AppStore extends ChangeNotifier {
       profile: _profile,
       passwordUpdatedAt: _passwordUpdatedAt,
       devices: _devices,
+      errors: _errors.map((item) => item.toJson()).toList(growable: false),
     );
   }
 
@@ -498,6 +558,7 @@ class AppStore extends ChangeNotifier {
       tags: draft.tags,
       myAnswer: draft.myAnswer,
       aiAnalysis: draft.aiAnalysis,
+      imageUrl: draft.imageUrl,
       isFavorite: draft.isFavorite,
       isMastered: draft.isMastered,
     );
@@ -585,7 +646,11 @@ class AppStore extends ChangeNotifier {
   Future<void> _persist() async {
     final repository = _repository;
     if (repository == null) return;
-    await repository.saveSnapshot(snapshot);
+    try {
+      await repository.saveSnapshot(snapshot);
+    } catch (error) {
+      debugPrint('Snapshot persistence failed: $error');
+    }
   }
 
   static String _buildDateLabel(DateTime time) {

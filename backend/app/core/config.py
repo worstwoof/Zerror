@@ -41,6 +41,12 @@ def _get_setting(name: str, file_values: Dict[str, str], default: str = "") -> s
 class Settings:
     app_name: str
     app_version: str
+    database_url: str
+    tencent_cos_secret_id: str
+    tencent_cos_secret_key: str
+    tencent_cos_region: str
+    tencent_cos_bucket: str
+    tencent_cos_base_url: str
     vivo_api_key: str
     vivo_app_id: str
     vivo_base_url: str
@@ -55,12 +61,33 @@ class Settings:
     def has_vivo_credentials(self) -> bool:
         return bool(self.vivo_api_key)
 
+    @property
+    def has_tencent_cos_config(self) -> bool:
+        return all(
+            [
+                self.tencent_cos_secret_id,
+                self.tencent_cos_secret_key,
+                self.tencent_cos_region,
+                self.tencent_cos_bucket,
+            ]
+        )
+
 
 def get_settings() -> Settings:
     file_values = _parse_env_file(DEFAULT_ENV_PATH)
     return Settings(
         app_name=_get_setting("APP_NAME", file_values, "Cuoti DouDui Backend"),
         app_version=_get_setting("APP_VERSION", file_values, "0.1.0"),
+        database_url=_get_setting(
+            "DATABASE_URL",
+            file_values,
+            f"sqlite:///{(PROJECT_ROOT / 'backend' / 'app.db').as_posix()}",
+        ),
+        tencent_cos_secret_id=_get_setting("TENCENT_COS_SECRET_ID", file_values),
+        tencent_cos_secret_key=_get_setting("TENCENT_COS_SECRET_KEY", file_values),
+        tencent_cos_region=_get_setting("TENCENT_COS_REGION", file_values),
+        tencent_cos_bucket=_get_setting("TENCENT_COS_BUCKET", file_values),
+        tencent_cos_base_url=_get_setting("TENCENT_COS_BASE_URL", file_values),
         vivo_api_key=_get_setting("VIVO_API_KEY", file_values),
         vivo_app_id=_get_setting("VIVO_APP_ID", file_values),
         vivo_base_url=_get_setting("VIVO_API_BASE_URL", file_values, "https://api-ai.vivo.com.cn/v1"),

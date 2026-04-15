@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 import '../capture/error_preview_screen.dart';
 import 'data_dashboard_screen.dart';
@@ -811,6 +812,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _avatarContent(AppStore store, {double iconSize = 28}) {
     final avatarPath = store.avatarPath;
     if (avatarPath != null) {
+      if (isRemoteMediaPath(avatarPath)) {
+        return Image.network(
+          avatarPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return _avatarFallback(iconSize: iconSize);
+          },
+        );
+      }
       return Image.file(
         File(avatarPath),
         fit: BoxFit.cover,

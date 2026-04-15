@@ -7,6 +7,7 @@ import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
+import '../../data/file_upload_client.dart';
 import '../base/error_detail_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class ErrorEditScreen extends StatefulWidget {
 
 class _ErrorEditScreenState extends State<ErrorEditScreen> {
   final AiApiClient _apiClient = const AiApiClient();
+  final FileUploadClient _fileUploadClient = const FileUploadClient();
   final List<String> _errorReasons = const [
     '粗心大意',
     '概念模糊',
@@ -39,6 +41,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   late final TextEditingController _reflectionController;
 
   bool _isAiThinking = true;
+  bool _isSaving = false;
   String _selectedErrorReason = '';
   String _subject = '通用';
   String _solutionSummary = '';
@@ -125,7 +128,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     _richArtifacts = result.richArtifacts;
   }
 
-  void _saveToArchive() {
+  Future<void> _saveToArchive() async {
     final question = _questionController.text.trim();
     if (question.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +155,75 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         SnackBar(content: Text('保存失败：$error')),
       );
     }
+  }
+
+  Future<void> _saveToArchiveWithUpload() async {
+    final question = _questionController.text.trim();
+    if (_isSaving) return;
+    if (question.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先确认题目内容')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      String? imageUrl;
+      if (widget.imagePath.isNotEmpty) {
+        final uploaded = await _fileUploadClient.uploadFile(
+          filePath: widget.imagePath,
+          category: 'error-image',
+        );
+        imageUrl = uploaded.fileUrl;
+      }
+
+      final draft = _buildDraftWithImage(question, imageUrl: imageUrl);
+      final created = AppStateScope.of(context).addErrorRecord(draft);
+
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('错题已加入档案')),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ErrorDetailScreen(errorId: created.id),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败: $error')),
+      );
+    }
+  }
+
+  NewErrorDraft _buildDraftWithImage(String question, {String? imageUrl}) {
+    final draft = _buildDraft(question);
+    return NewErrorDraft(
+      subject: draft.subject,
+      topic: draft.topic,
+      question: draft.question,
+      reason: draft.reason,
+      tags: draft.tags,
+      myAnswer: draft.myAnswer,
+      aiAnalysis: draft.aiAnalysis,
+      imageUrl: imageUrl,
+      isFavorite: draft.isFavorite,
+      isMastered: draft.isMastered,
+      dateLabel: draft.dateLabel,
+    );
   }
 
   NewErrorDraft _buildDraft(String question) {
@@ -294,7 +366,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 child: AppPrimaryButton(
                   label: '生成我的错题档案',
                   icon: Icons.library_add_check_rounded,
-                  onPressed: _saveToArchive,
+                  onPressed: _isSaving ? null : _saveToArchiveWithUpload,
                 ),
               ),
             ),

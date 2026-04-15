@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
+import '../../data/file_upload_client.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,9 +19,11 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final Color primaryGreen = AppPalette.matchaMist;
   final ImagePicker _picker = ImagePicker();
+  final FileUploadClient _fileUploadClient = const FileUploadClient();
 
   File? _avatarImage;
   bool _initialized = false;
+  bool _isSaving = false;
 
   late final TextEditingController _nameController;
   late final TextEditingController _idController;
@@ -65,21 +69,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (pickedFile == null) return;
       setState(() => _avatarImage = File(pickedFile.path));
     } catch (error) {
-      debugPrint('选择头像失败: $error');
+      debugPrint('Pick avatar failed: $error');
     }
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
+    if (_isSaving) return;
     final store = AppStateScope.of(context);
+
+    setState(() => _isSaving = true);
     store.updateProfile(
       name: _nameController.text,
       userId: _idController.text,
       motto: _bioController.text,
       email: _emailController.text,
     );
+
     if (_avatarImage != null) {
-      store.setAvatarPath(_avatarImage!.path);
+      try {
+        final uploaded = await _fileUploadClient.uploadFile(
+          filePath: _avatarImage!.path,
+          category: 'avatar',
+        );
+        store.setAvatarPath(uploaded.fileUrl);
+      } on FileUploadException catch (error) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+        return;
+      }
     }
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('资料已更新')),
     );
@@ -116,7 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: _saveProfile,
+            onPressed: _isSaving ? null : _saveProfile,
             child: const Text(
               '保存',
               style: TextStyle(
@@ -162,28 +186,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           child: CircleAvatar(
                             radius: 52,
                             backgroundColor: Colors.black26,
-                            child: avatarPath == null
-                                ? const Icon(
-                                    Icons.person_rounded,
-                                    color: AppPalette.textPrimary,
-                                    size: 42,
-                                  )
-                                : ClipOval(
-                                    child: Image.file(
-                                      File(avatarPath),
-                                      width: 104,
-                                      height: 104,
-                                      fit: BoxFit.cover,
-                                      filterQuality: FilterQuality.medium,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.person_rounded,
-                                          color: AppPalette.textPrimary,
-                                          size: 42,
-                                        );
-                                      },
-                                    ),
-                                  ),
+                            child: _buildAvatarPreview(avatarPath),
                           ),
                         ),
                         Container(
@@ -206,7 +209,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 32),
                 const AppSectionTitle(
                   title: '基础资料',
-                  subtitle: '更新公开展示的昵称、账号和个人简介',
+                  subtitle: '更新昵称、账号 ID 和个人简介',
                   icon: Icons.badge_rounded,
                 ),
                 const SizedBox(height: 16),
@@ -238,7 +241,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 28),
                 const AppSectionTitle(
                   title: '联系信息',
-                  subtitle: '后续找回账号和消息通知都会参考这里',
+                  subtitle: '后续找回账号和通知会参考这里',
                   icon: Icons.mail_outline_rounded,
                 ),
                 const SizedBox(height: 16),
@@ -254,9 +257,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: AppPrimaryButton(
-                    label: '保存修改',
+                    label: _isSaving ? '上传中...' : '保存修改',
                     icon: Icons.check_rounded,
-                    onPressed: _saveProfile,
+                    onPressed: _isSaving ? null : _saveProfile,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -264,6 +267,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarPreview(String? avatarPath) {
+    if (avatarPath == null || avatarPath.isEmpty) {
+      return const Icon(
+        Icons.person_rounded,
+        color: AppPalette.textPrimary,
+        size: 42,
+      );
+    }
+
+    if (isRemoteMediaPath(avatarPath)) {
+      return ClipOval(
+        child: Image.network(
+          avatarPath,
+          width: 104,
+          height: 104,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return const Icon(
+              Icons.person_rounded,
+              color: AppPalette.textPrimary,
+              size: 42,
+            );
+          },
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: Image.file(
+        File(avatarPath),
+        width: 104,
+        height: 104,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(
+            Icons.person_rounded,
+            color: AppPalette.textPrimary,
+            size: 42,
+          );
+        },
       ),
     );
   }
