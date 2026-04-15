@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
+import '../../data/ai_api_client.dart';
 import '../base/error_detail_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
@@ -12,25 +14,19 @@ class ErrorEditScreen extends StatefulWidget {
     super.key,
     required this.imagePath,
     required this.initialText,
+    this.initialAnalysis,
   });
 
   final String imagePath;
   final String initialText;
+  final AnalysisResult? initialAnalysis;
 
   @override
   State<ErrorEditScreen> createState() => _ErrorEditScreenState();
 }
 
 class _ErrorEditScreenState extends State<ErrorEditScreen> {
-  final Color primaryGreen = AppPalette.matchaMist;
-
-  late final TextEditingController _questionController;
-  late final TextEditingController _reflectionController;
-
-  bool _isAiThinking = true;
-  bool _showSimilarQuestions = false;
-  String _selectedErrorReason = '';
-
+  final AiApiClient _apiClient = const AiApiClient();
   final List<String> _errorReasons = const [
     '粗心大意',
     '概念模糊',
@@ -39,12 +35,33 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     '计算错误',
   ];
 
+  late final TextEditingController _questionController;
+  late final TextEditingController _reflectionController;
+
+  bool _isAiThinking = true;
+  String _selectedErrorReason = '';
+  String _subject = '通用';
+  String _solutionSummary = '';
+  String _mistakeDiagnosis = '';
+  String _reviewFocus = '';
+  List<int> _reviewSchedule = const [];
+  List<String> _knowledgePoints = const [];
+  List<String> _solutionSteps = const [];
+  List<SimilarQuestionItem> _similarQuestions = const [];
+  List<Map<String, dynamic>> _richArtifacts = const [];
+  String? _analysisError;
+
   @override
   void initState() {
     super.initState();
     _questionController = TextEditingController(text: widget.initialText);
     _reflectionController = TextEditingController();
-    _simulateAiAnalysis();
+    if (widget.initialAnalysis != null) {
+      _applyAnalysisResult(widget.initialAnalysis!);
+      _isAiThinking = false;
+    } else {
+      _generateAiAnalysis();
+    }
   }
 
   @override
@@ -54,10 +71,58 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     super.dispose();
   }
 
-  Future<void> _simulateAiAnalysis() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isAiThinking = false);
+  Future<void> _generateAiAnalysis() async {
+    final questionText = _questionController.text.trim();
+    if (questionText.isEmpty) {
+      setState(() {
+        _analysisError = '请先确认题目内容后再生成解析。';
+        _isAiThinking = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isAiThinking = true;
+      _analysisError = null;
+    });
+
+    try {
+      final result = await _apiClient.analyzeQuestion(
+        questionText: questionText,
+        subject: _guessSubject(questionText),
+        wrongReasonHint: _selectedErrorReason,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _applyAnalysisResult(result);
+        _isAiThinking = false;
+      });
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _analysisError = error.message;
+        _isAiThinking = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _analysisError = 'AI 解析失败，请检查本地后端或 vivo 接口配置。';
+        _isAiThinking = false;
+      });
+    }
+  }
+
+  void _applyAnalysisResult(AnalysisResult result) {
+    _subject = result.subject;
+    _knowledgePoints = result.knowledgePoints;
+    _solutionSummary = result.solutionSummary;
+    _solutionSteps = result.solutionSteps;
+    _mistakeDiagnosis = result.mistakeDiagnosis;
+    _reviewFocus = result.reviewFocus;
+    _reviewSchedule = result.reviewSchedule;
+    _similarQuestions = result.similarQuestions;
+    _richArtifacts = result.richArtifacts;
   }
 
   void _saveToArchive() {
@@ -90,13 +155,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   NewErrorDraft _buildDraft(String question) {
-    final subject = _inferSubject(question);
+    final subject = _subject == '通用' ? _inferSubject(question) : _subject;
     final topic = _inferTopic(question, subject);
-    final reason = _selectedErrorReason.isNotEmpty
-        ? _selectedErrorReason
-        : '概念模糊';
+    final reason = _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
     final reflection = _reflectionController.text.trim();
-    final note = reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection;
+
+    final summaryParts = <String>[
+      if (_solutionSummary.isNotEmpty) _solutionSummary,
+      if (_mistakeDiagnosis.isNotEmpty) '错因诊断：$_mistakeDiagnosis',
+      if (_reviewFocus.isNotEmpty)
+        _reviewSchedule.isEmpty
+            ? '复习建议：$_reviewFocus'
+            : '复习建议：$_reviewFocus（${_reviewSchedule.join(' / ')} 天）',
+      if (_richArtifacts.isNotEmpty)
+        '扩展内容：已生成 ${_richArtifacts.length} 个学科增强模块，可在后续版本接入展示。',
+    ];
 
     return NewErrorDraft(
       subject: subject,
@@ -104,11 +177,25 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       question: question,
       reason: reason,
       tags: _buildTags(subject, topic),
-      myAnswer: note,
-      aiAnalysis: _buildAiAnalysis(subject, topic),
+      myAnswer: reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection,
+      aiAnalysis: summaryParts.isEmpty ? _buildFallbackAnalysis(subject, topic) : summaryParts.join('\n\n'),
       isFavorite: false,
       isMastered: false,
     );
+  }
+
+  String _guessSubject(String questionText) {
+    final content = questionText.toLowerCase();
+    if (content.contains('矩阵') || content.contains('特征值') || content.contains('函数') || content.contains('导数')) {
+      return '数学';
+    }
+    if (content.contains('受力') || content.contains('加速度') || content.contains('电路') || content.contains('速度')) {
+      return '物理';
+    }
+    if (content.contains('cache') || content.contains('cpu') || content.contains('算法') || content.contains('java')) {
+      return '计算机';
+    }
+    return '通用';
   }
 
   String _inferSubject(String question) {
@@ -125,10 +212,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (question.contains('贝叶斯') || question.contains('概率')) {
       return '概率论';
     }
-    return '综合复盘';
+    return _subject == '通用' ? '综合复盘' : _subject;
   }
 
   String _inferTopic(String question, String subject) {
+    if (_knowledgePoints.isNotEmpty) {
+      return _knowledgePoints.first;
+    }
     if (question.contains('特征值') || question.contains('伴随矩阵')) {
       return '矩阵特征值与相似对角化';
     }
@@ -149,10 +239,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       subject,
       topic,
       '新录入',
+      if (_selectedErrorReason.isNotEmpty) _selectedErrorReason,
     ];
   }
 
-  String _buildAiAnalysis(String subject, String topic) {
+  String _buildFallbackAnalysis(String subject, String topic) {
     return '这道题已归入「$subject」中的「$topic」。建议先弄清楚题目考的核心定义，再把关键推理步骤拆成 2 到 3 个可复述的小步骤，后续复习时更容易真正回收。';
   }
 
@@ -174,9 +265,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _isAiThinking ? null : _generateAiAnalysis,
+            icon: const Icon(Icons.refresh_rounded, color: AppPalette.textPrimary),
+            tooltip: '重新生成解析',
+          ),
+        ],
       ),
       body: AppSurface(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
         child: _isAiThinking ? _buildLoadingState() : _buildAnalysisDashboard(),
       ),
       bottomNavigationBar: _isAiThinking
@@ -208,17 +306,19 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       child: AppPanel(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            CircularProgressIndicator(color: AppPalette.almondCream),
-            SizedBox(height: 24),
-            Text(
+          children: [
+            const CircularProgressIndicator(color: AppPalette.almondCream),
+            const SizedBox(height: 24),
+            const Text(
               '知芽 AI 正在深度分析题目...',
               style: TextStyle(color: AppPalette.textPrimary, fontSize: 16),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              '正在生成归因、知识点和后续训练建议',
-              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+              _selectedErrorReason.isEmpty
+                  ? '正在生成归因、知识点和后续训练建议'
+                  : '正在结合“$_selectedErrorReason”重新分析',
+              style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -227,12 +327,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildAnalysisDashboard() {
-    final question = _questionController.text.trim();
-    final subject = _inferSubject(question);
-    final topic = _inferTopic(question, subject);
+    final subject = _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
+    final topic = _inferTopic(_questionController.text, subject);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(top: 72, bottom: 96),
+      padding: const EdgeInsets.only(bottom: 96),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -274,13 +373,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 ),
                 const SizedBox(width: 12),
               ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _TagChip(label: subject),
-                  _TagChip(label: topic),
-                ],
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildTagChip(subject),
+                    _buildTagChip(topic),
+                    ..._knowledgePoints.take(2).map(_buildTagChip),
+                  ],
+                ),
               ),
             ],
           ),
@@ -298,6 +400,56 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               isDense: true,
             ),
           ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              ),
+            ),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _questionController,
+              builder: (context, value, _) {
+                final previewText = value.text.trim();
+                if (previewText.isEmpty) {
+                  return const Text(
+                    '这里会实时显示题干的 LaTeX 渲染效果。',
+                    style: TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 13,
+                    ),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '题干渲染预览',
+                      style: TextStyle(
+                        color: AppPalette.almondCream,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AppLatexText(
+                      previewText,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 14,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -305,13 +457,32 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
-      color: primaryGreen.withValues(alpha: 0.08),
+      color: AppPalette.matchaMist.withValues(alpha: 0.08),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_analysisError != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0x22E17D6B),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0x55E17D6B)),
+              ),
+              child: Text(
+                'AI 解析暂时失败：$_analysisError',
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  height: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           const AppSectionTitle(
-            title: 'AI 解题摘要',
-            subtitle: '先看归因，再决定是否继续补训练',
+            title: 'AI 深度解析',
+            subtitle: '现在已经接入真实后端结果',
             icon: Icons.auto_awesome,
           ),
           const SizedBox(height: 16),
@@ -322,40 +493,112 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               color: AppPalette.night.withValues(alpha: 0.70),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: AppPalette.textPrimary,
-                  size: 36,
+            alignment: Alignment.center,
+            child: const Text(
+              '预留：后续可接入动态板书 / HTML 扩展内容',
+              style: TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          if (_richArtifacts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildRichArtifactsPreview(),
+          ],
+          const SizedBox(height: 16),
+          _buildSectionLabel('💡 破题技巧'),
+          const SizedBox(height: 6),
+          AppLatexText(
+            _solutionSummary.isEmpty ? '等待 AI 返回解析结果。' : _solutionSummary,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              height: 1.5,
+              fontSize: 14,
+            ),
+          ),
+          if (_mistakeDiagnosis.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildSectionLabel('⚠️ 错因诊断'),
+            const SizedBox(height: 6),
+            AppLatexText(
+              _mistakeDiagnosis,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                height: 1.5,
+                fontSize: 14,
+              ),
+            ),
+          ],
+          if (_reviewFocus.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildSectionLabel('📅 复习建议'),
+            const SizedBox(height: 6),
+            AppLatexText(
+              _reviewSchedule.isEmpty
+                  ? _reviewFocus
+                  : '$_reviewFocus\n推荐节奏：${_reviewSchedule.join(' / ')} 天',
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                height: 1.5,
+                fontSize: 14,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              iconColor: AppPalette.almondCream,
+              collapsedIconColor: AppPalette.almondCream,
+              title: const Text(
+                '查看详细推导步骤',
+                style: TextStyle(
+                  color: AppPalette.almondCream,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
-                SizedBox(width: 12),
-                Text(
-                  '播放 AI 动态讲解',
-                  style: TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
+              ),
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _solutionSteps.isEmpty
+                      ? const Text(
+                          '当前没有可展示的详细步骤。',
+                          style: TextStyle(
+                            color: AppPalette.textPrimary,
+                            height: 1.6,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: _solutionSteps
+                              .map(
+                                (step) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: AppLatexText(
+                                    step,
+                                    style: const TextStyle(
+                                      color: AppPalette.textPrimary,
+                                      height: 1.6,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             '归档方向：$subject · $topic',
             style: const TextStyle(
               color: AppPalette.almondCream,
               fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _buildAiAnalysis(subject, topic),
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              height: 1.6,
-              fontSize: 14,
             ),
           ),
         ],
@@ -364,14 +607,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildSimilarQuestionsArea(String topic) {
-    if (!_showSimilarQuestions) {
+    if (_similarQuestions.isEmpty) {
       return SizedBox(
         width: double.infinity,
         child: OutlinedButton.icon(
-          onPressed: () => setState(() => _showSimilarQuestions = true),
+          onPressed: _isAiThinking ? null : _generateAiAnalysis,
           icon: const Icon(Icons.hub_rounded, color: AppPalette.almondCream),
           label: const Text(
-            '生成举一反三练习',
+            '重新生成举一反三练习',
             style: TextStyle(color: AppPalette.almondCream),
           ),
           style: OutlinedButton.styleFrom(
@@ -393,29 +636,50 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         children: [
           const AppSectionTitle(
             title: '举一反三',
-            subtitle: '后续可以直接把这里接入智能组卷或薄弱点训练',
+            subtitle: '后续可以把这里接到智能组卷或薄弱点训练',
             icon: Icons.explore_rounded,
           ),
           const SizedBox(height: 14),
           Text(
-            '变式练习：围绕「$topic」再补一题，重点检查你是否能自己复述关键推理步骤。',
+            '变式练习围绕「$topic」继续展开，方便后续直接进入二次练习。',
             style: const TextStyle(
               color: AppPalette.textPrimary,
               fontSize: 14,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {},
-              child: const Text(
-                '稍后去组卷练习',
-                style: TextStyle(color: AppPalette.matchaMist),
+          const SizedBox(height: 12),
+          ..._similarQuestions.asMap().entries.map((entry) {
+            final index = entry.key;
+            final question = entry.value;
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == _similarQuestions.length - 1 ? 0 : 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppLatexText(
+                    '练习 ${index + 1}：${question.prompt}',
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                  if (question.answerOutline.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    AppLatexText(
+                      '答案提纲：${question.answerOutline}',
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
@@ -445,7 +709,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               return ChoiceChip(
                 label: Text(reason),
                 selected: isSelected,
-                selectedColor: primaryGreen,
+                selectedColor: AppPalette.matchaMist,
                 backgroundColor: Colors.white.withValues(alpha: 0.05),
                 labelStyle: TextStyle(
                   color: isSelected ? AppPalette.night : AppPalette.textPrimary,
@@ -453,9 +717,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 ),
                 side: BorderSide.none,
                 onSelected: (selected) {
-                  if (selected) {
-                    setState(() => _selectedErrorReason = reason);
-                  }
+                  if (!selected) return;
+                  setState(() => _selectedErrorReason = reason);
+                  _generateAiAnalysis();
                 },
               );
             }).toList(),
@@ -470,6 +734,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
             decoration: InputDecoration(
               hintText: '写下你自己的避坑笔记...',
+              hintStyle: const TextStyle(color: AppPalette.textSecondary),
               filled: true,
               fillColor: Colors.white.withValues(alpha: 0.03),
               border: OutlineInputBorder(
@@ -478,33 +743,191 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _isAiThinking ? null : _generateAiAnalysis,
+              icon: const Icon(Icons.auto_awesome, color: AppPalette.matchaMist, size: 18),
+              label: const Text(
+                '结合当前题目重新分析',
+                style: TextStyle(color: AppPalette.matchaMist),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
-}
 
-class _TagChip extends StatelessWidget {
-  const _TagChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppPalette.matchaMist.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppPalette.matchaMist,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+  Widget _buildTagChip(String label) {
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      backgroundColor: AppPalette.almondCream.withValues(alpha: 0.12),
+      side: BorderSide.none,
+      labelStyle: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontWeight: FontWeight.w500,
       ),
     );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildRichArtifactsPreview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionLabel('🧩 学科扩展'),
+        const SizedBox(height: 8),
+        ..._richArtifacts.map(_buildRichArtifactCard),
+      ],
+    );
+  }
+
+  Widget _buildRichArtifactCard(Map<String, dynamic> artifact) {
+    final type = (artifact['artifact_type'] ?? '').toString();
+    final title = (artifact['title'] ?? '').toString().trim();
+    final description = (artifact['description'] ?? '').toString().trim();
+    final mimeType = (artifact['mime_type'] ?? '').toString().trim();
+    final content = (artifact['content'] ?? '').toString().trim();
+
+    final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
+    final displayDescription = description.isEmpty
+        ? _fallbackArtifactDescription(type)
+        : description;
+    final previewText = _artifactPreviewText(type, mimeType, content);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _artifactIcon(type),
+                color: AppPalette.almondCream,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayTitle,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            displayDescription,
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          if (previewText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            AppLatexText(
+              previewText,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _artifactIcon(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return Icons.motion_photos_auto_rounded;
+      case 'chart_spec':
+        return Icons.show_chart_rounded;
+      case 'code_snippet':
+        return Icons.code_rounded;
+      case 'timeline':
+        return Icons.timeline_rounded;
+      case 'study_card':
+        return Icons.style_rounded;
+      default:
+        return Icons.extension_rounded;
+    }
+  }
+
+  String _fallbackArtifactTitle(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return '交互式演示内容';
+      case 'chart_spec':
+        return '图表可视化内容';
+      case 'code_snippet':
+        return '代码示例';
+      case 'timeline':
+        return '流程时间线';
+      case 'study_card':
+        return '复习卡片';
+      default:
+        return '扩展内容';
+    }
+  }
+
+  String _fallbackArtifactDescription(String type) {
+    switch (type) {
+      case 'interactive_html':
+        return '已生成适合接入 WebView 的 HTML 内容，后续可用于播放学科演示动画。';
+      case 'chart_spec':
+        return '已生成结构化图表配置，后续可对接函数图像或统计图渲染。';
+      case 'code_snippet':
+        return '已生成关键代码与执行思路，适合编程题扩展展示。';
+      case 'timeline':
+        return '已生成流程型内容，后续可用于步骤推演或时序复盘。';
+      case 'study_card':
+        return '已生成可拆分展示的知识卡片，适合移动端碎片化复习。';
+      default:
+        return '已生成可扩展展示内容。';
+    }
+  }
+
+  String _artifactPreviewText(String type, String mimeType, String content) {
+    if (content.isEmpty) {
+      return '';
+    }
+    if (type == 'interactive_html' || mimeType == 'text/html') {
+      return '已生成 HTML 片段，可在后续版本中直接接入 WebView 展示交互动画。';
+    }
+
+    final singleLine = content.replaceAll('\n', ' ').trim();
+    if (singleLine.length <= 120) {
+      return singleLine;
+    }
+    return '${singleLine.substring(0, 120)}...';
   }
 }

@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
+import '../../data/ai_api_client.dart';
 import '../../core/theme.dart';
-import 'error_edit_screen.dart';
+import 'error_edit_screen.dart'; // 🌟 引入刚写的编辑页
 
 class ErrorPreviewScreen extends StatefulWidget {
   const ErrorPreviewScreen({super.key, required this.imagePath});
@@ -15,23 +15,48 @@ class ErrorPreviewScreen extends StatefulWidget {
 }
 
 class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
-  bool _isRecognizing = false;
+  final AiApiClient _apiClient = const AiApiClient();
+  bool _isRecognizing = false; // 控制加载动画的状态
 
+  // 直接调用图片解析接口，减少 OCR 误差在前端二次放大的问题。
   Future<void> _startOCR() async {
-    setState(() => _isRecognizing = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isRecognizing = false);
+    setState(() { _isRecognizing = true; });
 
-      const mockExtractedText = '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆。求证：A 的伴随矩阵 A* 的特征值。';
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => ErrorEditScreen(
-          imagePath: widget.imagePath,
-          initialText: mockExtractedText,
+    try {
+      final payload = await _apiClient.analyzeImage(
+        imagePath: widget.imagePath,
+      );
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ErrorEditScreen(
+            imagePath: widget.imagePath,
+            initialText: payload.extractedText,
+            initialAnalysis: payload.analysis,
+          ),
         ),
-      ),
-    );
+      );
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('图片解析失败：${error.message}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _isRecognizing = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('图片解析失败，请检查本地后端是否已启动。'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
@@ -103,7 +128,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                             height: 20,
                             child: CircularProgressIndicator(color: AppPalette.night, strokeWidth: 2),
                           )
-                        : const Text('提取文字', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : const Text('分析题目', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
