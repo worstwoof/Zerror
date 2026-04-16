@@ -132,10 +132,65 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     _richArtifacts = result.richArtifacts;
     _isGeneratingPhysicsAnimation = false;
     _physicsAnimationError = null;
+    _maybeAutoGeneratePhysicsAnimation();
   }
 
   bool _supportsPhysicsAnimation() {
-    return _subject.trim().contains('物理');
+    return _resolvedPhysicsSubject().contains('物理');
+  }
+
+  String _resolvedPhysicsSubject() {
+    final combined = [
+      _subject.trim(),
+      _questionController.text.trim(),
+      _knowledgePoints.join(' '),
+      _solutionSummary,
+    ].join(' ').toLowerCase();
+
+    const physicsKeywords = <String>[
+      '物理',
+      '力学',
+      '运动',
+      '速度',
+      '加速度',
+      '受力',
+      '摩擦',
+      '木板',
+      '物块',
+      '板块',
+      '斜面',
+      '平抛',
+      '碰撞',
+      '电路',
+      '光学',
+      '透镜',
+      '反射',
+      '折射',
+    ];
+
+    final matchesPhysics = physicsKeywords.any(combined.contains);
+    if (_subject.trim().contains('物理') || matchesPhysics) {
+      return '物理';
+    }
+    return _subject;
+  }
+
+  void _maybeAutoGeneratePhysicsAnimation() {
+    if (!_supportsPhysicsAnimation() ||
+        _hasInteractiveHtmlArtifact() ||
+        _isGeneratingPhysicsAnimation) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_supportsPhysicsAnimation() ||
+          _hasInteractiveHtmlArtifact() ||
+          _isGeneratingPhysicsAnimation) {
+        return;
+      }
+      _generatePhysicsAnimation();
+    });
   }
 
   bool _hasInteractiveHtmlArtifact() {
@@ -182,7 +237,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       final result = await _apiClient.generatePhysicsAnimation(
         PhysicsAnimationPayload(
           cleanedQuestion: questionText,
-          subject: _subject,
+          subject: _resolvedPhysicsSubject(),
           knowledgePoints: _knowledgePoints,
           solutionSummary: _solutionSummary,
           solutionSteps: _solutionSteps,

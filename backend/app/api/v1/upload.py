@@ -126,7 +126,7 @@ async def analyze_image(
                         subject=subject,
                         user_answer=user_answer,
                         wrong_reason_hint=wrong_reason_hint,
-                        enable_subject_extensions=False,
+                        enable_subject_extensions=enable_subject_extensions,
                     )
                 )
                 analysis_elapsed = time.perf_counter() - analysis_started_at
