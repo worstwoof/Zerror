@@ -280,11 +280,12 @@ class AppStore extends ChangeNotifier {
     WeeklyCalendarEntry(weekday: '日', dayLabel: '13', state: CalendarState.rest),
   ];
 
-  final List<int> weeklyReviewMinutes = const [18, 32, 24, 40, 28, 16, 36];
-  final int studyStreakDays = 14;
-  final int invitedCount = 3;
-  final int pendingInviteCount = 2;
-  final String inviteCode = 'ZERROR-2026';
+  List<int> get weeklyReviewMinutes {
+    if (!hasLearningHistory) {
+      return List<int>.filled(7, 0, growable: false);
+    }
+    return const [18, 32, 24, 40, 28, 16, 36];
+  }
 
   String get userName => _profile.name;
   String get userId => _profile.userId;
@@ -364,9 +365,23 @@ class AppStore extends ChangeNotifier {
   int get masteredCount => masteredErrors.length;
   int get knowledgePointCount => _errors.map((item) => item.topic).toSet().length;
   int get subjectCount => _errors.map((item) => item.subject).toSet().length;
+  bool get hasLearningHistory => totalErrors > 0;
+  int get invitedCount => 0;
+  int get pendingInviteCount => 0;
+  String get inviteCode {
+    final raw = (syncUserId ?? userId)
+        .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+        .toUpperCase();
+    if (raw.isEmpty) {
+      return 'ZERROR-NEW';
+    }
+    final suffix = raw.length > 6 ? raw.substring(0, 6) : raw;
+    return 'ZERROR-$suffix';
+  }
   int get unlockedMonths => invitedCount;
   int get completedReviewDaysThisWeek =>
-      weeklyCalendar.where((entry) => entry.state == CalendarState.done).length;
+      hasLearningHistory ? weeklyCalendar.where((entry) => entry.state == CalendarState.done).length : 0;
+  int get studyStreakDays => hasLearningHistory ? completedReviewDaysThisWeek : 0;
   int get todayPlannedMinutes =>
       todayTasks.fold(0, (sum, task) => sum + task.durationMinutes);
   double get masteryRate => totalErrors == 0 ? 0 : masteredCount / totalErrors;
@@ -427,6 +442,9 @@ class AppStore extends ChangeNotifier {
   }
 
   List<LearningTask> get todayTasks {
+    if (!hasLearningHistory) {
+      return const [];
+    }
     final focusSubject = weakestSubject == '暂无' ? '当前重点模块' : weakestSubject;
     return [
       LearningTask(
@@ -448,6 +466,9 @@ class AppStore extends ChangeNotifier {
   }
 
   List<GoalStepData> get goalSteps {
+    if (!hasLearningHistory) {
+      return const [];
+    }
     return [
       GoalStepData(
         title: '每天完成 1 次智能复习',

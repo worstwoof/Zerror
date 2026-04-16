@@ -307,10 +307,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(
                     width: itemWidth,
                     child: _quickAction(
-                      icon: Icons.edit_note_rounded,
-                      label: '手动记录',
+                      icon: Icons.bolt_rounded,
+                      label: '智能组卷',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ManualEntryScreen()),
+                        MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
                       ),
                     ),
                   ),
