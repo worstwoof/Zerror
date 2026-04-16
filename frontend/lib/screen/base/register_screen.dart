@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_state.dart';
 import '../../core/theme.dart';
 import '../../data/auth_api_client.dart';
-import 'home_screen.dart';
+import 'login_form_screen.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -86,12 +86,19 @@ class _RegisterScreenState extends State<RegisterScreen>
         username: username,
         email: email,
         password: password,
+        signInAfterRegister: false,
       );
 
       if (!mounted) return;
+      _showSnackBar('注册成功，请先登录');
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (context) => LoginFormScreen(
+            initialIdentifier: username,
+            initialPassword: password,
+          ),
+        ),
         (Route<dynamic> route) => false,
       );
     } on AuthApiException catch (error) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
@@ -6,7 +8,14 @@ import '../../data/auth_api_client.dart';
 import 'home_screen.dart';
 
 class LoginFormScreen extends StatefulWidget {
-  const LoginFormScreen({super.key});
+  const LoginFormScreen({
+    super.key,
+    this.initialIdentifier = '',
+    this.initialPassword = '',
+  });
+
+  final String initialIdentifier;
+  final String initialPassword;
 
   @override
   State<LoginFormScreen> createState() => _LoginFormScreenState();
@@ -23,10 +32,16 @@ class _LoginFormScreenState extends State<LoginFormScreen>
   late Animation<double> _buttonScaleAnimation;
 
   bool _isLoading = false;
+  bool _rememberPassword = false;
+  bool _autoLogin = false;
+  bool _rememberedStateLoaded = false;
 
   @override
   void initState() {
     super.initState();
+
+    _usernameController.text = widget.initialIdentifier;
+    _passwordController.text = widget.initialPassword;
 
     _logoBreathController = AnimationController(
       vsync: this,
@@ -49,6 +64,33 @@ class _LoginFormScreenState extends State<LoginFormScreen>
     _buttonScaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
       CurvedAnimation(parent: _buttonPressController, curve: Curves.easeInOut),
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_restoreRememberedLogin());
+    });
+  }
+
+  Future<void> _restoreRememberedLogin() async {
+    if (_rememberedStateLoaded || !mounted) return;
+    final remembered = await AppStateScope.of(context).loadRememberedLogin();
+    if (!mounted) return;
+
+    if (remembered != null) {
+      if (_usernameController.text.trim().isEmpty) {
+        _usernameController.text = remembered.identifier;
+      }
+      if (_passwordController.text.isEmpty) {
+        _passwordController.text = remembered.password;
+      }
+      setState(() {
+        _rememberPassword = remembered.rememberPassword;
+        _autoLogin = remembered.autoLogin;
+        _rememberedStateLoaded = true;
+      });
+      return;
+    }
+
+    setState(() => _rememberedStateLoaded = true);
   }
 
   Future<void> _handleLogin() async {
@@ -66,6 +108,9 @@ class _LoginFormScreenState extends State<LoginFormScreen>
       await AppStateScope.of(context).loginUser(
         identifier: identifier,
         password: password,
+        persistSession: _autoLogin,
+        rememberPassword: _rememberPassword,
+        autoLogin: _autoLogin,
       );
 
       if (!mounted) return;
@@ -83,6 +128,24 @@ class _LoginFormScreenState extends State<LoginFormScreen>
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _toggleRememberPassword(bool value) {
+    setState(() {
+      _rememberPassword = value;
+      if (!value) {
+        _autoLogin = false;
+      }
+    });
+  }
+
+  void _toggleAutoLogin(bool value) {
+    setState(() {
+      _autoLogin = value;
+      if (value) {
+        _rememberPassword = true;
+      }
+    });
   }
 
   void _showSnackBar(String message) {
@@ -191,7 +254,28 @@ class _LoginFormScreenState extends State<LoginFormScreen>
                     icon: Icons.lock_outline_rounded,
                     obscureText: true,
                   ),
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _authOption(
+                          label: '记住密码',
+                          value: _rememberPassword,
+                          onChanged: _toggleRememberPassword,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _authOption(
+                          label: '自动登录',
+                          value: _autoLogin,
+                          enabled: _rememberPassword || _autoLogin,
+                          onChanged: _toggleAutoLogin,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 88),
                   GestureDetector(
                     onTapDown: (_) => _buttonPressController.forward(),
                     onTapUp: (_) {
@@ -280,6 +364,50 @@ class _LoginFormScreenState extends State<LoginFormScreen>
           borderSide: BorderSide(color: AppPalette.honeyOrange, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
+      ),
+    );
+  }
+
+  Widget _authOption({
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    bool enabled = true,
+  }) {
+    final textColor = enabled
+        ? AppPalette.textSecondary
+        : AppPalette.textSecondary.withValues(alpha: 0.45);
+    return InkWell(
+      onTap: enabled ? () => onChanged(!value) : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: value,
+                onChanged: enabled ? (next) => onChanged(next ?? false) : null,
+                activeColor: AppPalette.almondCream,
+                checkColor: AppPalette.night,
+                side: BorderSide(color: textColor),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

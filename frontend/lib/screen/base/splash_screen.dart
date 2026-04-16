@@ -50,19 +50,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
 
     Future.delayed(const Duration(milliseconds: 5800), () {
-      if (!mounted) return;
-      final store = AppStateScope.of(context);
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              store.isAuthenticated ? const HomeScreen() : const LoginScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-      );
+      unawaited(_finishLaunch());
     });
+  }
+
+  Future<void> _finishLaunch() async {
+    if (!mounted) return;
+    final store = AppStateScope.of(context);
+    var authenticated = store.isAuthenticated;
+    if (!authenticated) {
+      authenticated = await store.tryAutoLogin();
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 800),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            authenticated ? const HomeScreen() : const LoginScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
   }
 
   @override

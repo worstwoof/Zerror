@@ -176,17 +176,16 @@ class AppStore extends ChangeNotifier {
         _errors = _restoreErrors(snapshot),
         _profile = snapshot?.profile ?? _profileFromSession(session) ?? _defaultProfile,
         _avatarPath = snapshot?.avatarPath,
-        _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
-            DateTime.now().subtract(const Duration(days: 7)),
+        _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now(),
         _devices = snapshot != null && snapshot.devices.isNotEmpty
             ? snapshot.devices.toList(growable: true)
-            : _seedDevices();
+            : _defaultDevices(session);
 
   static const UserProfileData _defaultProfile = UserProfileData(
-    name: 'Zander',
-    userId: 'zerror_001',
-    motto: '让错误再次发芽，让理解长出来',
-    email: 'zander@example.com',
+    name: '新用户',
+    userId: 'guest',
+    motto: '从第一道错题开始，慢慢长出自己的知识树。',
+    email: '',
   );
 
   final AppRepository? _repository;
@@ -234,114 +233,16 @@ class AppStore extends ChangeNotifier {
     );
   }
 
-  static List<ErrorRecord> _seedErrors() {
-    return const [
-      ErrorRecord(
-        id: 'linear-eigen',
-        subject: '线性代数',
-        topic: '矩阵特征值与相似对角化',
-        question: '已知矩阵 A 的特征值为 λ1、λ2、λ3，且 A 可逆。证明伴随矩阵 A* 的特征值为 |A|/λi。',
-        reason: '概念联系还不够牢',
-        dateLabel: '今天 14:30',
-        tags: ['线性代数', '特征值', '一轮复习'],
-        myAnswer: '我知道 A* 和 A^-1 有关系，但没有把特征值变换这一步写清楚。',
-        aiAnalysis: '先写出 A* = |A|A^-1。因为 A^-1 的特征值是 1/λi，所以 A* 的特征值就是 |A|/λi。',
-      ),
-      ErrorRecord(
-        id: 'graph-euler',
-        subject: '离散数学',
-        topic: '欧拉回路判定',
-        question: '无向连通图存在欧拉回路的充要条件是什么？',
-        reason: '定义记混了',
-        dateLabel: '今天 10:12',
-        tags: ['离散数学', '图论', '二轮复习'],
-        myAnswer: '我记得和点的度数有关，但容易和欧拉路径混在一起。',
-        aiAnalysis: '无向连通图存在欧拉回路，当且仅当图连通且所有顶点度数都为偶数。',
-      ),
-      ErrorRecord(
-        id: 'kmp-next',
-        subject: '数据结构',
-        topic: 'KMP next 数组构造',
-        question: 'KMP 中 next 数组的含义是什么，构造时为什么可以在失配后跳转？',
-        reason: '边界条件总漏看',
-        dateLabel: '昨天 20:15',
-        tags: ['数据结构', 'KMP', '算法实现'],
-        myAnswer: '我知道是在比前后缀，但一写代码就容易在 i、j 的变化上出错。',
-        aiAnalysis: 'next 数组保存的是最长相等前后缀长度，失配后会跳到对应前缀位置继续比较。',
-      ),
-      ErrorRecord(
-        id: 'java-strategy',
-        subject: 'Java',
-        topic: '策略模式与接口抽象',
-        question: '如何通过接口统一管理不同的业务策略，并避免条件分支不断膨胀？',
-        reason: '思路中途断开',
-        dateLabel: '4 月 6 日',
-        tags: ['Java', '设计模式', '接口抽象'],
-        myAnswer: '我知道应该上接口，但没把上下文类和策略实现拆清楚。',
-        aiAnalysis: '把共同行为抽成策略接口，再由具体实现负责不同规则，调用方只依赖接口即可扩展。',
-      ),
-      ErrorRecord(
-        id: 'function-extreme',
-        subject: '高等数学',
-        topic: '二次函数最值',
-        question: '已知顶点坐标和定义域时，如何快速判断二次函数最值所在的位置？',
-        reason: '边界条件漏检',
-        dateLabel: '4 月 5 日',
-        tags: ['高等数学', '函数', '最值'],
-        myAnswer: '我先找了顶点，但忘了回去检查定义域的边界点。',
-        aiAnalysis: '这类题先看开口方向和顶点位置，再结合定义域检查边界点，很多失分都发生在最后一步。',
-      ),
-      ErrorRecord(
-        id: 'politics-history',
-        subject: '考研政治',
-        topic: '近代史时间线梳理',
-        question: '如何快速区分几次重要会议在近代史时间线中的先后顺序？',
-        reason: '记忆链条断点太多',
-        dateLabel: '4 月 4 日',
-        tags: ['考研政治', '时间线', '记忆卡'],
-        myAnswer: '单个事件我能记住，但一连起来就会前后颠倒。',
-        aiAnalysis: '先抓关键年份，再把会议挂到核心节点上，用时间链代替碎片记忆。',
-      ),
-      ErrorRecord(
-        id: 'probability-bayes',
-        subject: '概率论',
-        topic: '贝叶斯公式应用',
-        question: '遇到条件概率反推原因的题，如何快速判断应该使用贝叶斯公式？',
-        reason: '题型识别不够快',
-        dateLabel: '4 月 3 日',
-        tags: ['概率论', '条件概率', '专项训练'],
-        myAnswer: '看到条件概率我知道大概相关，但总拿不准是顺推还是反推。',
-        aiAnalysis: '如果题目给的是结果，要求你反推原因，就优先想贝叶斯。先写目标概率，再拆先验和似然。',
-      ),
-      ErrorRecord(
-        id: 'os-scheduling',
-        subject: '操作系统',
-        topic: '进程调度策略比较',
-        question: '时间片轮转和优先级调度在响应时间、吞吐量、公平性上的差异是什么？',
-        reason: '对比维度没有搭起来',
-        dateLabel: '4 月 2 日',
-        tags: ['操作系统', '调度', '系统基础'],
-        myAnswer: '我能背定义，但一到优缺点对比就容易混。',
-        aiAnalysis: '比较时固定三个维度来记：调度目标、适用场景、潜在问题，会更稳定。',
-      ),
-    ];
-  }
-
-  static List<DeviceSession> _seedDevices() {
-    return const [
+  static List<DeviceSession> _defaultDevices(AuthSession? session) {
+    if (session == null) {
+      return <DeviceSession>[];
+    }
+    return [
       DeviceSession(
-        id: 'pixel-emulator',
-        name: 'Pixel 模拟器',
-        detail: 'Android · 上海 · 刚刚活跃',
+        id: 'current-${session.syncUserId}',
+        name: '当前设备',
+        detail: '本次登录设备',
         isCurrent: true,
-        isTrusted: true,
-        isOnline: true,
-      ),
-      DeviceSession(
-        id: 'windows-desktop',
-        name: 'Windows 桌面端',
-        detail: 'Windows · 上次登录于昨天 21:34',
-        isCurrent: false,
         isTrusted: true,
         isOnline: true,
       ),
@@ -349,26 +250,11 @@ class AppStore extends ChangeNotifier {
   }
 
   static List<ErrorRecord> _restoreErrors(AppPersistenceSnapshot? snapshot) {
-    if (snapshot != null && snapshot.errors.isNotEmpty) {
-      return snapshot.errors
-          .map(ErrorRecord.fromJson)
-          .toList(growable: true);
+    if (snapshot == null || snapshot.errors.isEmpty) {
+      return <ErrorRecord>[];
     }
-    return _applySnapshot(_seedErrors(), snapshot);
-  }
-
-  static List<ErrorRecord> _applySnapshot(
-    List<ErrorRecord> seed,
-    AppPersistenceSnapshot? snapshot,
-  ) {
-    if (snapshot == null) return seed.toList(growable: true);
-    return seed
-        .map(
-          (item) => item.copyWith(
-            isFavorite: snapshot.favoriteIds.contains(item.id),
-            isMastered: snapshot.masteredIds.contains(item.id),
-          ),
-        )
+    return snapshot.errors
+        .map(ErrorRecord.fromJson)
         .toList(growable: true);
   }
 
@@ -442,7 +328,19 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_devices);
 
   DeviceSession get currentDevice =>
-      _devices.firstWhere((item) => item.isCurrent, orElse: () => _devices.first);
+      _devices.firstWhere(
+        (item) => item.isCurrent,
+        orElse: () => _devices.isNotEmpty
+            ? _devices.first
+            : const DeviceSession(
+                id: 'current-device',
+                name: '当前设备',
+                detail: '本次登录设备',
+                isCurrent: true,
+                isTrusted: true,
+                isOnline: true,
+              ),
+      );
 
   int get activeDeviceCount => _devices.where((item) => item.isOnline).length;
   int get onlineOtherDeviceCount =>
@@ -672,6 +570,9 @@ class AppStore extends ChangeNotifier {
   Future<void> loginUser({
     required String identifier,
     required String password,
+    bool persistSession = true,
+    bool rememberPassword = false,
+    bool autoLogin = false,
   }) async {
     final client = _authApiClient;
     final sessionStore = _sessionStore;
@@ -683,7 +584,19 @@ class AppStore extends ChangeNotifier {
       identifier: identifier,
       password: password,
     );
-    await sessionStore.saveSession(session);
+    await sessionStore.saveSession(session, persist: persistSession);
+    if (rememberPassword) {
+      await sessionStore.saveRememberedLogin(
+        RememberedLoginData(
+          identifier: identifier,
+          password: password,
+          rememberPassword: true,
+          autoLogin: autoLogin,
+        ),
+      );
+    } else {
+      await sessionStore.clearRememberedLogin();
+    }
     _session = session;
     await _reloadForCurrentSession();
   }
@@ -692,6 +605,7 @@ class AppStore extends ChangeNotifier {
     required String username,
     required String email,
     required String password,
+    bool signInAfterRegister = true,
   }) async {
     final client = _authApiClient;
     final sessionStore = _sessionStore;
@@ -704,6 +618,9 @@ class AppStore extends ChangeNotifier {
       email: email,
       password: password,
     );
+    if (!signInAfterRegister) {
+      return;
+    }
     await sessionStore.saveSession(session);
     _session = session;
     await _reloadForCurrentSession();
@@ -723,10 +640,40 @@ class AppStore extends ChangeNotifier {
     }
 
     await sessionStore?.clear();
+    await sessionStore?.disableAutoLogin();
     _session = null;
     _applySnapshotState(null);
     notifyListeners();
     unawaited(_persist());
+  }
+
+  Future<RememberedLoginData?> loadRememberedLogin() async {
+    return _sessionStore?.loadRememberedLogin();
+  }
+
+  Future<bool> tryAutoLogin() async {
+    if (isAuthenticated) {
+      return true;
+    }
+
+    final remembered = await _sessionStore?.loadRememberedLogin();
+    if (remembered == null || !remembered.autoLogin || !remembered.hasCredentials) {
+      return false;
+    }
+
+    try {
+      await loginUser(
+        identifier: remembered.identifier,
+        password: remembered.password,
+        persistSession: true,
+        rememberPassword: true,
+        autoLogin: true,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Auto login failed: $error');
+      return false;
+    }
   }
 
   void setAvatarPath(String? path) {
@@ -760,11 +707,10 @@ class AppStore extends ChangeNotifier {
       ..addAll(_restoreErrors(snapshot));
     _profile = snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;
-    _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
-        DateTime.now().subtract(const Duration(days: 7));
+    _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now();
     _devices = snapshot != null && snapshot.devices.isNotEmpty
         ? snapshot.devices.toList(growable: true)
-        : _seedDevices();
+        : _defaultDevices(_session);
   }
 
   void _commit() {

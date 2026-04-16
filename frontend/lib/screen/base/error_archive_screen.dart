@@ -48,11 +48,14 @@ class _ErrorArchiveScreenState extends State<ErrorArchiveScreen> {
             _buildSubjectFilter(store),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                itemCount: filteredList.length,
-                itemBuilder: (context, index) => _buildErrorCard(context, store, filteredList[index]),
-              ),
+              child: filteredList.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: filteredList.length,
+                      itemBuilder: (context, index) =>
+                          _buildErrorCard(context, store, filteredList[index]),
+                    ),
             ),
           ],
         ),
@@ -127,6 +130,42 @@ class _ErrorArchiveScreenState extends State<ErrorArchiveScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: AppPanel(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(
+              Icons.inbox_rounded,
+              color: AppPalette.textSecondary,
+              size: 42,
+            ),
+            SizedBox(height: 14),
+            Text(
+              '还没有错题档案',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '先录入第一道错题，这里才会开始积累你的专属档案。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

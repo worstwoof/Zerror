@@ -36,10 +36,10 @@ class UserProfileData {
 
   factory UserProfileData.fromJson(Map<String, dynamic> json) {
     return UserProfileData(
-      name: json['name'] as String? ?? 'Zander',
-      userId: json['user_id'] as String? ?? 'zerror_001',
-      motto: json['motto'] as String? ?? 'Turn mistakes into momentum.',
-      email: json['email'] as String? ?? 'zander@example.com',
+      name: json['name'] as String? ?? '新用户',
+      userId: json['user_id'] as String? ?? 'guest',
+      motto: json['motto'] as String? ?? '从第一道错题开始，慢慢长出自己的知识树。',
+      email: json['email'] as String? ?? '',
     );
   }
 }
