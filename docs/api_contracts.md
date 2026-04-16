@@ -139,6 +139,59 @@
 - `timeline`: 生物过程流转、历史事件推演、实验步骤动画
 - `study_card`: 化学反应条件卡片、语文修辞辨析卡片、英语语法对照卡
 
+### 当前已落地的首批学科扩展
+
+为了便于 MVP 演示，当前后端已经支持一组“按学科兜底生成”的扩展内容：
+
+- 数学：默认补充 `chart_spec`，返回结构化图表/几何草图建议，适合后续对接 ECharts、Canvas 或自定义坐标系渲染。
+- 物理：默认补充 `interactive_html`，返回可嵌入 WebView 的小型 HTML 演示页，当前覆盖受力运动、电路、光路三类模板。
+- 化学：默认补充 `study_card`，返回 JSON 卡片集合，适合做翻卡式复习界面。
+- 编程：默认补充 `code_snippet`，返回 JSON 结构的代码骨架、调试清单与执行步骤。
+- 生物：默认补充 `timeline`，返回 JSON 时间线结构，适合后续接过程动画或阶段组件。
+
+说明：
+
+- 如果大模型本身已经返回了该学科对应的扩展类型，后端不会重复追加同类型 artifact。
+- 如果大模型没有返回扩展内容，但 `enable_subject_extensions=true`，后端会自动补一个默认 artifact，保证演示链路稳定。
+
+### 学科扩展示例
+
+数学 `chart_spec` 示例：
+
+```json
+{
+  "artifact_type": "chart_spec",
+  "title": "函数图像联动分析",
+  "description": "为数学题生成一个可继续接图表渲染器的结构化图像方案。",
+  "mime_type": "application/json",
+  "content": "{ \"renderer\": \"generic_chart_spec\", \"scene\": \"function\", ... }"
+}
+```
+
+物理 `interactive_html` 示例：
+
+```json
+{
+  "artifact_type": "interactive_html",
+  "title": "受力与运动演示",
+  "description": "可直接接入 WebView 的物理过程演示页面骨架。",
+  "mime_type": "text/html",
+  "content": "<!DOCTYPE html><html>...</html>"
+}
+```
+
+化学 `study_card` 示例：
+
+```json
+{
+  "artifact_type": "study_card",
+  "title": "化学平衡复习卡片",
+  "description": "将化学题拆成可快速翻看的知识卡片。",
+  "mime_type": "application/json",
+  "content": "{ \"cards\": [{\"front\": \"先判断什么\", \"back\": \"...\"}] }"
+}
+```
+
 ## 前端对接建议
 
 现有 Flutter 页面可以按最小改动接入：

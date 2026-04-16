@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -64,3 +64,18 @@ class OCRResponse(BaseModel):
 
 class ImageAnalysisResponse(AnalysisResponse):
     ocr: OCRResponse
+
+
+class PhysicsAnimationRequest(BaseModel):
+    cleaned_question: str = Field(..., min_length=1)
+    subject: str = Field(default="物理")
+    knowledge_points: List[str] = Field(default_factory=list)
+    solution_summary: str = ""
+    solution_steps: List[str] = Field(default_factory=list)
+
+
+class PhysicsAnimationResponse(BaseModel):
+    subject: str
+    artifact: Optional[RichArtifact] = None
+    generated: bool = False
+    reason: str = ""

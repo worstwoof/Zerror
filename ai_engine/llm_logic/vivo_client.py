@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
+import time
 import uuid
 from typing import Any, Dict, List
 
 import requests
 
 from backend.app.core.config import Settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class VivoAPIError(RuntimeError):
@@ -20,6 +25,7 @@ class VivoLMClient:
 
     def chat_completion(self, prompt: str, messages: List[Dict[str, Any]] | None = None) -> str:
         request_id = str(uuid.uuid4())
+        started_at = time.perf_counter()
         payload = {
             "model": self.settings.vivo_text_model,
             "messages": messages or [{"role": "user", "content": prompt}],
@@ -33,14 +39,29 @@ class VivoLMClient:
                 headers=self._json_headers(),
                 params={"request_id": request_id},
                 json=payload,
-                timeout=self.settings.vivo_timeout_seconds,
+                timeout=min(self.settings.vivo_timeout_seconds, self.settings.vivo_vision_timeout_seconds),
             )
         except requests.RequestException as exc:
+            logger.warning(
+                "vivo chat failed request_id=%s model=%s elapsed=%.2fs error=%s",
+                request_id,
+                self.settings.vivo_text_model,
+                time.perf_counter() - started_at,
+                exc,
+            )
             raise VivoAPIError(f"vivo 聊天接口网络异常，request_id={request_id}，错误={exc}") from exc
+        logger.info(
+            "vivo chat finished request_id=%s model=%s status=%s elapsed=%.2fs",
+            request_id,
+            self.settings.vivo_text_model,
+            response.status_code,
+            time.perf_counter() - started_at,
+        )
         return self._extract_chat_content(response, request_id)
 
     def vision_completion(self, prompt: str, image_bytes: bytes, mime_type: str = "image/png") -> str:
         request_id = str(uuid.uuid4())
+        started_at = time.perf_counter()
         payload = {
             "model": self.settings.vivo_vision_model,
             "messages": [
@@ -107,10 +128,13 @@ class VivoLMClient:
         }
 
     def _json_headers(self) -> Dict[str, str]:
-        return {
+        headers = {
             "Content-Type": "application/json; charset=utf-8",
             "Authorization": f"Bearer {self.settings.vivo_api_key}",
         }
+        if self.settings.vivo_app_id:
+            headers["app_id"] = self.settings.vivo_app_id
+        return headers
 
     def _extract_chat_content(self, response: requests.Response, request_id: str) -> str:
         self._raise_for_status(response, request_id)

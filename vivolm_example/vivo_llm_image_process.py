@@ -31,7 +31,7 @@ def sync_image_chat():
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "生成答案解析"},
+                    {"type": "text", "text": "生成这道题的网页动画演示，并返回网页源代码"},
                     {
                         "type": "image_url",
                         "image_url": {

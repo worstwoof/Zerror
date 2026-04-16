@@ -61,7 +61,7 @@ class AnalysisResult {
         .toList();
 
     return AnalysisResult(
-      subject: (json['subject'] ?? '通用').toString(),
+      subject: (json['subject'] ?? '未分类').toString(),
       knowledgePoints: (json['knowledge_points'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
           .where((item) => item.trim().isNotEmpty)
@@ -75,11 +75,16 @@ class AnalysisResult {
       reviewSchedule: schedule,
       reviewFocus: (reviewPlan['focus'] ?? '').toString(),
       similarQuestions: (json['similar_questions'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(SimilarQuestionItem.fromJson)
+          .whereType<Map>()
+          .map(
+            (item) => SimilarQuestionItem.fromJson(
+              item.map((key, value) => MapEntry(key.toString(), value)),
+            ),
+          )
           .toList(),
       richArtifacts: (json['rich_artifacts'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
+          .whereType<Map>()
+          .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
           .toList(),
     );
   }
@@ -97,8 +102,66 @@ class ImageAnalysisPayload {
   factory ImageAnalysisPayload.fromJson(Map<String, dynamic> json) {
     final ocr = (json['ocr'] as Map<String, dynamic>?) ?? const {};
     return ImageAnalysisPayload(
-      extractedText: (json['cleaned_question'] ?? ocr['normalized_text'] ?? '').toString(),
+      extractedText: (json['cleaned_question'] ?? ocr['normalized_text'] ?? '')
+          .toString(),
       analysis: AnalysisResult.fromJson(json),
+    );
+  }
+}
+
+class PhysicsAnimationPayload {
+  final String cleanedQuestion;
+  final String subject;
+  final List<String> knowledgePoints;
+  final String solutionSummary;
+  final List<String> solutionSteps;
+
+  const PhysicsAnimationPayload({
+    required this.cleanedQuestion,
+    required this.subject,
+    required this.knowledgePoints,
+    required this.solutionSummary,
+    required this.solutionSteps,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'cleaned_question': cleanedQuestion,
+      'subject': subject,
+      'knowledge_points': knowledgePoints,
+      'solution_summary': solutionSummary,
+      'solution_steps': solutionSteps,
+    };
+  }
+}
+
+class PhysicsAnimationResult {
+  final String subject;
+  final Map<String, dynamic>? artifact;
+  final bool generated;
+  final String reason;
+
+  const PhysicsAnimationResult({
+    required this.subject,
+    required this.artifact,
+    required this.generated,
+    required this.reason,
+  });
+
+  factory PhysicsAnimationResult.fromJson(Map<String, dynamic> json) {
+    final rawArtifact = json['artifact'];
+    Map<String, dynamic>? artifact;
+    if (rawArtifact is Map) {
+      artifact = rawArtifact.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+
+    return PhysicsAnimationResult(
+      subject: (json['subject'] ?? '').toString(),
+      artifact: artifact,
+      generated: json['generated'] == true,
+      reason: (json['reason'] ?? '').toString(),
     );
   }
 }
@@ -120,7 +183,7 @@ class AiApiClient {
 
     final normalizedText = (payload['normalized_text'] ?? '').toString().trim();
     if (normalizedText.isEmpty) {
-      throw const AiApiException('OCR 没有返回可用文本。');
+      throw const AiApiException('OCR 未返回可用文本，请更换更清晰的图片后重试。');
     }
     return normalizedText;
   }
@@ -154,10 +217,13 @@ class AiApiClient {
 
   Future<ImageAnalysisPayload> analyzeImage({
     required String imagePath,
-    String subject = '通用',
+    String subject = '未分类',
     String wrongReasonHint = '',
   }) async {
-    final request = http.MultipartRequest('POST', Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/image'))
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/image'),
+    )
       ..fields['subject'] = subject
       ..fields['user_answer'] = ''
       ..fields['wrong_reason_hint'] = wrongReasonHint
@@ -174,9 +240,28 @@ class AiApiClient {
 
     final result = ImageAnalysisPayload.fromJson(payload);
     if (result.extractedText.trim().isEmpty) {
-      throw const AiApiException('图片解析已返回，但 OCR 文本为空。');
+      throw const AiApiException('图片解析成功，但 OCR 未提取出题目文字。');
     }
     return result;
+  }
+
+  Future<PhysicsAnimationResult> generatePhysicsAnimation(
+    PhysicsAnimationPayload payload,
+  ) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/physics-animation'),
+      headers: const {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: jsonEncode(payload.toJson()),
+    );
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(decoded));
+    }
+
+    return PhysicsAnimationResult.fromJson(decoded);
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {
@@ -185,10 +270,10 @@ class AiApiClient {
     }
     final decodedBody = utf8.decode(response.bodyBytes);
     final dynamic parsed = jsonDecode(decodedBody);
-    if (parsed is Map<String, dynamic>) {
-      return parsed;
+    if (parsed is Map) {
+      return parsed.map((key, value) => MapEntry(key.toString(), value));
     }
-    throw const AiApiException('接口返回的不是有效 JSON 对象。');
+    throw const AiApiException('后端返回的不是有效的 JSON 对象。');
   }
 
   String _extractErrorMessage(Map<String, dynamic> payload) {
