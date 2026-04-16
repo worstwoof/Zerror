@@ -174,9 +174,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     try {
       String? imageUrl;
       if (widget.imagePath.isNotEmpty) {
+        final store = AppStateScope.of(context);
         final uploaded = await _fileUploadClient.uploadFile(
           filePath: widget.imagePath,
           category: 'error-image',
+          syncUserId: store.syncUserId,
+          authToken: store.authToken,
         );
         imageUrl = uploaded.fileUrl;
       }

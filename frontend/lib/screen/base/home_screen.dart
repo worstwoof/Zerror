@@ -401,7 +401,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.logout_rounded,
                       title: '\u9000\u51fa\u767b\u5f55',
                       isDanger: true,
-                      onTap: () {
+                      onTap: () async {
+                        await store.signOutUser();
+                        if (!context.mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(builder: (_) => const LoginScreen()),
                           (route) => false,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
 import '../../core/theme.dart';
+import '../../data/auth_api_client.dart';
 import 'home_screen.dart';
 
 class LoginFormScreen extends StatefulWidget {
@@ -10,14 +12,13 @@ class LoginFormScreen extends StatefulWidget {
   State<LoginFormScreen> createState() => _LoginFormScreenState();
 }
 
-class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderStateMixin {
+class _LoginFormScreenState extends State<LoginFormScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final Color primaryGreen = AppPalette.matchaMist;
 
   late AnimationController _logoBreathController;
   late Animation<double> _logoScaleAnimation;
-
   late AnimationController _buttonPressController;
   late Animation<double> _buttonScaleAnimation;
 
@@ -33,7 +34,10 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
     )..repeat(reverse: true);
 
     _logoScaleAnimation = Tween<double>(begin: 0.96, end: 1.04).animate(
-      CurvedAnimation(parent: _logoBreathController, curve: Curves.easeInOutSine),
+      CurvedAnimation(
+        parent: _logoBreathController,
+        curve: Curves.easeInOutSine,
+      ),
     );
 
     _buttonPressController = AnimationController(
@@ -47,15 +51,22 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
     );
   }
 
-  void _handleLogin() async {
+  Future<void> _handleLogin() async {
     if (_isLoading) return;
 
-    final username = _usernameController.text.trim();
+    final identifier = _usernameController.text.trim();
     final password = _passwordController.text.trim();
+    if (identifier.isEmpty || password.isEmpty) {
+      _showSnackBar('请输入账号和密码');
+      return;
+    }
 
-    if (username == 'zerror' && password == '123456') {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 1500));
+    setState(() => _isLoading = true);
+    try {
+      await AppStateScope.of(context).loginUser(
+        identifier: identifier,
+        password: password,
+      );
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -63,12 +74,22 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
         MaterialPageRoute(builder: (context) => const HomeScreen()),
         (Route<dynamic> route) => false,
       );
-      return;
+    } on AuthApiException catch (error) {
+      _showSnackBar(error.message);
+    } catch (_) {
+      _showSnackBar('登录失败，请稍后再试');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
 
+  void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('账号或密码不正确，请重试'),
+        content: Text(message),
         backgroundColor: AppPalette.kombuGreen,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -90,7 +111,9 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const DecoratedBox(decoration: BoxDecoration(gradient: AppPalette.appBackground)),
+          const DecoratedBox(
+            decoration: BoxDecoration(gradient: AppPalette.appBackground),
+          ),
           Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
           Container(
             decoration: BoxDecoration(
@@ -115,7 +138,11 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
                     onTap: () => Navigator.pop(context),
                     child: const Padding(
                       padding: EdgeInsets.only(right: 16, top: 8, bottom: 8),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, color: AppPalette.textSecondary, size: 22),
+                      child: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: AppPalette.textSecondary,
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -134,25 +161,33 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
                       const SizedBox(width: 8),
                       ScaleTransition(
                         scale: _logoScaleAnimation,
-                        child: Image.asset('assets/images/logo.png', height: 80, fit: BoxFit.contain),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          height: 80,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ],
                   ),
                   const Text(
-                    '欢迎回来，让错误再次发芽。',
-                    style: TextStyle(fontSize: 15, height: 1.6, color: AppPalette.textSecondary),
+                    '欢迎回来，让错题继续变成真正的理解。',
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: AppPalette.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 40),
                   _buildInteractiveTextField(
                     controller: _usernameController,
-                    label: '账号 (默认 zerror)',
+                    label: '用户名或邮箱',
                     icon: Icons.person_outline_rounded,
                     obscureText: false,
                   ),
                   const SizedBox(height: 32),
                   _buildInteractiveTextField(
                     controller: _passwordController,
-                    label: '密码 (默认 123456)',
+                    label: '密码',
                     icon: Icons.lock_outline_rounded,
                     obscureText: true,
                   ),
@@ -185,11 +220,18 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
                               ? const SizedBox(
                                   width: 24,
                                   height: 24,
-                                  child: CircularProgressIndicator(color: AppPalette.night, strokeWidth: 2.5),
+                                  child: CircularProgressIndicator(
+                                    color: AppPalette.night,
+                                    strokeWidth: 2.5,
+                                  ),
                                 )
                               : const Text(
                                   '验证并登录',
-                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppPalette.night),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppPalette.night,
+                                  ),
                                 ),
                         ),
                       ),
@@ -214,11 +256,22 @@ class _LoginFormScreenState extends State<LoginFormScreen> with TickerProviderSt
     return TextField(
       controller: controller,
       obscureText: obscureText,
-      style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16, letterSpacing: 1.2),
+      style: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontSize: 16,
+        letterSpacing: 1.2,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AppPalette.textSecondary, fontSize: 15),
-        floatingLabelStyle: const TextStyle(color: AppPalette.almondCream, fontSize: 16, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          color: AppPalette.textSecondary,
+          fontSize: 15,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: AppPalette.almondCream,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
         prefixIcon: Icon(icon, color: AppPalette.textSecondary, size: 22),
         enabledBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Color(0x66F8F3EA), width: 1),

@@ -4,6 +4,9 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 
 import 'app_repository.dart';
+import 'auth_session.dart';
+import 'auth_session_store.dart';
+import '../data/auth_api_client.dart';
 
 class ErrorRecord {
   const ErrorRecord({
@@ -163,9 +166,15 @@ class AppStore extends ChangeNotifier {
   AppStore.seeded({
     AppRepository? repository,
     AppPersistenceSnapshot? snapshot,
+    AuthSessionStore? sessionStore,
+    AuthApiClient? authApiClient,
+    AuthSession? session,
   })  : _repository = repository,
+        _sessionStore = sessionStore,
+        _authApiClient = authApiClient,
+        _session = session,
         _errors = _restoreErrors(snapshot),
-        _profile = snapshot?.profile ?? _defaultProfile,
+        _profile = snapshot?.profile ?? _profileFromSession(session) ?? _defaultProfile,
         _avatarPath = snapshot?.avatarPath,
         _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
             DateTime.now().subtract(const Duration(days: 7)),
@@ -181,24 +190,48 @@ class AppStore extends ChangeNotifier {
   );
 
   final AppRepository? _repository;
+  final AuthSessionStore? _sessionStore;
+  final AuthApiClient? _authApiClient;
   final List<ErrorRecord> _errors;
+  AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
   DateTime _passwordUpdatedAt;
   List<DeviceSession> _devices;
 
-  static Future<AppStore> bootstrap(AppRepository repository) async {
+  static Future<AppStore> bootstrap(
+    AppRepository repository, {
+    required AuthSessionStore sessionStore,
+    required AuthApiClient authApiClient,
+  }) async {
+    final session = await sessionStore.loadSession();
     AppPersistenceSnapshot? snapshot;
     try {
       snapshot = await repository.loadSnapshot();
     } catch (error) {
       debugPrint('Snapshot bootstrap failed: $error');
     }
-    final store = AppStore.seeded(repository: repository, snapshot: snapshot);
-    if (snapshot == null || snapshot.errors.isEmpty) {
+    final store = AppStore.seeded(
+      repository: repository,
+      snapshot: snapshot,
+      sessionStore: sessionStore,
+      authApiClient: authApiClient,
+      session: session,
+    );
+    if (session != null && (snapshot == null || snapshot.errors.isEmpty)) {
       unawaited(store._persist());
     }
     return store;
+  }
+
+  static UserProfileData? _profileFromSession(AuthSession? session) {
+    if (session == null) return null;
+    return UserProfileData(
+      name: session.username,
+      userId: session.username,
+      motto: _defaultProfile.motto,
+      email: session.email,
+    );
   }
 
   static List<ErrorRecord> _seedErrors() {
@@ -372,6 +405,9 @@ class AppStore extends ChangeNotifier {
   String get userMotto => _profile.motto;
   String get userEmail => _profile.email;
   String? get avatarPath => _avatarPath;
+  bool get isAuthenticated => _session != null && !(_session?.isExpired ?? true);
+  String? get authToken => _session?.token;
+  String? get syncUserId => _session?.syncUserId;
 
   String get passwordUpdatedLabel {
     final days = DateTime.now().difference(_passwordUpdatedAt).inDays;
@@ -633,9 +669,102 @@ class AppStore extends ChangeNotifier {
     return changed;
   }
 
+  Future<void> loginUser({
+    required String identifier,
+    required String password,
+  }) async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    if (client == null || sessionStore == null) {
+      throw StateError('Authentication is not configured.');
+    }
+
+    final session = await client.login(
+      identifier: identifier,
+      password: password,
+    );
+    await sessionStore.saveSession(session);
+    _session = session;
+    await _reloadForCurrentSession();
+  }
+
+  Future<void> registerUser({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    if (client == null || sessionStore == null) {
+      throw StateError('Authentication is not configured.');
+    }
+
+    final session = await client.register(
+      username: username,
+      email: email,
+      password: password,
+    );
+    await sessionStore.saveSession(session);
+    _session = session;
+    await _reloadForCurrentSession();
+  }
+
+  Future<void> signOutUser() async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    final currentSession = _session;
+
+    if (client != null && currentSession != null && currentSession.token.isNotEmpty) {
+      try {
+        await client.logout(currentSession.token);
+      } catch (error) {
+        debugPrint('Sign out request failed: $error');
+      }
+    }
+
+    await sessionStore?.clear();
+    _session = null;
+    _applySnapshotState(null);
+    notifyListeners();
+    unawaited(_persist());
+  }
+
   void setAvatarPath(String? path) {
     _avatarPath = path;
     _commit();
+  }
+
+  Future<void> _reloadForCurrentSession() async {
+    AppPersistenceSnapshot? loadedSnapshot;
+    final repository = _repository;
+
+    if (repository != null) {
+      try {
+        loadedSnapshot = await repository.loadSnapshot();
+      } catch (error) {
+        debugPrint('Snapshot reload after auth failed: $error');
+      }
+    }
+
+    _applySnapshotState(loadedSnapshot);
+    notifyListeners();
+
+    if (_session != null && (loadedSnapshot == null || loadedSnapshot.errors.isEmpty)) {
+      await _persist();
+    }
+  }
+
+  void _applySnapshotState(AppPersistenceSnapshot? snapshot) {
+    _errors
+      ..clear()
+      ..addAll(_restoreErrors(snapshot));
+    _profile = snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
+    _avatarPath = snapshot?.avatarPath;
+    _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
+        DateTime.now().subtract(const Duration(days: 7));
+    _devices = snapshot != null && snapshot.devices.isNotEmpty
+        ? snapshot.devices.toList(growable: true)
+        : _seedDevices();
   }
 
   void _commit() {

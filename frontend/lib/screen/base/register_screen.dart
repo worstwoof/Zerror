@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
 import '../../core/theme.dart';
+import '../../data/auth_api_client.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -69,14 +71,47 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Future<void> _handleRegister() async {
     if (_isLoading) return;
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (Route<dynamic> route) => false,
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackBar('请完整填写用户名、邮箱和密码');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await AppStateScope.of(context).registerUser(
+        username: username,
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (Route<dynamic> route) => false,
+      );
+    } on AuthApiException catch (error) {
+      _showSnackBar(error.message);
+    } catch (_) {
+      _showSnackBar('注册失败，请稍后再试');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppPalette.kombuGreen,
+      ),
     );
   }
 
@@ -150,7 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       ],
                     ),
                     const Text(
-                      '欢迎加入，让每一道错题都变成新的理解。',
+                      '创建一个真正可登录、可同步错题数据的账号。',
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.6,
@@ -231,7 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          '已经有账号？',
+                          '已经有账号了？',
                           style: TextStyle(color: AppPalette.textSecondary),
                         ),
                         TextButton(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from backend.app.api.v1.app_state import router as app_state_router
+from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.files import router as files_router
 from backend.app.api.v1.upload import router as ai_router
 from backend.app.core.config import settings
@@ -19,6 +20,7 @@ app = FastAPI(
 init_db()
 
 app.include_router(ai_router)
+app.include_router(auth_router)
 app.include_router(app_state_router)
 app.include_router(files_router)
 

@@ -5,3 +5,4 @@ python-multipart==0.0.20
 sqlalchemy==2.0.38
 psycopg[binary]==3.2.6
 cos-python-sdk-v5==1.9.37
+email-validator==2.2.0

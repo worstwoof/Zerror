@@ -620,6 +620,8 @@ class ProfileScreen extends StatelessWidget {
       final uploaded = await _fileUploadClient.uploadFile(
         filePath: pickedFile.path,
         category: 'avatar',
+        syncUserId: store.syncUserId,
+        authToken: store.authToken,
       );
       store.setAvatarPath(uploaded.fileUrl);
       ScaffoldMessenger.of(context).showSnackBar(

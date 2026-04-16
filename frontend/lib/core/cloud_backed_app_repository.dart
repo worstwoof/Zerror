@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import 'app_repository.dart';
+import 'auth_session_store.dart';
+import 'constants.dart';
 import 'local_app_repository.dart';
 import 'remote_app_repository.dart';
 
@@ -14,10 +16,17 @@ class CloudBackedAppRepository implements AppRepository {
   final LocalAppRepository _local;
   final RemoteAppRepository _remote;
 
-  static Future<CloudBackedAppRepository> create() async {
-    final local = await LocalAppRepository.create();
-    final remote = RemoteAppRepository();
-    return CloudBackedAppRepository._(local: local, remote: remote);
+  static Future<CloudBackedAppRepository> create(AuthSessionStore sessionStore) async {
+    final local = await LocalAppRepository.create(
+      snapshotKeyProvider: () => AppConstants.snapshotStorageKey(
+        sessionStore.currentSession?.syncUserId,
+      ),
+    );
+    final remote = RemoteAppRepository(sessionStore: sessionStore);
+    return CloudBackedAppRepository._(
+      local: local,
+      remote: remote,
+    );
   }
 
   @override

@@ -43,14 +43,19 @@ class FileUploadClient {
     required String filePath,
     required String category,
     String? syncUserId,
+    String? authToken,
   }) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse(AppConstants.fileUploadEndpoint),
     )
       ..fields['category'] = category
-      ..fields['sync_user_id'] = syncUserId ?? AppConstants.appSyncUserId
+      ..fields['sync_user_id'] = syncUserId ?? 'anonymous'
       ..files.add(await http.MultipartFile.fromPath('file', filePath));
+
+    if (authToken != null && authToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $authToken';
+    }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

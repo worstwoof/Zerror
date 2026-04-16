@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'app_repository.dart';
+import 'auth_session_store.dart';
 import 'constants.dart';
 
 class RemoteAppRepositoryException implements Exception {
@@ -18,20 +19,26 @@ class RemoteAppRepositoryException implements Exception {
 class RemoteAppRepository implements AppRepository {
   RemoteAppRepository({
     http.Client? client,
-    String? syncUserId,
+    required AuthSessionStore sessionStore,
   })  : _client = client ?? http.Client(),
-        _syncUserId = syncUserId ?? AppConstants.appSyncUserId;
+        _sessionStore = sessionStore;
 
   final http.Client _client;
-  final String _syncUserId;
+  final AuthSessionStore _sessionStore;
 
   @override
   Future<AppPersistenceSnapshot?> loadSnapshot() async {
+    final session = _sessionStore.currentSession;
+    if (session == null || session.token.isEmpty || session.syncUserId.isEmpty) {
+      return null;
+    }
+
     final response = await _client
         .get(
-          Uri.parse(AppConstants.appStateEndpoint(_syncUserId)),
-          headers: const {
+          Uri.parse(AppConstants.appStateEndpoint(session.syncUserId)),
+          headers: {
             'Accept': 'application/json',
+            'Authorization': 'Bearer ${session.token}',
           },
         )
         .timeout(const Duration(seconds: 12));
@@ -56,12 +63,18 @@ class RemoteAppRepository implements AppRepository {
 
   @override
   Future<void> saveSnapshot(AppPersistenceSnapshot snapshot) async {
+    final session = _sessionStore.currentSession;
+    if (session == null || session.token.isEmpty || session.syncUserId.isEmpty) {
+      return;
+    }
+
     final response = await _client
         .put(
-          Uri.parse(AppConstants.appStateEndpoint(_syncUserId)),
-          headers: const {
+          Uri.parse(AppConstants.appStateEndpoint(session.syncUserId)),
+          headers: {
             'Content-Type': 'application/json; charset=utf-8',
             'Accept': 'application/json',
+            'Authorization': 'Bearer ${session.token}',
           },
           body: jsonEncode({
             'snapshot': snapshot.toJson(),

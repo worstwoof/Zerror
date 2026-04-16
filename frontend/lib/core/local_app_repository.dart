@@ -5,15 +5,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_repository.dart';
 
 class LocalAppRepository implements AppRepository {
-  LocalAppRepository._(this._preferences);
-
-  static const String _snapshotKey = 'app_snapshot_v1';
+  LocalAppRepository._(
+    this._preferences, {
+    required String Function() snapshotKeyProvider,
+  }) : _snapshotKeyProvider = snapshotKeyProvider;
 
   final SharedPreferences _preferences;
+  final String Function() _snapshotKeyProvider;
 
-  static Future<LocalAppRepository> create() async {
+  String get _snapshotKey => _snapshotKeyProvider();
+
+  static Future<LocalAppRepository> create({
+    String Function()? snapshotKeyProvider,
+  }) async {
     final preferences = await SharedPreferences.getInstance();
-    return LocalAppRepository._(preferences);
+    return LocalAppRepository._(
+      preferences,
+      snapshotKeyProvider: snapshotKeyProvider ?? () => 'app_snapshot_v1',
+    );
   }
 
   @override

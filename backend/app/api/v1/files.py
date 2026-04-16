@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
+from backend.app.core.auth import get_current_user
 from backend.app.core.config import settings
 from backend.app.core.object_storage import ObjectStorageError, TencentCOSStorage
+from backend.app.db.models import User
+from backend.app.db.session import get_db
 from backend.app.schemas.file_schema import FileUploadResponse
+from backend.app.services.app_state_service import create_or_update_media_asset
 
 
 router = APIRouter(prefix="/api/v1/files", tags=["files"])
@@ -18,6 +23,8 @@ async def upload_file(
     file: UploadFile = File(...),
     category: str = Form("general"),
     sync_user_id: str = Form("anonymous"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> FileUploadResponse:
     if cos_storage is None:
         raise HTTPException(
@@ -32,7 +39,8 @@ async def upload_file(
             detail="Uploaded file is empty.",
         )
 
-    folder = _build_folder(sync_user_id=sync_user_id, category=category)
+    effective_sync_user_id = current_user.sync_user_id or sync_user_id
+    folder = _build_folder(sync_user_id=effective_sync_user_id, category=category)
     try:
         object_key, file_url = cos_storage.upload_bytes(
             file_bytes=file_bytes,
@@ -45,6 +53,17 @@ async def upload_file(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
+    create_or_update_media_asset(
+        db,
+        user=current_user,
+        category=category,
+        object_key=object_key,
+        file_url=file_url,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=len(file_bytes),
+    )
+    db.commit()
 
     return FileUploadResponse(
         object_key=object_key,

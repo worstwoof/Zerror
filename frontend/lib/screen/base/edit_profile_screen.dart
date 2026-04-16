@@ -90,6 +90,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final uploaded = await _fileUploadClient.uploadFile(
           filePath: _avatarImage!.path,
           category: 'avatar',
+          syncUserId: store.syncUserId,
+          authToken: store.authToken,
         );
         store.setAvatarPath(uploaded.fileUrl);
       } on FileUploadException catch (error) {
