@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
 import '../../data/file_upload_client.dart';
 import '../base/error_detail_screen.dart';
+import 'html_artifact_preview_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
   const ErrorEditScreen({
@@ -53,6 +55,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   List<SimilarQuestionItem> _similarQuestions = const [];
   List<Map<String, dynamic>> _richArtifacts = const [];
   String? _analysisError;
+  bool _isGeneratingPhysicsAnimation = false;
+  String? _physicsAnimationError;
 
   @override
   void initState() {
@@ -126,6 +130,96 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     _reviewSchedule = result.reviewSchedule;
     _similarQuestions = result.similarQuestions;
     _richArtifacts = result.richArtifacts;
+    _isGeneratingPhysicsAnimation = false;
+    _physicsAnimationError = null;
+  }
+
+  bool _supportsPhysicsAnimation() {
+    return _subject.trim().contains('物理');
+  }
+
+  bool _hasInteractiveHtmlArtifact() {
+    return _findInteractiveHtmlArtifactIndex() != -1;
+  }
+
+  int _findInteractiveHtmlArtifactIndex() {
+    return _richArtifacts.indexWhere((artifact) {
+      final type = (artifact['artifact_type'] ?? '').toString();
+      final mimeType = (artifact['mime_type'] ?? '').toString();
+      return type == 'interactive_html' || mimeType == 'text/html';
+    });
+  }
+
+  void _upsertInteractiveHtmlArtifact(Map<String, dynamic> artifact) {
+    final normalizedArtifact = artifact.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+    final updatedArtifacts = List<Map<String, dynamic>>.from(_richArtifacts);
+    final existingIndex = _findInteractiveHtmlArtifactIndex();
+    if (existingIndex >= 0) {
+      updatedArtifacts[existingIndex] = normalizedArtifact;
+    } else {
+      updatedArtifacts.insert(0, normalizedArtifact);
+    }
+    _richArtifacts = updatedArtifacts;
+  }
+
+  Future<void> _generatePhysicsAnimation() async {
+    final questionText = _questionController.text.trim();
+    if (questionText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先确认题目内容，再生成动画演示。')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingPhysicsAnimation = true;
+      _physicsAnimationError = null;
+    });
+
+    try {
+      final result = await _apiClient.generatePhysicsAnimation(
+        PhysicsAnimationPayload(
+          cleanedQuestion: questionText,
+          subject: _subject,
+          knowledgePoints: _knowledgePoints,
+          solutionSummary: _solutionSummary,
+          solutionSteps: _solutionSteps,
+        ),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingPhysicsAnimation = false;
+        if (result.generated && result.artifact != null) {
+          _upsertInteractiveHtmlArtifact(result.artifact!);
+          _physicsAnimationError = null;
+        } else {
+          _physicsAnimationError = result.reason.trim().isEmpty
+              ? '当前题目暂时无法生成动画演示。'
+              : result.reason;
+        }
+      });
+
+      if (result.generated && result.artifact != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('动画演示已生成，可在下方学科扩展中打开。')),
+        );
+      }
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingPhysicsAnimation = false;
+        _physicsAnimationError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingPhysicsAnimation = false;
+        _physicsAnimationError = '动画演示生成失败，请检查后端服务后重试。';
+      });
+    }
   }
 
   Future<void> _saveToArchive() async {
@@ -577,6 +671,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ),
+          if (_supportsPhysicsAnimation()) ...[
+            const SizedBox(height: 12),
+            _buildPhysicsAnimationActionCard(),
+          ],
           if (_richArtifacts.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildRichArtifactsPreview(),
@@ -847,6 +945,103 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     );
   }
 
+  Widget _buildPhysicsAnimationActionCard() {
+    final hasArtifact = _hasInteractiveHtmlArtifact();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppPalette.night.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppPalette.matchaMist.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '物理动画演示',
+                      style: TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      hasArtifact
+                          ? '已生成当前题目的 HTML 动画，可重新生成以刷新展示内容。'
+                          : '按需调用后端生成与题目对应的 HTML 动画，并复用下方 WebView 预览。',
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 42,
+                child: OutlinedButton.icon(
+                  onPressed: _isGeneratingPhysicsAnimation ? null : _generatePhysicsAnimation,
+                  icon: _isGeneratingPhysicsAnimation
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.animation_rounded,
+                          color: AppPalette.almondCream,
+                          size: 18,
+                        ),
+                  label: Text(
+                    _isGeneratingPhysicsAnimation
+                        ? '生成中...'
+                        : hasArtifact
+                            ? '重新生成'
+                            : '生成动画',
+                    style: const TextStyle(color: AppPalette.almondCream),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: AppPalette.almondCream.withValues(alpha: 0.45),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_physicsAnimationError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _physicsAnimationError!,
+              style: const TextStyle(
+                color: Color(0xFFFFC3B8),
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionLabel(String text) {
     return Text(
       text,
@@ -924,17 +1119,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               height: 1.5,
             ),
           ),
-          if (previewText.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            AppLatexText(
-              previewText,
-              style: const TextStyle(
-                color: AppPalette.textPrimary,
-                fontSize: 13,
-                height: 1.5,
-              ),
-            ),
-          ],
+          const SizedBox(height: 10),
+          _buildRichArtifactBody(
+            title: displayTitle,
+            type: type,
+            mimeType: mimeType,
+            content: content,
+            previewText: previewText,
+          ),
         ],
       ),
     );
@@ -1004,5 +1196,550 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       return singleLine;
     }
     return '${singleLine.substring(0, 120)}...';
+  }
+
+  Widget _buildRichArtifactBody({
+    required String title,
+    required String type,
+    required String mimeType,
+    required String content,
+    required String previewText,
+  }) {
+    final parsed = _tryParseArtifactJson(mimeType, content);
+
+    switch (type) {
+      case 'chart_spec':
+        if (parsed != null) {
+          return _buildChartSpecArtifact(parsed);
+        }
+        break;
+      case 'study_card':
+        if (parsed != null) {
+          return _buildStudyCardArtifact(parsed);
+        }
+        break;
+      case 'code_snippet':
+        if (parsed != null) {
+          return _buildCodeSnippetArtifact(parsed);
+        }
+        break;
+      case 'timeline':
+        if (parsed != null) {
+          return _buildTimelineArtifact(parsed);
+        }
+        break;
+      case 'interactive_html':
+        return _buildInteractiveHtmlArtifact(
+          title: title,
+          content: content,
+        );
+    }
+
+    if (previewText.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return AppLatexText(
+      previewText,
+      style: const TextStyle(
+        color: AppPalette.textPrimary,
+        fontSize: 13,
+        height: 1.5,
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _tryParseArtifactJson(String mimeType, String content) {
+    if (content.trim().isEmpty) {
+      return null;
+    }
+    if (mimeType != 'application/json') {
+      return null;
+    }
+    try {
+      final parsed = jsonDecode(content);
+      if (parsed is Map<String, dynamic>) {
+        return parsed;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  Widget _buildChartSpecArtifact(Map<String, dynamic> data) {
+    final scene = (data['scene'] ?? '').toString();
+    final knowledgePoints = (data['knowledge_points'] as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+    final suggestions = (data['plot_suggestions'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final studentTasks = (data['student_tasks'] as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+    final stepMapping = (data['step_mapping'] as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (scene.isNotEmpty) _buildArtifactMetaChip('场景', _chartSceneLabel(scene)),
+        if (knowledgePoints.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: knowledgePoints.map((item) => _buildArtifactMetaPill(item)).toList(),
+          ),
+        ],
+        if (suggestions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...suggestions.map((item) {
+            final label = (item['label'] ?? '').toString();
+            final value = (item['value'] ?? '').toString();
+            if (value.trim().isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildArtifactInfoTile(
+                label: label.isEmpty ? '图像提示' : label,
+                child: AppLatexText(
+                  value,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+        if (studentTasks.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildArtifactSectionTitle('学生操作建议'),
+          const SizedBox(height: 8),
+          ...studentTasks.map(
+            (task) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildArtifactBullet(task),
+            ),
+          ),
+        ],
+        if (stepMapping.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildArtifactSectionTitle('和解题步骤的对应关系'),
+          const SizedBox(height: 8),
+          ...stepMapping.asMap().entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildArtifactInfoTile(
+                label: '步骤 ${entry.key + 1}',
+                child: AppLatexText(
+                  entry.value,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStudyCardArtifact(Map<String, dynamic> data) {
+    final cards = (data['cards'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    if (cards.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: cards.map((card) {
+        final front = (card['front'] ?? '').toString();
+        final back = (card['back'] ?? '').toString();
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                front.isEmpty ? '复习卡片' : front,
+                style: const TextStyle(
+                  color: AppPalette.almondCream,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (back.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                AppLatexText(
+                  back,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCodeSnippetArtifact(Map<String, dynamic> data) {
+    final focus = (data['focus'] ?? '').toString();
+    final language = (data['language'] ?? '').toString();
+    final template = (data['template'] ?? '').toString();
+    final traceSteps = (data['trace_steps'] as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+    final debugChecklist = (data['debug_checklist'] as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (focus.isNotEmpty || language.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (focus.isNotEmpty) _buildArtifactMetaChip('核心', focus),
+              if (language.isNotEmpty) _buildArtifactMetaChip('语言', language),
+            ],
+          ),
+        if (template.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildArtifactSectionTitle('代码骨架'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppPalette.night.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SelectableText(
+                template,
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 12.5,
+                  height: 1.5,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (traceSteps.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildArtifactSectionTitle('执行思路'),
+          const SizedBox(height: 8),
+          ...traceSteps.map((step) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactBullet(step),
+              )),
+        ],
+        if (debugChecklist.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildArtifactSectionTitle('调试清单'),
+          const SizedBox(height: 8),
+          ...debugChecklist.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactBullet(item),
+              )),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTimelineArtifact(Map<String, dynamic> data) {
+    final stages = (data['stages'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    if (stages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: stages.asMap().entries.map((entry) {
+        final index = entry.key;
+        final stage = entry.value;
+        final stageName = (stage['stage'] ?? '').toString();
+        final focus = (stage['focus'] ?? '').toString();
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: AppPalette.matchaMist,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: AppPalette.night,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (index != stages.length - 1)
+                  Container(
+                    width: 2,
+                    height: 42,
+                    color: AppPalette.pastelGrey.withValues(alpha: 0.20),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildArtifactInfoTile(
+                  label: stageName.isEmpty ? '阶段 ${index + 1}' : stageName,
+                  child: AppLatexText(
+                    focus,
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildInteractiveHtmlArtifact({
+    required String title,
+    required String content,
+  }) {
+    final htmlSize = utf8.encode(content).length;
+    final kb = (htmlSize / 1024).toStringAsFixed(1);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildArtifactMetaChip('类型', 'HTML 动画'),
+              _buildArtifactMetaChip('大小', '$kb KB'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            '这部分已经不是普通文本，而是一段可嵌入 WebView 的交互页面源码。当前页面先不直接渲染源码，避免出现显示不全的问题。',
+            style: TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '下一步可以把它接到独立的 WebView 预览页，用来播放物理过程动画或交互演示。',
+            style: TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => HtmlArtifactPreviewScreen(
+                      title: title,
+                      htmlContent: content,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.open_in_browser_rounded,
+                color: AppPalette.almondCream,
+              ),
+              label: const Text(
+                '打开交互预览',
+                style: TextStyle(color: AppPalette.almondCream),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: AppPalette.almondCream.withValues(alpha: 0.45),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArtifactSectionTitle(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppPalette.almondCream,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _buildArtifactInfoTile({
+    required String label,
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArtifactBullet(String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          margin: const EdgeInsets.only(top: 7),
+          decoration: const BoxDecoration(
+            color: AppPalette.almondCream,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: AppLatexText(
+            text,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArtifactMetaChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppPalette.almondCream.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label：$value',
+        style: const TextStyle(
+          color: AppPalette.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArtifactMetaPill(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppPalette.textPrimary,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _chartSceneLabel(String scene) {
+    switch (scene) {
+      case 'function':
+        return '函数图像';
+      case 'geometry':
+        return '几何构型';
+      case 'statistics':
+        return '统计图表';
+      default:
+        return scene;
+    }
   }
 }

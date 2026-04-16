@@ -103,6 +103,65 @@ class ImageAnalysisPayload {
   }
 }
 
+class PhysicsAnimationPayload {
+  final String cleanedQuestion;
+  final String subject;
+  final List<String> knowledgePoints;
+  final String solutionSummary;
+  final List<String> solutionSteps;
+
+  const PhysicsAnimationPayload({
+    required this.cleanedQuestion,
+    required this.subject,
+    required this.knowledgePoints,
+    required this.solutionSummary,
+    required this.solutionSteps,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'cleaned_question': cleanedQuestion,
+      'subject': subject,
+      'knowledge_points': knowledgePoints,
+      'solution_summary': solutionSummary,
+      'solution_steps': solutionSteps,
+    };
+  }
+}
+
+class PhysicsAnimationResult {
+  final String subject;
+  final Map<String, dynamic>? artifact;
+  final bool generated;
+  final String reason;
+
+  const PhysicsAnimationResult({
+    required this.subject,
+    required this.artifact,
+    required this.generated,
+    required this.reason,
+  });
+
+  factory PhysicsAnimationResult.fromJson(Map<String, dynamic> json) {
+    final rawArtifact = json['artifact'];
+    Map<String, dynamic>? artifact;
+    if (rawArtifact is Map<String, dynamic>) {
+      artifact = rawArtifact;
+    } else if (rawArtifact is Map) {
+      artifact = rawArtifact.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+
+    return PhysicsAnimationResult(
+      subject: (json['subject'] ?? '').toString(),
+      artifact: artifact,
+      generated: json['generated'] == true,
+      reason: (json['reason'] ?? '').toString(),
+    );
+  }
+}
+
 class AiApiClient {
   const AiApiClient();
 
@@ -180,6 +239,25 @@ class AiApiClient {
       throw const AiApiException('图片解析已返回，但 OCR 文本为空。');
     }
     return result;
+  }
+
+  Future<PhysicsAnimationResult> generatePhysicsAnimation(
+    PhysicsAnimationPayload payload,
+  ) async {
+    final response = await http.post(
+      Uri.parse('${AppConstants.apiBaseUrl}/api/v1/analysis/physics-animation'),
+      headers: const {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: jsonEncode(payload.toJson()),
+    );
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(decoded));
+    }
+
+    return PhysicsAnimationResult.fromJson(decoded);
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {

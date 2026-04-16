@@ -55,6 +55,7 @@ class Settings:
     vivo_text_model: str
     vivo_vision_model: str
     vivo_timeout_seconds: int
+    vivo_vision_timeout_seconds: int
     vivo_max_tokens: int
     debug: bool
 
@@ -97,6 +98,7 @@ def get_settings() -> Settings:
         vivo_text_model=_get_setting("VIVO_TEXT_MODEL", file_values, "Doubao-Seed-2.0-mini"),
         vivo_vision_model=_get_setting("VIVO_VISION_MODEL", file_values, "qwen3.5-plus"),
         vivo_timeout_seconds=int(_get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120")),
+        vivo_vision_timeout_seconds=int(_get_setting("VIVO_VISION_TIMEOUT_SECONDS", file_values, "90")),
         vivo_max_tokens=int(_get_setting("VIVO_MAX_TOKENS", file_values, "4096")),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )
