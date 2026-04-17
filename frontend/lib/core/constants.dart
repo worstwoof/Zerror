@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
+  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120';
+
   static const String _apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
@@ -10,15 +12,26 @@ class AppConstants {
     if (_apiBaseUrlOverride.isNotEmpty) {
       return _apiBaseUrlOverride;
     }
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
+      return _defaultCloudApiBaseUrl;
     }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
-    }
-    return 'http://127.0.0.1:8000';
+    return _defaultCloudApiBaseUrl;
   }
 
+  static String snapshotStorageKey(String? syncUserId) {
+    final scopedKey = (syncUserId == null || syncUserId.trim().isEmpty)
+        ? 'guest'
+        : Uri.encodeComponent(syncUserId.trim());
+    return 'app_snapshot_v2_$scopedKey';
+  }
+
+  static String get registerEndpoint => '$apiBaseUrl/api/v1/auth/register';
+  static String get loginEndpoint => '$apiBaseUrl/api/v1/auth/login';
+  static String get logoutEndpoint => '$apiBaseUrl/api/v1/auth/logout';
+  static String get meEndpoint => '$apiBaseUrl/api/v1/auth/me';
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';
   static String get analysisEndpoint => '$apiBaseUrl/api/v1/analysis/text';
+  static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';
+  static String appStateEndpoint(String syncUserId) =>
+      '$apiBaseUrl/api/v1/app-state/${Uri.encodeComponent(syncUserId)}';
 }

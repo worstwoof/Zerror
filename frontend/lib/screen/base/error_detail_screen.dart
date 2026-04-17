@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 import 'home_screen.dart';
 
@@ -124,6 +127,29 @@ class ErrorDetailScreen extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (error.imageUrl != null && error.imageUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: isRemoteMediaPath(error.imageUrl)
+                            ? Image.network(
+                                error.imageUrl!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const SizedBox.shrink();
+                                },
+                              )
+                            : Image.file(
+                                File(error.imageUrl!),
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                      ),
+                    ],
                   ],
                 ),
               ),

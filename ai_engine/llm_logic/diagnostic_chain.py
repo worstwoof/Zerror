@@ -17,6 +17,7 @@ from backend.app.schemas.card_schema import (
 from .ocr_parser import normalize_ocr_text
 from .subject_extensions import (
     _physics_scene_type,
+    _build_physics_html,
     build_subject_extension_artifacts,
     filter_subject_extension_artifacts,
 )
@@ -211,10 +212,17 @@ class DiagnosticService:
             knowledge_points=knowledge_points,
         ):
             return None
-        return self._generate_physics_html_artifact(
+        artifact = self._generate_physics_html_artifact(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        if artifact is not None:
+            return artifact
+        return self._build_physics_template_artifact(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
             solution_steps=solution_steps,
         )
 
@@ -525,6 +533,31 @@ class DiagnosticService:
             artifacts=[candidate],
         )
         return validated[0] if validated else None
+
+    def _build_physics_template_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        candidate = _build_physics_html(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_steps=solution_steps,
+        )
+        validated = filter_subject_extension_artifacts(
+            subject="物理",
+            cleaned_question=cleaned_question,
+            artifacts=[candidate],
+        )
+        if validated:
+            logger.info(
+                "physics html fallback template used scene=%s",
+                _physics_scene_type(f"{cleaned_question} {' '.join(knowledge_points)}"),
+            )
+            return validated[0]
+        return None
 
     def _build_physics_html_prompt(
         self,

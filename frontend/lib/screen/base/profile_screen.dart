@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
+import '../../data/file_upload_client.dart';
 import 'achievements_screen.dart';
 import 'edit_profile_screen.dart';
 import 'favorites_screen.dart';
@@ -14,6 +16,8 @@ import 'share_center_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.onOpenDrawer});
+
+  static const FileUploadClient _fileUploadClient = FileUploadClient();
 
   final VoidCallback? onOpenDrawer;
 
@@ -303,7 +307,14 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _goalsCard(BuildContext context, AppStore store) {
-    final focusGoal = store.goalSteps.first;
+    final focusGoal = store.goalSteps.isNotEmpty
+        ? store.goalSteps.first
+        : const GoalStepData(
+            title: '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
+            progress: '0',
+            note: '\u65b0\u8d26\u53f7\u4f1a\u4ece 0 \u5f00\u59cb\u7d2f\u8ba1\u5b66\u4e60\u76ee\u6807\uff0c\u5f55\u5165\u9519\u9898\u540e\u8fd9\u91cc\u624d\u4f1a\u51fa\u73b0\u9636\u6bb5\u8ba1\u5212\u3002',
+          );
+    final hasGoals = store.goalSteps.isNotEmpty;
     return _glassCard(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const GoalsScreen()),
@@ -346,7 +357,9 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            '\u4f60\u5f53\u524d\u6b63\u5728\u63a8\u8fdb ${store.goalSteps.length} \u4e2a\u9636\u6bb5\u76ee\u6807',
+            hasGoals
+                ? '\u4f60\u5f53\u524d\u6b63\u5728\u63a8\u8fdb ${store.goalSteps.length} \u4e2a\u9636\u6bb5\u76ee\u6807'
+                : '\u4f60\u5f53\u524d\u6b63\u5728\u63a8\u8fdb 0 \u4e2a\u9636\u6bb5\u76ee\u6807',
             style: const TextStyle(
               color: AppPalette.textPrimary,
               fontSize: 28,
@@ -379,7 +392,7 @@ class ProfileScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        focusGoal.title,
+                        hasGoals ? focusGoal.title : '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
                         style: const TextStyle(
                           color: AppPalette.textPrimary,
                           fontSize: 16,
@@ -613,9 +626,20 @@ class ProfileScreen extends StatelessWidget {
         imageQuality: 88,
       );
       if (!context.mounted || pickedFile == null) return;
-      store.setAvatarPath(pickedFile.path);
+      final uploaded = await _fileUploadClient.uploadFile(
+        filePath: pickedFile.path,
+        category: 'avatar',
+        syncUserId: store.syncUserId,
+        authToken: store.authToken,
+      );
+      store.setAvatarPath(uploaded.fileUrl);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('\u5934\u50cf\u5df2\u66f4\u65b0')),
+      );
+    } on FileUploadException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -630,6 +654,16 @@ class ProfileScreen extends StatelessWidget {
   Widget _avatarContent(AppStore store, {double iconSize = 28}) {
     final avatarPath = store.avatarPath;
     if (avatarPath != null) {
+      if (isRemoteMediaPath(avatarPath)) {
+        return Image.network(
+          avatarPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return _avatarFallback(iconSize: iconSize);
+          },
+        );
+      }
       return Image.file(
         File(avatarPath),
         fit: BoxFit.cover,

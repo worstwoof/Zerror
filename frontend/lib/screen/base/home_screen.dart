@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 import '../capture/error_preview_screen.dart';
 import 'data_dashboard_screen.dart';
@@ -153,6 +154,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab(BuildContext context, AppStore store) {
+    if (store.totalErrors == 0) {
+      return _buildEmptyHomeTab(context, store);
+    }
+
     final featuredReview = store.smartReviewQueue.isNotEmpty
         ? store.smartReviewQueue.first
         : store.errors.first;
@@ -252,6 +257,105 @@ class _HomeScreenState extends State<HomeScreen> {
             actionLabel: '\u53bb\u8bad\u7ec3',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const WeaknessPracticeScreen()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyHomeTab(BuildContext context, AppStore store) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 38, 24, 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '欢迎回来，${store.userName}',
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 38,
+              fontWeight: FontWeight.w700,
+              height: 1.12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            '你的错题档案还是空的。先录入第一道题，后面的复习、学科拓展和数据统计才会慢慢长出来。',
+            style: TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 16,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 28),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = (constraints.maxWidth - 36) / 4;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 14,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: _quickAction(
+                      icon: Icons.camera_alt_rounded,
+                      label: '拍照录入',
+                      onTap: () => _showAddActionSheet(context),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _quickAction(
+                      icon: Icons.bolt_rounded,
+                      label: '智能组卷',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _quickAction(
+                      icon: Icons.folder_special_rounded,
+                      label: '错题档案',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: _quickAction(
+                      icon: Icons.event_note_rounded,
+                      label: '学习计划',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 28),
+          _featureCard(
+            title: '开始建立第一份错题档案',
+            subtitle: '拍题或手动录入都可以。只要有了第一道题，首页就会自动长出复习队列、收藏和学科扩展。',
+            tag: '当前 0 道错题',
+            icon: Icons.auto_stories_rounded,
+            actionLabel: '去录入',
+            onTap: () => _showAddActionSheet(context),
+          ),
+          const SizedBox(height: 18),
+          _featureCard(
+            title: '先搭好学习节奏',
+            subtitle: '现在可以先看计划页，但真正的复习推荐会在你录入错题之后按数据生成。',
+            tag: '空白起点',
+            icon: Icons.insights_rounded,
+            actionLabel: '查看计划',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
             ),
           ),
         ],
@@ -400,7 +504,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.logout_rounded,
                       title: '\u9000\u51fa\u767b\u5f55',
                       isDanger: true,
-                      onTap: () {
+                      onTap: () async {
+                        await store.signOutUser();
+                        if (!context.mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(builder: (_) => const LoginScreen()),
                           (route) => false,
@@ -811,6 +917,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _avatarContent(AppStore store, {double iconSize = 28}) {
     final avatarPath = store.avatarPath;
     if (avatarPath != null) {
+      if (isRemoteMediaPath(avatarPath)) {
+        return Image.network(
+          avatarPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return _avatarFallback(iconSize: iconSize);
+          },
+        );
+      }
       return Image.file(
         File(avatarPath),
         fit: BoxFit.cover,

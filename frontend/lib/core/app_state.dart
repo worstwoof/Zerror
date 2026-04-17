@@ -4,6 +4,9 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 
 import 'app_repository.dart';
+import 'auth_session.dart';
+import 'auth_session_store.dart';
+import '../data/auth_api_client.dart';
 
 class ErrorRecord {
   const ErrorRecord({
@@ -16,6 +19,7 @@ class ErrorRecord {
     required this.tags,
     required this.myAnswer,
     required this.aiAnalysis,
+    this.imageUrl,
     this.isMastered = false,
     this.isFavorite = false,
   });
@@ -29,12 +33,14 @@ class ErrorRecord {
   final List<String> tags;
   final String myAnswer;
   final String aiAnalysis;
+  final String? imageUrl;
   final bool isMastered;
   final bool isFavorite;
 
   ErrorRecord copyWith({
     bool? isMastered,
     bool? isFavorite,
+    String? imageUrl,
   }) {
     return ErrorRecord(
       id: id,
@@ -46,8 +52,44 @@ class ErrorRecord {
       tags: tags,
       myAnswer: myAnswer,
       aiAnalysis: aiAnalysis,
+      imageUrl: imageUrl ?? this.imageUrl,
       isMastered: isMastered ?? this.isMastered,
       isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subject': subject,
+      'topic': topic,
+      'question': question,
+      'reason': reason,
+      'date_label': dateLabel,
+      'tags': tags,
+      'my_answer': myAnswer,
+      'ai_analysis': aiAnalysis,
+      'image_url': imageUrl,
+      'is_mastered': isMastered,
+      'is_favorite': isFavorite,
+    };
+  }
+
+  factory ErrorRecord.fromJson(Map<String, dynamic> json) {
+    final rawTags = json['tags'];
+    return ErrorRecord(
+      id: json['id'] as String? ?? 'error-record',
+      subject: json['subject'] as String? ?? 'General',
+      topic: json['topic'] as String? ?? 'Review',
+      question: json['question'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      dateLabel: json['date_label'] as String? ?? '',
+      tags: rawTags is List ? rawTags.whereType<String>().toList(growable: false) : const [],
+      myAnswer: json['my_answer'] as String? ?? '',
+      aiAnalysis: json['ai_analysis'] as String? ?? '',
+      imageUrl: json['image_url'] as String?,
+      isMastered: json['is_mastered'] as bool? ?? false,
+      isFavorite: json['is_favorite'] as bool? ?? false,
     );
   }
 }
@@ -85,6 +127,7 @@ class NewErrorDraft {
     required this.tags,
     required this.myAnswer,
     required this.aiAnalysis,
+    this.imageUrl,
     this.isFavorite = false,
     this.isMastered = false,
     this.dateLabel,
@@ -97,6 +140,7 @@ class NewErrorDraft {
   final List<String> tags;
   final String myAnswer;
   final String aiAnalysis;
+  final String? imageUrl;
   final bool isFavorite;
   final bool isMastered;
   final String? dateLabel;
@@ -122,161 +166,95 @@ class AppStore extends ChangeNotifier {
   AppStore.seeded({
     AppRepository? repository,
     AppPersistenceSnapshot? snapshot,
+    AuthSessionStore? sessionStore,
+    AuthApiClient? authApiClient,
+    AuthSession? session,
   })  : _repository = repository,
-        _errors = _applySnapshot(_seedErrors(), snapshot),
-        _profile = snapshot?.profile ?? _defaultProfile,
+        _sessionStore = sessionStore,
+        _authApiClient = authApiClient,
+        _session = session,
+        _errors = _restoreErrors(snapshot),
+        _profile = snapshot?.profile ?? _profileFromSession(session) ?? _defaultProfile,
         _avatarPath = snapshot?.avatarPath,
-        _passwordUpdatedAt = snapshot?.passwordUpdatedAt ??
-            DateTime.now().subtract(const Duration(days: 7)),
+        _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now(),
         _devices = snapshot != null && snapshot.devices.isNotEmpty
             ? snapshot.devices.toList(growable: true)
-            : _seedDevices();
+            : _defaultDevices(session);
 
   static const UserProfileData _defaultProfile = UserProfileData(
-    name: 'Zander',
-    userId: 'zerror_001',
-    motto: '让错误再次发芽，让理解长出来',
-    email: 'zander@example.com',
+    name: '新用户',
+    userId: 'guest',
+    motto: '从第一道错题开始，慢慢长出自己的知识树。',
+    email: '',
   );
 
   final AppRepository? _repository;
+  final AuthSessionStore? _sessionStore;
+  final AuthApiClient? _authApiClient;
   final List<ErrorRecord> _errors;
+  AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
   DateTime _passwordUpdatedAt;
   List<DeviceSession> _devices;
 
-  static Future<AppStore> bootstrap(AppRepository repository) async {
-    final snapshot = await repository.loadSnapshot();
-    return AppStore.seeded(repository: repository, snapshot: snapshot);
+  static Future<AppStore> bootstrap(
+    AppRepository repository, {
+    required AuthSessionStore sessionStore,
+    required AuthApiClient authApiClient,
+  }) async {
+    final session = await sessionStore.loadSession();
+    AppPersistenceSnapshot? snapshot;
+    try {
+      snapshot = await repository.loadSnapshot();
+    } catch (error) {
+      debugPrint('Snapshot bootstrap failed: $error');
+    }
+    final store = AppStore.seeded(
+      repository: repository,
+      snapshot: snapshot,
+      sessionStore: sessionStore,
+      authApiClient: authApiClient,
+      session: session,
+    );
+    if (session != null && (snapshot == null || snapshot.errors.isEmpty)) {
+      unawaited(store._persist());
+    }
+    return store;
   }
 
-  static List<ErrorRecord> _seedErrors() {
-    return const [
-      ErrorRecord(
-        id: 'linear-eigen',
-        subject: '线性代数',
-        topic: '矩阵特征值与相似对角化',
-        question: '已知矩阵 A 的特征值为 λ1、λ2、λ3，且 A 可逆。证明伴随矩阵 A* 的特征值为 |A|/λi。',
-        reason: '概念联系还不够牢',
-        dateLabel: '今天 14:30',
-        tags: ['线性代数', '特征值', '一轮复习'],
-        myAnswer: '我知道 A* 和 A^-1 有关系，但没有把特征值变换这一步写清楚。',
-        aiAnalysis: '先写出 A* = |A|A^-1。因为 A^-1 的特征值是 1/λi，所以 A* 的特征值就是 |A|/λi。',
-      ),
-      ErrorRecord(
-        id: 'graph-euler',
-        subject: '离散数学',
-        topic: '欧拉回路判定',
-        question: '无向连通图存在欧拉回路的充要条件是什么？',
-        reason: '定义记混了',
-        dateLabel: '今天 10:12',
-        tags: ['离散数学', '图论', '二轮复习'],
-        myAnswer: '我记得和点的度数有关，但容易和欧拉路径混在一起。',
-        aiAnalysis: '无向连通图存在欧拉回路，当且仅当图连通且所有顶点度数都为偶数。',
-      ),
-      ErrorRecord(
-        id: 'kmp-next',
-        subject: '数据结构',
-        topic: 'KMP next 数组构造',
-        question: 'KMP 中 next 数组的含义是什么，构造时为什么可以在失配后跳转？',
-        reason: '边界条件总漏看',
-        dateLabel: '昨天 20:15',
-        tags: ['数据结构', 'KMP', '算法实现'],
-        myAnswer: '我知道是在比前后缀，但一写代码就容易在 i、j 的变化上出错。',
-        aiAnalysis: 'next 数组保存的是最长相等前后缀长度，失配后会跳到对应前缀位置继续比较。',
-      ),
-      ErrorRecord(
-        id: 'java-strategy',
-        subject: 'Java',
-        topic: '策略模式与接口抽象',
-        question: '如何通过接口统一管理不同的业务策略，并避免条件分支不断膨胀？',
-        reason: '思路中途断开',
-        dateLabel: '4 月 6 日',
-        tags: ['Java', '设计模式', '接口抽象'],
-        myAnswer: '我知道应该上接口，但没把上下文类和策略实现拆清楚。',
-        aiAnalysis: '把共同行为抽成策略接口，再由具体实现负责不同规则，调用方只依赖接口即可扩展。',
-      ),
-      ErrorRecord(
-        id: 'function-extreme',
-        subject: '高等数学',
-        topic: '二次函数最值',
-        question: '已知顶点坐标和定义域时，如何快速判断二次函数最值所在的位置？',
-        reason: '边界条件漏检',
-        dateLabel: '4 月 5 日',
-        tags: ['高等数学', '函数', '最值'],
-        myAnswer: '我先找了顶点，但忘了回去检查定义域的边界点。',
-        aiAnalysis: '这类题先看开口方向和顶点位置，再结合定义域检查边界点，很多失分都发生在最后一步。',
-      ),
-      ErrorRecord(
-        id: 'politics-history',
-        subject: '考研政治',
-        topic: '近代史时间线梳理',
-        question: '如何快速区分几次重要会议在近代史时间线中的先后顺序？',
-        reason: '记忆链条断点太多',
-        dateLabel: '4 月 4 日',
-        tags: ['考研政治', '时间线', '记忆卡'],
-        myAnswer: '单个事件我能记住，但一连起来就会前后颠倒。',
-        aiAnalysis: '先抓关键年份，再把会议挂到核心节点上，用时间链代替碎片记忆。',
-      ),
-      ErrorRecord(
-        id: 'probability-bayes',
-        subject: '概率论',
-        topic: '贝叶斯公式应用',
-        question: '遇到条件概率反推原因的题，如何快速判断应该使用贝叶斯公式？',
-        reason: '题型识别不够快',
-        dateLabel: '4 月 3 日',
-        tags: ['概率论', '条件概率', '专项训练'],
-        myAnswer: '看到条件概率我知道大概相关，但总拿不准是顺推还是反推。',
-        aiAnalysis: '如果题目给的是结果，要求你反推原因，就优先想贝叶斯。先写目标概率，再拆先验和似然。',
-      ),
-      ErrorRecord(
-        id: 'os-scheduling',
-        subject: '操作系统',
-        topic: '进程调度策略比较',
-        question: '时间片轮转和优先级调度在响应时间、吞吐量、公平性上的差异是什么？',
-        reason: '对比维度没有搭起来',
-        dateLabel: '4 月 2 日',
-        tags: ['操作系统', '调度', '系统基础'],
-        myAnswer: '我能背定义，但一到优缺点对比就容易混。',
-        aiAnalysis: '比较时固定三个维度来记：调度目标、适用场景、潜在问题，会更稳定。',
-      ),
-    ];
+  static UserProfileData? _profileFromSession(AuthSession? session) {
+    if (session == null) return null;
+    return UserProfileData(
+      name: session.username,
+      userId: session.username,
+      motto: _defaultProfile.motto,
+      email: session.email,
+    );
   }
 
-  static List<DeviceSession> _seedDevices() {
-    return const [
+  static List<DeviceSession> _defaultDevices(AuthSession? session) {
+    if (session == null) {
+      return <DeviceSession>[];
+    }
+    return [
       DeviceSession(
-        id: 'pixel-emulator',
-        name: 'Pixel 模拟器',
-        detail: 'Android · 上海 · 刚刚活跃',
+        id: 'current-${session.syncUserId}',
+        name: '当前设备',
+        detail: '本次登录设备',
         isCurrent: true,
         isTrusted: true,
         isOnline: true,
       ),
-      DeviceSession(
-        id: 'windows-desktop',
-        name: 'Windows 桌面端',
-        detail: 'Windows · 上次登录于昨天 21:34',
-        isCurrent: false,
-        isTrusted: true,
-        isOnline: true,
-      ),
     ];
   }
 
-  static List<ErrorRecord> _applySnapshot(
-    List<ErrorRecord> seed,
-    AppPersistenceSnapshot? snapshot,
-  ) {
-    if (snapshot == null) return seed.toList(growable: true);
-    return seed
-        .map(
-          (item) => item.copyWith(
-            isFavorite: snapshot.favoriteIds.contains(item.id),
-            isMastered: snapshot.masteredIds.contains(item.id),
-          ),
-        )
+  static List<ErrorRecord> _restoreErrors(AppPersistenceSnapshot? snapshot) {
+    if (snapshot == null || snapshot.errors.isEmpty) {
+      return <ErrorRecord>[];
+    }
+    return snapshot.errors
+        .map(ErrorRecord.fromJson)
         .toList(growable: true);
   }
 
@@ -288,6 +266,7 @@ class AppStore extends ChangeNotifier {
       profile: _profile,
       passwordUpdatedAt: _passwordUpdatedAt,
       devices: _devices,
+      errors: _errors.map((item) => item.toJson()).toList(growable: false),
     );
   }
 
@@ -301,17 +280,21 @@ class AppStore extends ChangeNotifier {
     WeeklyCalendarEntry(weekday: '日', dayLabel: '13', state: CalendarState.rest),
   ];
 
-  final List<int> weeklyReviewMinutes = const [18, 32, 24, 40, 28, 16, 36];
-  final int studyStreakDays = 14;
-  final int invitedCount = 3;
-  final int pendingInviteCount = 2;
-  final String inviteCode = 'ZERROR-2026';
+  List<int> get weeklyReviewMinutes {
+    if (!hasLearningHistory) {
+      return List<int>.filled(7, 0, growable: false);
+    }
+    return const [18, 32, 24, 40, 28, 16, 36];
+  }
 
   String get userName => _profile.name;
   String get userId => _profile.userId;
   String get userMotto => _profile.motto;
   String get userEmail => _profile.email;
   String? get avatarPath => _avatarPath;
+  bool get isAuthenticated => _session != null && !(_session?.isExpired ?? true);
+  String? get authToken => _session?.token;
+  String? get syncUserId => _session?.syncUserId;
 
   String get passwordUpdatedLabel {
     final days = DateTime.now().difference(_passwordUpdatedAt).inDays;
@@ -346,7 +329,19 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_devices);
 
   DeviceSession get currentDevice =>
-      _devices.firstWhere((item) => item.isCurrent, orElse: () => _devices.first);
+      _devices.firstWhere(
+        (item) => item.isCurrent,
+        orElse: () => _devices.isNotEmpty
+            ? _devices.first
+            : const DeviceSession(
+                id: 'current-device',
+                name: '当前设备',
+                detail: '本次登录设备',
+                isCurrent: true,
+                isTrusted: true,
+                isOnline: true,
+              ),
+      );
 
   int get activeDeviceCount => _devices.where((item) => item.isOnline).length;
   int get onlineOtherDeviceCount =>
@@ -370,9 +365,23 @@ class AppStore extends ChangeNotifier {
   int get masteredCount => masteredErrors.length;
   int get knowledgePointCount => _errors.map((item) => item.topic).toSet().length;
   int get subjectCount => _errors.map((item) => item.subject).toSet().length;
+  bool get hasLearningHistory => totalErrors > 0;
+  int get invitedCount => 0;
+  int get pendingInviteCount => 0;
+  String get inviteCode {
+    final raw = (syncUserId ?? userId)
+        .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+        .toUpperCase();
+    if (raw.isEmpty) {
+      return 'ZERROR-NEW';
+    }
+    final suffix = raw.length > 6 ? raw.substring(0, 6) : raw;
+    return 'ZERROR-$suffix';
+  }
   int get unlockedMonths => invitedCount;
   int get completedReviewDaysThisWeek =>
-      weeklyCalendar.where((entry) => entry.state == CalendarState.done).length;
+      hasLearningHistory ? weeklyCalendar.where((entry) => entry.state == CalendarState.done).length : 0;
+  int get studyStreakDays => hasLearningHistory ? completedReviewDaysThisWeek : 0;
   int get todayPlannedMinutes =>
       todayTasks.fold(0, (sum, task) => sum + task.durationMinutes);
   double get masteryRate => totalErrors == 0 ? 0 : masteredCount / totalErrors;
@@ -433,6 +442,9 @@ class AppStore extends ChangeNotifier {
   }
 
   List<LearningTask> get todayTasks {
+    if (!hasLearningHistory) {
+      return const [];
+    }
     final focusSubject = weakestSubject == '暂无' ? '当前重点模块' : weakestSubject;
     return [
       LearningTask(
@@ -454,6 +466,9 @@ class AppStore extends ChangeNotifier {
   }
 
   List<GoalStepData> get goalSteps {
+    if (!hasLearningHistory) {
+      return const [];
+    }
     return [
       GoalStepData(
         title: '每天完成 1 次智能复习',
@@ -498,6 +513,7 @@ class AppStore extends ChangeNotifier {
       tags: draft.tags,
       myAnswer: draft.myAnswer,
       aiAnalysis: draft.aiAnalysis,
+      imageUrl: draft.imageUrl,
       isFavorite: draft.isFavorite,
       isMastered: draft.isMastered,
     );
@@ -572,9 +588,150 @@ class AppStore extends ChangeNotifier {
     return changed;
   }
 
+  Future<void> loginUser({
+    required String identifier,
+    required String password,
+    bool persistSession = true,
+    bool rememberPassword = false,
+    bool autoLogin = false,
+  }) async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    if (client == null || sessionStore == null) {
+      throw StateError('Authentication is not configured.');
+    }
+
+    final session = await client.login(
+      identifier: identifier,
+      password: password,
+    );
+    await sessionStore.saveSession(session, persist: persistSession);
+    if (rememberPassword) {
+      await sessionStore.saveRememberedLogin(
+        RememberedLoginData(
+          identifier: identifier,
+          password: password,
+          rememberPassword: true,
+          autoLogin: autoLogin,
+        ),
+      );
+    } else {
+      await sessionStore.clearRememberedLogin();
+    }
+    _session = session;
+    await _reloadForCurrentSession();
+  }
+
+  Future<void> registerUser({
+    required String username,
+    required String email,
+    required String password,
+    bool signInAfterRegister = true,
+  }) async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    if (client == null || sessionStore == null) {
+      throw StateError('Authentication is not configured.');
+    }
+
+    final session = await client.register(
+      username: username,
+      email: email,
+      password: password,
+    );
+    if (!signInAfterRegister) {
+      return;
+    }
+    await sessionStore.saveSession(session);
+    _session = session;
+    await _reloadForCurrentSession();
+  }
+
+  Future<void> signOutUser() async {
+    final client = _authApiClient;
+    final sessionStore = _sessionStore;
+    final currentSession = _session;
+
+    if (client != null && currentSession != null && currentSession.token.isNotEmpty) {
+      try {
+        await client.logout(currentSession.token);
+      } catch (error) {
+        debugPrint('Sign out request failed: $error');
+      }
+    }
+
+    await sessionStore?.clear();
+    await sessionStore?.disableAutoLogin();
+    _session = null;
+    _applySnapshotState(null);
+    notifyListeners();
+    unawaited(_persist());
+  }
+
+  Future<RememberedLoginData?> loadRememberedLogin() async {
+    return _sessionStore?.loadRememberedLogin();
+  }
+
+  Future<bool> tryAutoLogin() async {
+    if (isAuthenticated) {
+      return true;
+    }
+
+    final remembered = await _sessionStore?.loadRememberedLogin();
+    if (remembered == null || !remembered.autoLogin || !remembered.hasCredentials) {
+      return false;
+    }
+
+    try {
+      await loginUser(
+        identifier: remembered.identifier,
+        password: remembered.password,
+        persistSession: true,
+        rememberPassword: true,
+        autoLogin: true,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Auto login failed: $error');
+      return false;
+    }
+  }
+
   void setAvatarPath(String? path) {
     _avatarPath = path;
     _commit();
+  }
+
+  Future<void> _reloadForCurrentSession() async {
+    AppPersistenceSnapshot? loadedSnapshot;
+    final repository = _repository;
+
+    if (repository != null) {
+      try {
+        loadedSnapshot = await repository.loadSnapshot();
+      } catch (error) {
+        debugPrint('Snapshot reload after auth failed: $error');
+      }
+    }
+
+    _applySnapshotState(loadedSnapshot);
+    notifyListeners();
+
+    if (_session != null && (loadedSnapshot == null || loadedSnapshot.errors.isEmpty)) {
+      await _persist();
+    }
+  }
+
+  void _applySnapshotState(AppPersistenceSnapshot? snapshot) {
+    _errors
+      ..clear()
+      ..addAll(_restoreErrors(snapshot));
+    _profile = snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
+    _avatarPath = snapshot?.avatarPath;
+    _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now();
+    _devices = snapshot != null && snapshot.devices.isNotEmpty
+        ? snapshot.devices.toList(growable: true)
+        : _defaultDevices(_session);
   }
 
   void _commit() {
@@ -585,7 +742,11 @@ class AppStore extends ChangeNotifier {
   Future<void> _persist() async {
     final repository = _repository;
     if (repository == null) return;
-    await repository.saveSnapshot(snapshot);
+    try {
+      await repository.saveSnapshot(snapshot);
+    } catch (error) {
+      debugPrint('Snapshot persistence failed: $error');
+    }
   }
 
   static String _buildDateLabel(DateTime time) {

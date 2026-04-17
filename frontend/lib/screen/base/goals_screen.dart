@@ -10,6 +10,7 @@ class GoalsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
+    final hasGoals = store.goalSteps.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppPalette.night,
@@ -33,14 +34,24 @@ class GoalsScreen extends StatelessWidget {
                     style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '错题复盘效率提升计划',
-                    style: TextStyle(color: AppPalette.textPrimary, fontSize: 24, fontWeight: FontWeight.w700),
+                  Text(
+                    hasGoals ? '错题复盘效率提升计划' : '还没有学习目标',
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '目标周期 30 天，重点提升复盘频率、归因质量和知识回收效率。目前还有 ${store.pendingReviewCount} 道错题值得继续巩固。',
-                    style: const TextStyle(color: AppPalette.textSecondary, fontSize: 14, height: 1.5),
+                    hasGoals
+                        ? '目标周期 30 天，重点提升复盘频率、归因质量和知识回收效率。目前还有 ${store.pendingReviewCount} 道错题值得继续巩固。'
+                        : '新账号会从 0 开始累计学习目标。先录入第一道错题，后面系统再根据你的错题和复习节奏生成阶段计划。',
+                    style: const TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),
@@ -53,23 +64,67 @@ class GoalsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView.separated(
-                itemCount: store.goalSteps.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final item = store.goalSteps[index];
-                  return _GoalStep(
-                    title: item.title,
-                    progress: item.progress,
-                    note: item.note,
-                  );
-                },
-              ),
+              child: hasGoals
+                  ? ListView.separated(
+                      itemCount: store.goalSteps.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final item = store.goalSteps[index];
+                        return _GoalStep(
+                          title: item.title,
+                          progress: item.progress,
+                          note: item.note,
+                        );
+                      },
+                    )
+                  : const _EmptyGoalsState(),
             ),
             const SizedBox(height: 18),
-            AppPrimaryButton(label: '新建目标', icon: Icons.add_rounded, onPressed: () {}),
+            AppPrimaryButton(
+              label: hasGoals ? '新建目标' : '先录入第一道题',
+              icon: hasGoals ? Icons.add_rounded : Icons.auto_stories_rounded,
+              onPressed: () => Navigator.pop(context),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyGoalsState extends StatelessWidget {
+  const _EmptyGoalsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Icon(
+            Icons.flag_outlined,
+            color: AppPalette.textSecondary,
+            size: 28,
+          ),
+          SizedBox(height: 12),
+          Text(
+            '目标清单还是空的',
+            style: TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            '先录入错题，后面这里会自动长出阶段目标、复习节奏和薄弱点突破计划。',
+            style: TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -107,17 +162,31 @@ class _GoalStep extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(note, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13)),
+                Text(
+                  note,
+                  style: const TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 12),
           Text(
             progress,
-            style: const TextStyle(color: AppPalette.almondCream, fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: AppPalette.almondCream,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -148,9 +217,16 @@ class _Header extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(color: AppPalette.textPrimary, fontSize: 26, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              Text(subtitle, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13)),
+              Text(
+                subtitle,
+                style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+              ),
             ],
           ),
         ),

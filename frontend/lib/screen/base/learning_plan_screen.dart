@@ -33,7 +33,9 @@ class LearningPlanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final focusSubject = store.weakestSubject == '暂无' ? '当前重点模块' : store.weakestSubject;
+    final hasLearningHistory = store.hasLearningHistory;
+    final focusSubject =
+        store.weakestSubject == '暂无' ? '当前重点模块' : store.weakestSubject;
     final reviewTarget = store.smartReviewQueue.isNotEmpty
         ? store.smartReviewQueue.first.topic
         : '核心错题回收';
@@ -65,7 +67,7 @@ class LearningPlanScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '完成 1 次智能复习 + 1 次薄弱点专训',
+                      hasLearningHistory ? '完成 1 次智能复习 + 1 次薄弱点专练' : '先录入第一道错题',
                       style: const TextStyle(
                         color: AppPalette.textPrimary,
                         fontSize: 24,
@@ -75,7 +77,9 @@ class LearningPlanScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '今天计划投入 ${store.todayPlannedMinutes} 分钟，优先回收 ${store.pendingReviewCount} 道待复习错题，再集中补强「$focusSubject」。',
+                      hasLearningHistory
+                          ? '今天计划投入 ${store.todayPlannedMinutes} 分钟，优先回收 ${store.pendingReviewCount} 道待复习错题，再集中补强「$focusSubject」。'
+                          : '新用户还没有复习历史。录入题目后，这里会根据你的错题情况自动生成今日任务、周节奏和复习建议。',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 14,
@@ -88,19 +92,25 @@ class LearningPlanScreen extends StatelessWidget {
               const SizedBox(height: 18),
               const AppSectionTitle(
                 title: '今日任务',
-                subtitle: '按照这个顺序走，学习节奏会更顺',
+                subtitle: '把今天该做的事拆成清晰步骤',
                 icon: Icons.fact_check_rounded,
               ),
               const SizedBox(height: 12),
-              ...store.todayTasks.map(
-                (task) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _PlanTaskCard(
-                    task: task,
-                    onTap: () => _handleTaskTap(context, task),
+              if (store.todayTasks.isEmpty)
+                _EmptySectionPanel(
+                  title: '还没有今日任务',
+                  note: '先录入第一道错题，或者先去智能组卷热身，系统才会开始为你生成任务清单。',
+                )
+              else
+                ...store.todayTasks.map(
+                  (task) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PlanTaskCard(
+                      task: task,
+                      onTap: () => _handleTaskTap(context, task),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 6),
               const AppSectionTitle(
                 title: '本周日历',
@@ -112,7 +122,9 @@ class LearningPlanScreen extends StatelessWidget {
               const SizedBox(height: 18),
               AppSectionTitle(
                 title: '艾宾浩斯遗忘曲线',
-                subtitle: '推荐先回看「$reviewTarget」，别让高价值错题滑出记忆峰值',
+                subtitle: hasLearningHistory
+                    ? '推荐先回看「$reviewTarget」，别让高价值错题滑出记忆峰值'
+                    : '录入并复习错题后，这里才会生成属于你的记忆趋势',
                 icon: Icons.show_chart_rounded,
               ),
               const SizedBox(height: 12),
@@ -217,6 +229,50 @@ class _PlanTaskCard extends StatelessWidget {
   }
 }
 
+class _EmptySectionPanel extends StatelessWidget {
+  const _EmptySectionPanel({
+    required this.title,
+    required this.note,
+  });
+
+  final String title;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.hourglass_empty_rounded,
+            color: AppPalette.textSecondary,
+            size: 28,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            note,
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CalendarPanel extends StatelessWidget {
   const _CalendarPanel({required this.store});
 
@@ -224,6 +280,13 @@ class _CalendarPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!store.hasLearningHistory) {
+      return const _EmptySectionPanel(
+        title: '本周日历还是空的',
+        note: '录入错题后，这里才会开始标记每天的复习安排和回收节奏。',
+      );
+    }
+
     return AppPanel(
       child: Column(
         children: [
@@ -231,7 +294,7 @@ class _CalendarPanel extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  '4 月第 2 周',
+                  '本周复习安排',
                   style: TextStyle(
                     color: AppPalette.textPrimary,
                     fontSize: 18,
@@ -368,6 +431,13 @@ class _ForgettingCurvePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (pendingReviewCount == 0) {
+      return const _EmptySectionPanel(
+        title: '暂时还没有记忆曲线',
+        note: '等你开始录入并回看错题后，系统才会生成专属的遗忘趋势和建议复习点。',
+      );
+    }
+
     return AppPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,6 +494,34 @@ class _RhythmPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!store.hasLearningHistory) {
+      return AppPanel(
+        child: Column(
+          children: [
+            Row(
+              children: const [
+                Expanded(child: _PlanMetric(label: '已完成', value: '0')),
+                _MetricDivider(),
+                Expanded(child: _PlanMetric(label: '待回收', value: '0')),
+                _MetricDivider(),
+                Expanded(child: _PlanMetric(label: '连续打卡', value: '0天')),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              '开始记录错题后，这里才会根据你的本周复习行为生成节奏柱状图。',
+              style: TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final maxMinutes = store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
     return AppPanel(
       child: Column(
         children: [
@@ -455,8 +553,7 @@ class _RhythmPanel extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(store.weeklyReviewMinutes.length, (index) {
-              final maxMinutes = store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
-              final ratio = store.weeklyReviewMinutes[index] / maxMinutes;
+              final ratio = maxMinutes == 0 ? 0.0 : store.weeklyReviewMinutes[index] / maxMinutes;
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
