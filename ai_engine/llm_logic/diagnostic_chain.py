@@ -1200,7 +1200,7 @@ Requirements:
             )
             return None
 
-        html_document = self._render_electromagnetism_scene_html(
+        html_document = self._render_electromagnetism_scene_html_v2(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
@@ -1713,6 +1713,677 @@ Requirements:
 </body>
 </html>"""
 
+    def _render_electromagnetism_scene_html_v2(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        scene_spec: Dict[str, Any],
+    ) -> str:
+        subtype = str(
+            scene_spec.get("subtype")
+            or self._guess_electromagnetism_subtype(cleaned_question)
+        ).lower()
+        if subtype not in {"charged_particle", "electromagnetic_induction"}:
+            subtype = self._guess_electromagnetism_subtype(cleaned_question)
+
+        guessed_field_type = self._guess_electromagnetism_field_type(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+        )
+        field_type = str(scene_spec.get("field_type") or guessed_field_type).lower()
+        if field_type not in {"magnetic", "electric", "mixed"}:
+            field_type = guessed_field_type
+
+        field_marker = self._electromagnetism_choice(
+            scene_spec.get("field_marker"),
+            {"cross", "dot", "line"},
+            "cross" if field_type != "electric" else "line",
+        )
+        trajectory = self._electromagnetism_choice(
+            scene_spec.get("trajectory"),
+            {"arc_up", "arc_down", "straight", "circle"},
+            "arc_up" if subtype == "charged_particle" else "straight",
+        )
+        charge_sign = self._electromagnetism_choice(
+            scene_spec.get("charge_sign"),
+            {"positive", "negative", "unknown"},
+            "positive",
+        )
+        velocity_direction = self._electromagnetism_choice(
+            scene_spec.get("velocity_direction"),
+            {"left", "right", "up", "down"},
+            "right",
+        )
+        force_direction = self._electromagnetism_choice(
+            scene_spec.get("force_direction"),
+            {"up", "down", "left", "right", "none"},
+            "up",
+        )
+        rod_motion_direction = self._electromagnetism_choice(
+            scene_spec.get("rod_motion_direction"),
+            {"left", "right"},
+            "right",
+        )
+
+        raw_focus_points = scene_spec.get("focus_points")
+        focus_points = [
+            str(item).strip()
+            for item in raw_focus_points
+            if str(item).strip()
+        ] if isinstance(raw_focus_points, list) else []
+        if not focus_points:
+            focus_points = [item for item in knowledge_points[:3] if item.strip()]
+        if not focus_points:
+            focus_points = ["受力方向", "场方向判断", "运动与偏转关系"]
+
+        title_text = self._display_plain_text(
+            str(scene_spec.get("title") or ""),
+            limit=18,
+        ) or self._guess_electromagnetism_title(
+            cleaned_question=cleaned_question,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        title = html.escape(title_text)
+        phenomenon_summary_text = self._display_plain_text(
+            str(scene_spec.get("phenomenon_summary") or solution_summary),
+            limit=52,
+        ) or self._guess_electromagnetism_summary(
+            cleaned_question=cleaned_question,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        interaction_hint_text = self._display_plain_text(
+            str(scene_spec.get("interaction_hint") or ""),
+            limit=48,
+        ) or "拖动强度滑块，对比轨迹弯曲、感应强弱或电流变化。"
+        direction_hint_text = self._display_plain_text(
+            str(scene_spec.get("direction_hint") or ""),
+            limit=48,
+        ) or "结合受力方向、场方向和运动方向，判断粒子偏转或感应电流方向。"
+        question_hint_text = self._display_plain_text(cleaned_question, limit=42)
+
+        phenomenon_summary = html.escape(phenomenon_summary_text)
+        interaction_hint = html.escape(interaction_hint_text)
+        direction_hint = html.escape(direction_hint_text)
+        question_hint = html.escape(question_hint_text)
+        focus_html = "".join(
+            f"<li>{html.escape(self._display_plain_text(item, limit=22) or item)}</li>"
+            for item in focus_points[:4]
+        )
+        badge_html = "".join(
+            f'<span class="scene-chip">{html.escape(self._display_plain_text(item, limit=18) or item)}</span>'
+            for item in focus_points[:3]
+        )
+        subtype_label = "带电粒子运动" if subtype == "charged_particle" else "电磁感应过程"
+        field_badge = {
+            "magnetic": "磁场",
+            "electric": "电场",
+            "mixed": "复合场",
+        }[field_type]
+
+        if subtype == "charged_particle" and field_type == "electric":
+            particle_path = {
+                "arc_up": "M68 170 Q180 170 248 148 T430 76",
+                "arc_down": "M68 88 Q180 88 248 112 T430 186",
+                "straight": "M68 130 H430",
+                "circle": "M120 132 Q230 42 340 132 Q230 220 120 132",
+            }[trajectory]
+            field_arrows = "".join(
+                f'<line x1="198" y1="{y}" x2="322" y2="{y}" class="field-arrow" />'
+                for y in (92, 122, 152, 182)
+            )
+            velocity_arrow = self._electromagnetism_arrow_line(
+                kind="velocity",
+                direction=velocity_direction,
+                x=94,
+                y=128,
+                length=70,
+            )
+            force_arrow = self._electromagnetism_arrow_line(
+                kind="force",
+                direction=force_direction,
+                x=264,
+                y=124,
+                length=56,
+            )
+            charge_label = {"positive": "q+", "negative": "q-", "unknown": "q"}[charge_sign]
+            scene_markup = """
+      <svg viewBox="0 0 520 260" aria-label="电场中带电粒子运动示意">
+        <defs>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+            <polygon points="0 0, 8 3.5, 0 7" fill="currentColor" />
+          </marker>
+        </defs>
+        <rect x="28" y="28" width="464" height="190" rx="28" class="stage-shell" />
+        <rect x="170" y="68" width="180" height="118" rx="20" class="field-zone electric-zone" />
+        <rect x="188" y="76" width="18" height="102" rx="9" class="plate positive-plate" />
+        <rect x="314" y="76" width="18" height="102" rx="9" class="plate negative-plate" />
+        __FIELD_ARROWS__
+        <path d="__PARTICLE_PATH__" class="trace electric-trace" />
+        <circle class="particle electric-particle" r="9">
+          <animateMotion dur="3.4s" repeatCount="indefinite" path="__PARTICLE_PATH__" />
+        </circle>
+        __VELOCITY_ARROW__
+        __FORCE_ARROW__
+        <text x="88" y="114" class="label">v</text>
+        <text x="276" y="112" class="label">F</text>
+        <text x="194" y="68" class="label subtle">正极板</text>
+        <text x="306" y="68" class="label subtle">负极板</text>
+        <text x="60" y="184" class="label subtle">粒子 {charge_label}</text>
+        <text x="196" y="202" class="label subtle">电场方向</text>
+      </svg>
+"""
+            scene_markup = (
+                scene_markup
+                .replace("__FIELD_ARROWS__", field_arrows)
+                .replace("__PARTICLE_PATH__", particle_path)
+                .replace("__VELOCITY_ARROW__", velocity_arrow)
+                .replace("__FORCE_ARROW__", force_arrow)
+            )
+        elif subtype == "charged_particle":
+            particle_path = self._electromagnetism_particle_path(
+                trajectory,
+                velocity_direction,
+            )
+            velocity_arrow = self._electromagnetism_arrow_line(
+                kind="velocity",
+                direction=velocity_direction,
+                x=92,
+                y=144,
+                length=72,
+            )
+            force_arrow = self._electromagnetism_arrow_line(
+                kind="force",
+                direction=force_direction,
+                x=288,
+                y=116,
+                length=58,
+            )
+            charge_label = {"positive": "q+", "negative": "q-", "unknown": "q"}[charge_sign]
+            field_marks = self._electromagnetism_field_marks(
+                field_marker=field_marker,
+                x_positions=(232, 280, 328, 376),
+                y_positions=(84, 124, 164),
+            )
+            plate_outline = ""
+            if field_type == "mixed":
+                plate_outline = """
+        <rect x="176" y="72" width="18" height="96" rx="9" class="plate positive-plate faint-plate" />
+        <rect x="396" y="72" width="18" height="96" rx="9" class="plate negative-plate faint-plate" />
+"""
+            scene_markup = """
+      <svg viewBox="0 0 520 260" aria-label="磁场中带电粒子运动示意">
+        <defs>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+            <polygon points="0 0, 8 3.5, 0 7" fill="currentColor" />
+          </marker>
+        </defs>
+        <rect x="28" y="28" width="464" height="190" rx="28" class="stage-shell" />
+        <rect x="198" y="54" width="232" height="138" rx="24" class="field-zone magnetic-zone" />
+        __PLATE_OUTLINE__
+        __FIELD_MARKS__
+        <path d="__PARTICLE_PATH__" class="trace magnetic-trace" />
+        <circle class="particle magnetic-particle" r="9">
+          <animateMotion dur="3.2s" repeatCount="indefinite" path="__PARTICLE_PATH__" />
+        </circle>
+        __VELOCITY_ARROW__
+        __FORCE_ARROW__
+        <text x="94" y="132" class="label">v</text>
+        <text x="296" y="94" class="label">F</text>
+        <text x="236" y="48" class="label subtle">{field_badge}区域</text>
+        <text x="46" y="164" class="label subtle">粒子 {charge_label}</text>
+      </svg>
+"""
+            scene_markup = (
+                scene_markup
+                .replace("__PLATE_OUTLINE__", plate_outline)
+                .replace("__FIELD_MARKS__", field_marks)
+                .replace("__PARTICLE_PATH__", particle_path)
+                .replace("__VELOCITY_ARROW__", velocity_arrow)
+                .replace("__FORCE_ARROW__", force_arrow)
+            )
+        else:
+            field_marks = self._electromagnetism_field_marks(
+                field_marker=field_marker,
+                x_positions=(124, 176, 228, 280, 332, 384),
+                y_positions=(84, 126, 168),
+            )
+            rod_arrow = self._electromagnetism_arrow_line(
+                kind="velocity",
+                direction=rod_motion_direction,
+                x=260,
+                y=76,
+                length=86,
+            )
+            scene_markup = """
+      <svg viewBox="0 0 520 260" aria-label="电磁感应过程示意">
+        <defs>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+            <polygon points="0 0, 8 3.5, 0 7" fill="currentColor" />
+          </marker>
+        </defs>
+        <rect x="28" y="28" width="464" height="190" rx="28" class="stage-shell" />
+        <rect x="92" y="52" width="312" height="144" rx="24" class="field-zone induction-zone" />
+        <line x1="120" y1="62" x2="120" y2="198" class="rail" />
+        <line x1="380" y1="62" x2="380" y2="198" class="rail" />
+        <line x1="120" y1="62" x2="380" y2="62" class="wire" />
+        <line x1="120" y1="198" x2="380" y2="198" class="wire" />
+        <path d="M380 62 H432 V198 H380" class="wire" fill="none" />
+        __FIELD_MARKS__
+        <rect id="rod" x="236" y="74" width="26" height="112" rx="13" class="rod" />
+        <circle cx="432" cy="130" r="28" class="meter" />
+        <line x1="432" y1="130" x2="448" y2="116" class="needle" />
+        <circle cx="432" cy="130" r="4" class="needle-cap" />
+        <circle class="charge induction-charge" r="6">
+          <animateMotion dur="2.8s" repeatCount="indefinite" path="M120 62 H380 H432 V198 H120 Z" />
+        </circle>
+        __ROD_ARROW__
+        <text x="348" y="80" class="label">v</text>
+        <text x="422" y="136" class="label">G</text>
+        <text x="182" y="48" class="label subtle">{field_badge}区域</text>
+        <text x="238" y="206" class="label subtle">导体棒切割磁感线</text>
+      </svg>
+"""
+            scene_markup = (
+                scene_markup
+                .replace("__FIELD_MARKS__", field_marks)
+                .replace("__ROD_ARROW__", rod_arrow)
+            )
+
+        state_closed = json.dumps(phenomenon_summary_text, ensure_ascii=False)
+        state_alt = json.dumps(direction_hint_text, ensure_ascii=False)
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --accent: #ffd6a0;
+      --accent-2: #9ed6ff;
+      --accent-3: #8fe0c2;
+      --panel: rgba(255,255,255,0.08);
+      --line: rgba(255,255,255,0.12);
+      --curve: 1;
+      --field-opacity: 0.7;
+      --rod-x: 0px;
+      --needle-rotate: 18deg;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(122, 191, 223, 0.18), transparent 36%),
+        linear-gradient(180deg, #101b24, #0c1318 72%);
+      color: #f3efe7;
+      padding: 14px;
+    }}
+    .shell {{
+      display: grid;
+      gap: 12px;
+      max-width: 760px;
+      margin: 0 auto;
+    }}
+    .card {{
+      border-radius: 22px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }}
+    .hero {{
+      display: grid;
+      gap: 10px;
+    }}
+    .kicker {{
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #c4d7db;
+    }}
+    .headline {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+    }}
+    .title {{
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.25;
+      max-width: 520px;
+    }}
+    .badge {{
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,214,160,0.12);
+      color: #fff3de;
+      font-size: 12px;
+      white-space: nowrap;
+    }}
+    .subtitle {{
+      color: #d2dde0;
+      font-size: 14px;
+      line-height: 1.6;
+    }}
+    .question-hint {{
+      color: #afc3c8;
+      font-size: 12px;
+      line-height: 1.5;
+    }}
+    .scene-chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+    .scene-chip {{
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(143, 224, 194, 0.10);
+      color: #ecf6f1;
+      font-size: 12px;
+    }}
+    .stage {{
+      border-radius: 22px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    }}
+    svg {{
+      width: 100%;
+      height: 280px;
+      display: block;
+    }}
+    .label {{
+      fill: #f9f4ea;
+      font-size: 14px;
+    }}
+    .label.subtle {{
+      fill: #cfd9dc;
+      font-size: 12px;
+    }}
+    .stage-shell {{
+      fill: rgba(255,255,255,0.03);
+      stroke: rgba(255,255,255,0.06);
+    }}
+    .field-zone {{
+      fill: rgba(134, 182, 201, 0.08);
+      stroke: rgba(167, 215, 197, 0.26);
+    }}
+    .electric-zone {{
+      fill: rgba(158,214,255,0.08);
+      stroke: rgba(158,214,255,0.24);
+    }}
+    .magnetic-zone {{
+      fill: rgba(143,224,194,0.08);
+    }}
+    .induction-zone {{
+      fill: rgba(143,224,194,0.06);
+    }}
+    .arrow-line {{
+      stroke-width: 5;
+      stroke-linecap: round;
+      marker-end: url(#arrowHead);
+    }}
+    .velocity {{ stroke: #ffd6a0; }}
+    .force {{ stroke: #9ed6ff; }}
+    .wire, .rail {{
+      stroke: #ecdcb7;
+      stroke-width: 6;
+      stroke-linecap: round;
+      fill: none;
+    }}
+    .rail {{ stroke: #9dc6d3; }}
+    .rod {{
+      fill: #466978;
+      stroke: #bde5f0;
+      stroke-width: 3;
+      transform: translateX(var(--rod-x));
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,0.28));
+    }}
+    .meter {{
+      fill: rgba(255,214,160,0.18);
+      stroke: var(--accent);
+      stroke-width: 5;
+    }}
+    .needle {{
+      stroke: var(--accent-2);
+      stroke-width: 4;
+      stroke-linecap: round;
+      transform-origin: 432px 130px;
+      transform: rotate(var(--needle-rotate));
+      transition: transform 180ms ease;
+    }}
+    .needle-cap {{
+      fill: #f8f3ea;
+    }}
+    .trace {{
+      fill: none;
+      stroke-width: 5;
+      stroke-dasharray: 10 10;
+      stroke-linecap: round;
+      animation: dash 2.6s linear infinite;
+    }}
+    .magnetic-trace {{ stroke: #ffd6a0; }}
+    .electric-trace {{ stroke: #9ed6ff; }}
+    .particle {{
+      filter: drop-shadow(0 0 16px rgba(255,214,160,0.55));
+    }}
+    .magnetic-particle {{ fill: #ffd6a0; }}
+    .electric-particle {{ fill: #9ed6ff; }}
+    .charge.induction-charge {{
+      fill: #ffd6a0;
+      opacity: 0.9;
+    }}
+    .field-arrow {{
+      stroke: rgba(158,214,255,var(--field-opacity));
+      stroke-width: 4;
+      stroke-linecap: round;
+      marker-end: url(#arrowHead);
+    }}
+    .plate {{
+      stroke-width: 3;
+    }}
+    .positive-plate {{
+      fill: rgba(255,214,160,0.22);
+      stroke: rgba(255,214,160,0.72);
+    }}
+    .negative-plate {{
+      fill: rgba(158,214,255,0.20);
+      stroke: rgba(158,214,255,0.68);
+    }}
+    .faint-plate {{
+      opacity: 0.6;
+    }}
+    .panel-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .mini {{
+      border-radius: 16px;
+      background: rgba(0,0,0,0.12);
+      padding: 12px;
+    }}
+    .mini-key {{
+      color: #c7d3d7;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }}
+    .mini-value {{
+      color: #fff3de;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.6;
+    }}
+    .controls {{
+      display: grid;
+      gap: 10px;
+    }}
+    .buttons {{
+      display: flex;
+      gap: 10px;
+    }}
+    button {{
+      flex: 1;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }}
+    .primary {{
+      background: var(--accent);
+      color: #171712;
+    }}
+    .secondary {{
+      background: rgba(255,255,255,0.07);
+      color: #eef3ea;
+      border: 1px solid rgba(255,255,255,0.1);
+    }}
+    .slider-row {{
+      display: grid;
+      gap: 6px;
+    }}
+    .slider-label {{
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #d3dde2;
+    }}
+    input[type="range"] {{
+      width: 100%;
+      accent-color: var(--accent);
+    }}
+    ul {{
+      margin: 0;
+      padding-left: 18px;
+      color: #e7eef1;
+      line-height: 1.7;
+      font-size: 13px;
+    }}
+    @keyframes dash {{
+      to {{
+        stroke-dashoffset: -40;
+      }}
+    }}
+    @media (max-width: 640px) {{
+      body {{
+        padding: 10px;
+      }}
+      .title {{
+        font-size: 20px;
+        max-width: none;
+      }}
+      .panel-grid {{
+        grid-template-columns: 1fr;
+      }}
+      svg {{
+        height: 250px;
+      }}
+    }}
+  </style>
+</head>
+<body data-scene="electromagnetism" data-subtype="{subtype}" data-field="{field_type}">
+  <div class="shell">
+    <section class="card hero">
+      <div class="kicker">PHYSICS SCENE</div>
+      <div class="headline">
+        <h2 class="title">{title}</h2>
+        <div class="badge">{subtype_label} / {field_badge}</div>
+      </div>
+      <div class="subtitle">{phenomenon_summary}</div>
+      <div class="scene-chips">
+        <span class="scene-chip">{subtype_label}</span>
+        <span class="scene-chip">{field_badge}</span>
+        {badge_html}
+      </div>
+      <div class="question-hint">题干聚焦：{question_hint}</div>
+    </section>
+
+    <section class="card stage">
+{scene_markup}
+    </section>
+
+    <section class="card">
+      <div class="panel-grid">
+        <div class="mini">
+          <div class="mini-key">现象观察</div>
+          <div class="mini-value" id="stateText">{phenomenon_summary}</div>
+        </div>
+        <div class="mini">
+          <div class="mini-key">方向判断</div>
+          <div class="mini-value" id="directionText">{direction_hint}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="buttons">
+        <button class="primary" id="toggleBtn">切换提示</button>
+        <button class="secondary" id="resetBtn">恢复默认</button>
+      </div>
+      <label class="slider-row">
+        <div class="slider-label"><span>场强 / 运动强度</span><span id="strengthValue">3</span></div>
+        <input id="strengthSlider" type="range" min="1" max="5" step="1" value="3" />
+      </label>
+      <div class="mini">
+        <div class="mini-key">复盘要点</div>
+        <ul>{focus_html}</ul>
+      </div>
+      <div style="font-size:12px;color:#c7d3d7;">{interaction_hint}</div>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const toggleBtn = document.getElementById('toggleBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const strengthSlider = document.getElementById('strengthSlider');
+    const strengthValue = document.getElementById('strengthValue');
+    const stateText = document.getElementById('stateText');
+    const directionText = document.getElementById('directionText');
+    const statePrimary = {state_closed};
+    const stateSecondary = {state_alt};
+    let showingPrimary = true;
+
+    function applyStrength(level) {{
+      strengthValue.textContent = String(level);
+      root.style.setProperty('--curve', (0.55 + level * 0.18).toFixed(2));
+      root.style.setProperty('--field-opacity', (0.35 + level * 0.1).toFixed(2));
+      root.style.setProperty('--rod-x', `${{(level - 3) * 16}}px`);
+      root.style.setProperty('--needle-rotate', `${{(level - 3) * 10 + 18}}deg`);
+    }}
+
+    function resetView() {{
+      showingPrimary = true;
+      stateText.textContent = statePrimary;
+      directionText.textContent = stateSecondary;
+      strengthSlider.value = '3';
+      applyStrength(3);
+    }}
+
+    toggleBtn.addEventListener('click', () => {{
+      showingPrimary = !showingPrimary;
+      stateText.textContent = showingPrimary ? statePrimary : stateSecondary;
+      directionText.textContent = showingPrimary ? stateSecondary : statePrimary;
+    }});
+    resetBtn.addEventListener('click', resetView);
+    strengthSlider.addEventListener('input', () => applyStrength(Number(strengthSlider.value)));
+    resetView();
+  </script>
+</body>
+</html>"""
+
     def _guess_electromagnetism_subtype(self, cleaned_question: str) -> str:
         lowered = cleaned_question.lower()
         induction_keywords = [
@@ -1796,6 +2467,90 @@ Requirements:
                 )
         return '<g class="fieldMarks">' + "".join(marks) + "</g>"
 
+    def _display_plain_text(self, text: str, *, limit: int = 48) -> str:
+        if not text:
+            return ""
+
+        normalized = text
+        normalized = re.sub(r"\$\$(.*?)\$\$", r"\1", normalized, flags=re.DOTALL)
+        normalized = re.sub(r"\$(.*?)\$", r"\1", normalized, flags=re.DOTALL)
+        normalized = normalized.replace("\\(", "").replace("\\)", "")
+        normalized = normalized.replace("\\[", "").replace("\\]", "")
+        normalized = re.sub(r"\\text\{([^{}]*)\}", r"\1", normalized)
+        normalized = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"\1/\2", normalized)
+        normalized = re.sub(r"\\sqrt\{([^{}]+)\}", r"√(\1)", normalized)
+        normalized = re.sub(r"\\[A-Za-z]+", "", normalized)
+        normalized = normalized.replace("{", "").replace("}", "")
+        normalized = re.sub(r"\s+", " ", normalized).strip(" ,，。；;：:")
+        if len(normalized) > limit:
+            normalized = normalized[: limit - 1].rstrip() + "…"
+        return normalized
+
+    def _guess_electromagnetism_field_type(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+    ) -> str:
+        lowered = f"{cleaned_question} {' '.join(knowledge_points)}".lower()
+        has_electric = any(
+            token in lowered
+            for token in ["电场", "电势", "电压", "平行板", "极板", "带电", "匀强电场"]
+        )
+        has_magnetic = any(
+            token in lowered
+            for token in ["磁场", "磁感应", "洛伦兹", "磁通量", "感应电流", "安培力", "导体棒", "线圈", "磁感线"]
+        )
+        if has_electric and has_magnetic:
+            return "mixed"
+        if has_electric:
+            return "electric"
+        return "magnetic"
+
+    def _guess_electromagnetism_title(
+        self,
+        *,
+        cleaned_question: str,
+        subtype: str,
+        field_type: str,
+    ) -> str:
+        lowered = cleaned_question.lower()
+        if subtype == "electromagnetic_induction":
+            if any(token in lowered for token in ["导体棒", "金属棒", "切割磁感线"]):
+                return "导体棒切割磁感线"
+            if any(token in lowered for token in ["线圈", "磁通量", "穿过线圈"]):
+                return "线圈磁通量变化"
+            return "电磁感应过程演示"
+
+        if field_type == "electric":
+            if any(token in lowered for token in ["平行板", "极板"]):
+                return "平行板间粒子偏转"
+            return "电场中粒子运动"
+        if field_type == "mixed":
+            return "复合场中粒子运动"
+        if any(token in lowered for token in ["圆周", "半径", "回旋"]):
+            return "磁场中圆周偏转"
+        return "磁场中粒子偏转"
+
+    def _guess_electromagnetism_summary(
+        self,
+        *,
+        cleaned_question: str,
+        subtype: str,
+        field_type: str,
+    ) -> str:
+        lowered = cleaned_question.lower()
+        if subtype == "electromagnetic_induction":
+            if any(token in lowered for token in ["导体棒", "切割磁感线", "金属棒"]):
+                return "观察导体棒运动、磁场方向和感应电流方向之间的对应关系。"
+            return "观察磁通量变化如何触发感应电流与偏转现象。"
+
+        if field_type == "electric":
+            return "观察带电粒子进入电场后受到电场力作用而产生的偏转轨迹。"
+        if field_type == "mixed":
+            return "综合比较电场力、洛伦兹力与初速度方向对轨迹的共同影响。"
+        return "观察带电粒子在磁场中受洛伦兹力作用后的偏转与轨迹变化。"
+
     def _build_electromagnetism_template_artifact(
         self,
         *,
@@ -1804,6 +2559,11 @@ Requirements:
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
+        guessed_subtype = self._guess_electromagnetism_subtype(cleaned_question)
+        guessed_field_type = self._guess_electromagnetism_field_type(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+        )
         scene_spec = {
             "title": cleaned_question[:24] or "电磁过程演示",
             "subtype": self._guess_electromagnetism_subtype(cleaned_question),
@@ -1813,7 +2573,7 @@ Requirements:
             "interaction_hint": "拖动滑块改变场强或运动强度，观察受力方向和轨迹变化。",
             "direction_hint": "结合左手定则、右手定则或洛伦兹力方向判断。",
         }
-        html_document = self._render_electromagnetism_scene_html(
+        html_document = self._render_electromagnetism_scene_html_v2(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
@@ -1821,7 +2581,10 @@ Requirements:
         )
         candidate = RichArtifact(
             artifact_type="interactive_html",
-            title=str(scene_spec["title"]),
+            title=str(
+                self._display_plain_text(str(scene_spec["title"]), limit=18)
+                or scene_spec["title"]
+            ),
             description="电磁题使用本地模板渲染的演示页面。",
             mime_type="text/html",
             content=html_document,
