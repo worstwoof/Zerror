@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 
 from backend.app.api.v1.app_state import router as app_state_router
@@ -9,6 +11,11 @@ from backend.app.api.v1.upload import router as ai_router
 from backend.app.core.config import settings
 from backend.app.db.session import init_db
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 app = FastAPI(
     title=settings.app_name,

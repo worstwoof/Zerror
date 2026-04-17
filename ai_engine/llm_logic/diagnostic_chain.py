@@ -1251,6 +1251,12 @@ Return a JSON object with this shape:
   "title": "short Chinese title",
   "subtype": "charged_particle|electromagnetic_induction",
   "field_type": "magnetic|electric|mixed",
+  "field_marker": "cross|dot|line",
+  "trajectory": "arc_up|arc_down|straight|circle",
+  "charge_sign": "positive|negative|unknown",
+  "velocity_direction": "left|right|up|down",
+  "force_direction": "up|down|left|right|none",
+  "rod_motion_direction": "left|right",
   "focus_points": ["point 1", "point 2", "point 3"],
   "phenomenon_summary": "one short sentence",
   "interaction_hint": "one short sentence",
@@ -1262,7 +1268,9 @@ Requirements:
 2. Prefer `charged_particle` for 粒子偏转、洛伦兹力、圆周轨迹.
 3. Prefer `electromagnetic_induction` for 导体棒、线圈、磁通量、感应电流.
 4. `focus_points` should contain 2 to 4 short items.
-5. All values should be plain strings or string arrays.
+5. Use `field_marker=cross` for magnetic field into the page, `dot` for out of the page.
+6. Use `trajectory` and `force_direction` only when they are clear from the question or the solution.
+7. All values should be plain strings or string arrays.
 """.strip()
 
     def _render_electromagnetism_scene_html(
@@ -1283,6 +1291,36 @@ Requirements:
         field_type = str(scene_spec.get("field_type") or "magnetic").lower()
         if field_type not in {"magnetic", "electric", "mixed"}:
             field_type = "magnetic"
+        field_marker = self._electromagnetism_choice(
+            scene_spec.get("field_marker"),
+            {"cross", "dot", "line"},
+            "cross" if field_type == "magnetic" else "line",
+        )
+        trajectory = self._electromagnetism_choice(
+            scene_spec.get("trajectory"),
+            {"arc_up", "arc_down", "straight", "circle"},
+            "arc_up" if subtype == "charged_particle" else "straight",
+        )
+        charge_sign = self._electromagnetism_choice(
+            scene_spec.get("charge_sign"),
+            {"positive", "negative", "unknown"},
+            "positive",
+        )
+        velocity_direction = self._electromagnetism_choice(
+            scene_spec.get("velocity_direction"),
+            {"left", "right", "up", "down"},
+            "right",
+        )
+        force_direction = self._electromagnetism_choice(
+            scene_spec.get("force_direction"),
+            {"up", "down", "left", "right", "none"},
+            "up",
+        )
+        rod_motion_direction = self._electromagnetism_choice(
+            scene_spec.get("rod_motion_direction"),
+            {"left", "right"},
+            "right",
+        )
 
         raw_focus_points = scene_spec.get("focus_points")
         focus_points = [
@@ -1307,32 +1345,85 @@ Requirements:
         summary_line = html.escape(cleaned_question[:84])
         focus_html = "".join(f"<li>{html.escape(item)}</li>" for item in focus_points[:4])
         subtype_label = "带电粒子偏转" if subtype == "charged_particle" else "电磁感应"
+        field_badge = {
+            "magnetic": "磁场",
+            "electric": "电场",
+            "mixed": "复合场",
+        }[field_type]
 
         if subtype == "charged_particle":
+            particle_path = self._electromagnetism_particle_path(trajectory, velocity_direction)
+            velocity_arrow = self._electromagnetism_arrow_line(
+                kind="velocity",
+                direction=velocity_direction,
+                x=92,
+                y=144,
+                length=72,
+            )
+            force_arrow = self._electromagnetism_arrow_line(
+                kind="force",
+                direction=force_direction,
+                x=286,
+                y=118,
+                length=54,
+            )
+            charge_label = {"positive": "q+", "negative": "q-", "unknown": "q"}[charge_sign]
+            field_marks = self._electromagnetism_field_marks(
+                field_marker=field_marker,
+                x_positions=(238, 286, 334, 382),
+                y_positions=(86, 126, 166),
+            )
             scene_markup = """
       <svg viewBox="0 0 520 260" aria-label="带电粒子偏转演示图">
-        <rect x="28" y="28" width="464" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
         <defs>
-          <pattern id="fieldDots" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="12" cy="12" r="3" fill="rgba(167,215,197,0.65)" />
-          </pattern>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+            <polygon points="0 0, 8 3.5, 0 7" fill="currentColor" />
+          </marker>
         </defs>
-        <rect x="204" y="54" width="220" height="138" rx="18" fill="url(#fieldDots)" stroke="rgba(167,215,197,0.35)" />
-        <path id="particlePath" d="M74 144 H186 Q238 144 266 122 T356 86 Q392 74 430 70" fill="none" stroke="#ffd6a0" stroke-width="5" stroke-dasharray="10 10" />
+        <rect x="28" y="28" width="464" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
+        <rect x="204" y="54" width="220" height="138" rx="18" fill="rgba(142,188,198,0.08)" stroke="rgba(167,215,197,0.35)" />
+        __FIELD_MARKS__
+        <path id="particlePath" d="__PARTICLE_PATH__" fill="none" stroke="#ffd6a0" stroke-width="5" stroke-dasharray="10 10" />
         <circle id="particle" r="9" fill="#ffd6a0">
-          <animateMotion id="particleMotion" dur="3.2s" repeatCount="indefinite" path="M74 144 H186 Q238 144 266 122 T356 86 Q392 74 430 70" />
+          <animateMotion id="particleMotion" dur="3.2s" repeatCount="indefinite" path="__PARTICLE_PATH__" />
         </circle>
-        <line x1="76" y1="144" x2="156" y2="144" class="arrow-line velocity" />
-        <line x1="270" y1="118" x2="270" y2="70" class="arrow-line force" id="forceArrow" />
-        <text x="92" y="136" class="label">v</text>
-        <text x="278" y="82" class="label">F</text>
-        <text x="250" y="48" class="label subtle">B 场区域</text>
-        <text x="46" y="164" class="label subtle">带电粒子</text>
+        __VELOCITY_ARROW__
+        __FORCE_ARROW__
+        <text x="94" y="132" class="label">v</text>
+        <text x="294" y="96" class="label">F</text>
+        <text x="250" y="48" class="label subtle">__FIELD_BADGE__ 区域</text>
+        <text x="46" y="164" class="label subtle">带电粒子 __CHARGE_LABEL__</text>
       </svg>
 """
+            scene_markup = (
+                scene_markup
+                .replace("__FIELD_MARKS__", field_marks)
+                .replace("__PARTICLE_PATH__", particle_path)
+                .replace("__VELOCITY_ARROW__", velocity_arrow)
+                .replace("__FORCE_ARROW__", force_arrow)
+                .replace("__FIELD_BADGE__", field_badge)
+                .replace("__CHARGE_LABEL__", charge_label)
+            )
         else:
+            field_marks = self._electromagnetism_field_marks(
+                field_marker=field_marker,
+                x_positions=(72, 276, 454),
+                y_positions=(104, 148),
+            )
+            rod_arrow = self._electromagnetism_arrow_line(
+                kind="velocity",
+                direction=rod_motion_direction,
+                x=250,
+                y=86,
+                length=76,
+            )
             scene_markup = """
       <svg viewBox="0 0 520 260" aria-label="电磁感应演示图">
+        <defs>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+            <polygon points="0 0, 8 3.5, 0 7" fill="currentColor" />
+          </marker>
+        </defs>
         <rect x="28" y="28" width="464" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
         <line x1="120" y1="64" x2="120" y2="196" class="rail" />
         <line x1="380" y1="64" x2="380" y2="196" class="rail" />
@@ -1341,20 +1432,19 @@ Requirements:
         <rect id="rod" x="226" y="74" width="24" height="112" rx="12" class="rod" />
         <circle cx="430" cy="130" r="24" class="meter" />
         <path d="M380 64 H430 V196 H380" class="wire" fill="none" />
-        <g class="fieldMarks">
-          <text x="72" y="104" class="label subtle">×</text>
-          <text x="72" y="148" class="label subtle">×</text>
-          <text x="454" y="104" class="label subtle">×</text>
-          <text x="454" y="148" class="label subtle">×</text>
-          <text x="276" y="104" class="label subtle">×</text>
-          <text x="276" y="148" class="label subtle">×</text>
-        </g>
-        <line x1="250" y1="86" x2="330" y2="86" class="arrow-line velocity" id="rodArrow" />
+        __FIELD_MARKS__
+        __ROD_ARROW__
         <text x="338" y="92" class="label">v</text>
         <text x="420" y="136" class="label">G</text>
-        <text x="200" y="52" class="label subtle">切割磁感线</text>
+        <text x="188" y="52" class="label subtle">切割__FIELD_BADGE__线</text>
       </svg>
 """
+            scene_markup = (
+                scene_markup
+                .replace("__FIELD_MARKS__", field_marks)
+                .replace("__ROD_ARROW__", rod_arrow)
+                .replace("__FIELD_BADGE__", field_badge)
+            )
 
         state_closed = json.dumps(
             str(scene_spec.get("phenomenon_summary") or phenomenon_summary),
@@ -1636,6 +1726,75 @@ Requirements:
         if any(keyword in lowered for keyword in induction_keywords):
             return "electromagnetic_induction"
         return "charged_particle"
+
+    def _electromagnetism_choice(
+        self,
+        value: Any,
+        allowed: set[str],
+        default: str,
+    ) -> str:
+        normalized = str(value or "").strip().lower()
+        return normalized if normalized in allowed else default
+
+    def _electromagnetism_particle_path(
+        self,
+        trajectory: str,
+        velocity_direction: str,
+    ) -> str:
+        if velocity_direction in {"up", "down"}:
+            return {
+                "straight": "M170 196 V76",
+                "arc_up": "M170 196 V146 Q170 118 204 102 T282 78",
+                "arc_down": "M170 76 V126 Q170 154 204 170 T282 194",
+                "circle": "M170 170 A54 54 0 1 1 171 170",
+            }[trajectory]
+        return {
+            "straight": "M74 144 H430",
+            "arc_up": "M74 144 H186 Q238 144 266 122 T356 86 Q392 74 430 70",
+            "arc_down": "M74 118 H186 Q238 118 266 140 T356 176 Q392 188 430 192",
+            "circle": "M188 144 A66 66 0 1 1 189 144",
+        }[trajectory]
+
+    def _electromagnetism_arrow_line(
+        self,
+        *,
+        kind: str,
+        direction: str,
+        x: int,
+        y: int,
+        length: int,
+    ) -> str:
+        offsets = {
+            "right": (length, 0),
+            "left": (-length, 0),
+            "up": (0, -length),
+            "down": (0, length),
+            "none": (0, 0),
+        }
+        dx, dy = offsets[direction]
+        x2 = x + dx
+        y2 = y + dy
+        color_class = "velocity" if kind == "velocity" else "force"
+        return (
+            f'<line x1="{x}" y1="{y}" x2="{x2}" y2="{y2}" '
+            f'class="arrow-line {color_class}" />'
+        )
+
+    def _electromagnetism_field_marks(
+        self,
+        *,
+        field_marker: str,
+        x_positions: tuple[int, ...],
+        y_positions: tuple[int, ...],
+    ) -> str:
+        marks = []
+        glyph = {"cross": "×", "dot": "•", "line": "|"}[field_marker]
+        for x_pos in x_positions:
+            for y_pos in y_positions:
+                marks.append(
+                    f'<text x="{x_pos}" y="{y_pos}" class="label subtle">{glyph}</text>'
+                )
+        return '<g class="fieldMarks">' + "".join(marks) + "</g>"
 
     def _build_electromagnetism_template_artifact(
         self,
