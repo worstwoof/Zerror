@@ -2270,6 +2270,26 @@ def _physics_scene_type(text: str) -> str:
         "非弹性碰撞",
         "小球",
     ]
+    electromagnetism_keywords = [
+        "电场",
+        "磁场",
+        "电磁场",
+        "带电粒子",
+        "粒子",
+        "洛伦兹力",
+        "安培力",
+        "电磁感应",
+        "感应电流",
+        "感应电动势",
+        "磁通量",
+        "导体棒",
+        "线圈",
+        "偏转",
+        "轨迹",
+        "右手定则",
+        "左手定则",
+        "匀强磁场",
+    ]
     mechanics_keywords = [
         "受力",
         "牛顿",
@@ -2284,6 +2304,8 @@ def _physics_scene_type(text: str) -> str:
         return "optics"
     if any(keyword in lowered for keyword in circuit_keywords):
         return "circuit"
+    if any(keyword in lowered for keyword in electromagnetism_keywords):
+        return "electromagnetism"
     if any(keyword in lowered for keyword in incline_keywords):
         return "incline"
     if any(keyword in lowered for keyword in projectile_keywords):

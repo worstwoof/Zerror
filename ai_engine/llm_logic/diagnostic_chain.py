@@ -233,6 +233,25 @@ class DiagnosticService:
             if artifact is not None:
                 logger.info("physics animation fell back to local circuit template")
                 return artifact
+        if scene_type == "electromagnetism":
+            artifact = self._generate_electromagnetism_scene_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation used electromagnetism scene spec renderer")
+                return artifact
+            artifact = self._build_electromagnetism_template_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation fell back to local electromagnetism template")
+                return artifact
         if not self._should_generate_physics_html(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
@@ -269,6 +288,7 @@ class DiagnosticService:
             "collision",
             "mechanics",
             "circuit",
+            "electromagnetism",
             "optics",
         }
 
@@ -1144,6 +1164,515 @@ Requirements:
             if any(keyword in lowered for keyword in keywords):
                 components.append(label)
         return components[:6]
+
+    def _generate_electromagnetism_scene_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        prompt = self._build_electromagnetism_scene_prompt(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        started_at = time.perf_counter()
+        try:
+            raw_spec = self.client.chat_completion(prompt)
+        except Exception as exc:
+            logger.warning(
+                "electromagnetism scene spec generation failed elapsed=%.2fs error=%s",
+                time.perf_counter() - started_at,
+                exc,
+            )
+            return None
+
+        try:
+            scene_spec = self._parse_json(raw_spec)
+        except Exception as exc:
+            logger.warning(
+                "electromagnetism scene spec parse failed elapsed=%.2fs error=%s",
+                time.perf_counter() - started_at,
+                exc,
+            )
+            return None
+
+        html_document = self._render_electromagnetism_scene_html(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            scene_spec=scene_spec,
+        )
+        candidate = RichArtifact(
+            artifact_type="interactive_html",
+            title=str(scene_spec.get("title") or "电磁过程演示"),
+            description="电磁题使用轻量场景规格驱动的本地渲染页面。",
+            mime_type="text/html",
+            content=html_document,
+        )
+        validated = filter_subject_extension_artifacts(
+            subject="物理",
+            cleaned_question=cleaned_question,
+            artifacts=[candidate],
+        )
+        return validated[0] if validated else None
+
+    def _build_electromagnetism_scene_prompt(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> str:
+        points = ", ".join(knowledge_points[:4]) or "电磁分析"
+        steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼场的方向、受力方向和关键现象。"
+        return f"""
+You are generating a compact electromagnetism scene specification for a mobile WebView.
+Return JSON only. Do not output HTML. Do not output Markdown.
+
+Question:
+{cleaned_question}
+
+Knowledge points:
+{points}
+
+Solution summary:
+{solution_summary}
+
+Key steps:
+{steps}
+
+Return a JSON object with this shape:
+{{
+  "title": "short Chinese title",
+  "subtype": "charged_particle|electromagnetic_induction",
+  "field_type": "magnetic|electric|mixed",
+  "focus_points": ["point 1", "point 2", "point 3"],
+  "phenomenon_summary": "one short sentence",
+  "interaction_hint": "one short sentence",
+  "direction_hint": "one short sentence"
+}}
+
+Requirements:
+1. Keep it short and specific to the question.
+2. Prefer `charged_particle` for 粒子偏转、洛伦兹力、圆周轨迹.
+3. Prefer `electromagnetic_induction` for 导体棒、线圈、磁通量、感应电流.
+4. `focus_points` should contain 2 to 4 short items.
+5. All values should be plain strings or string arrays.
+""".strip()
+
+    def _render_electromagnetism_scene_html(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        scene_spec: Dict[str, Any],
+    ) -> str:
+        title = html.escape(
+            str(scene_spec.get("title") or cleaned_question[:28] or "电磁过程演示")
+        )
+        subtype = str(scene_spec.get("subtype") or self._guess_electromagnetism_subtype(cleaned_question)).lower()
+        if subtype not in {"charged_particle", "electromagnetic_induction"}:
+            subtype = self._guess_electromagnetism_subtype(cleaned_question)
+
+        field_type = str(scene_spec.get("field_type") or "magnetic").lower()
+        if field_type not in {"magnetic", "electric", "mixed"}:
+            field_type = "magnetic"
+
+        raw_focus_points = scene_spec.get("focus_points")
+        focus_points = [
+            str(item).strip()
+            for item in raw_focus_points
+            if str(item).strip()
+        ] if isinstance(raw_focus_points, list) else []
+        if not focus_points:
+            focus_points = [item for item in knowledge_points[:3] if item.strip()]
+        if not focus_points:
+            focus_points = ["先判断场方向", "再定受力方向", "最后观察轨迹或感应电流变化"]
+
+        phenomenon_summary = html.escape(
+            str(scene_spec.get("phenomenon_summary") or solution_summary or "观察场方向变化带来的运动或电流变化。")
+        )
+        interaction_hint = html.escape(
+            str(scene_spec.get("interaction_hint") or "拖动滑块改变场强，观察轨迹弯曲程度或感应效果。")
+        )
+        direction_hint = html.escape(
+            str(scene_spec.get("direction_hint") or "结合右手定则或左手定则判断方向。")
+        )
+        summary_line = html.escape(cleaned_question[:84])
+        focus_html = "".join(f"<li>{html.escape(item)}</li>" for item in focus_points[:4])
+        subtype_label = "带电粒子偏转" if subtype == "charged_particle" else "电磁感应"
+
+        if subtype == "charged_particle":
+            scene_markup = """
+      <svg viewBox="0 0 520 260" aria-label="带电粒子偏转演示图">
+        <rect x="28" y="28" width="464" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
+        <defs>
+          <pattern id="fieldDots" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="12" cy="12" r="3" fill="rgba(167,215,197,0.65)" />
+          </pattern>
+        </defs>
+        <rect x="204" y="54" width="220" height="138" rx="18" fill="url(#fieldDots)" stroke="rgba(167,215,197,0.35)" />
+        <path id="particlePath" d="M74 144 H186 Q238 144 266 122 T356 86 Q392 74 430 70" fill="none" stroke="#ffd6a0" stroke-width="5" stroke-dasharray="10 10" />
+        <circle id="particle" r="9" fill="#ffd6a0">
+          <animateMotion id="particleMotion" dur="3.2s" repeatCount="indefinite" path="M74 144 H186 Q238 144 266 122 T356 86 Q392 74 430 70" />
+        </circle>
+        <line x1="76" y1="144" x2="156" y2="144" class="arrow-line velocity" />
+        <line x1="270" y1="118" x2="270" y2="70" class="arrow-line force" id="forceArrow" />
+        <text x="92" y="136" class="label">v</text>
+        <text x="278" y="82" class="label">F</text>
+        <text x="250" y="48" class="label subtle">B 场区域</text>
+        <text x="46" y="164" class="label subtle">带电粒子</text>
+      </svg>
+"""
+        else:
+            scene_markup = """
+      <svg viewBox="0 0 520 260" aria-label="电磁感应演示图">
+        <rect x="28" y="28" width="464" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
+        <line x1="120" y1="64" x2="120" y2="196" class="rail" />
+        <line x1="380" y1="64" x2="380" y2="196" class="rail" />
+        <line x1="120" y1="64" x2="380" y2="64" class="wire" />
+        <line x1="120" y1="196" x2="380" y2="196" class="wire" />
+        <rect id="rod" x="226" y="74" width="24" height="112" rx="12" class="rod" />
+        <circle cx="430" cy="130" r="24" class="meter" />
+        <path d="M380 64 H430 V196 H380" class="wire" fill="none" />
+        <g class="fieldMarks">
+          <text x="72" y="104" class="label subtle">×</text>
+          <text x="72" y="148" class="label subtle">×</text>
+          <text x="454" y="104" class="label subtle">×</text>
+          <text x="454" y="148" class="label subtle">×</text>
+          <text x="276" y="104" class="label subtle">×</text>
+          <text x="276" y="148" class="label subtle">×</text>
+        </g>
+        <line x1="250" y1="86" x2="330" y2="86" class="arrow-line velocity" id="rodArrow" />
+        <text x="338" y="92" class="label">v</text>
+        <text x="420" y="136" class="label">G</text>
+        <text x="200" y="52" class="label subtle">切割磁感线</text>
+      </svg>
+"""
+
+        state_closed = json.dumps(
+            str(scene_spec.get("phenomenon_summary") or phenomenon_summary),
+            ensure_ascii=False,
+        )
+        state_alt = json.dumps(
+            direction_hint,
+            ensure_ascii=False,
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --accent: #ffd6a0;
+      --accent-2: #9ed6ff;
+      --panel: rgba(255,255,255,0.08);
+      --line: rgba(255,255,255,0.12);
+      --curve: 1;
+      --field-opacity: 0.7;
+      --rod-x: 0px;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(122, 191, 223, 0.18), transparent 36%),
+        linear-gradient(180deg, #101b24, #0c1318 72%);
+      color: #f3efe7;
+      padding: 14px;
+    }}
+    .shell {{ display: grid; gap: 12px; }}
+    .card {{
+      border-radius: 22px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }}
+    .headline {{
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+    }}
+    .title {{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.3;
+    }}
+    .badge {{
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,214,160,0.12);
+      color: #fff3de;
+      font-size: 12px;
+      white-space: nowrap;
+    }}
+    .subtitle {{
+      margin-top: 8px;
+      color: #d2dde0;
+      font-size: 13px;
+      line-height: 1.6;
+    }}
+    .stage {{
+      border-radius: 22px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    }}
+    svg {{
+      width: 100%;
+      height: 280px;
+      display: block;
+    }}
+    .label {{
+      fill: #f9f4ea;
+      font-size: 14px;
+    }}
+    .label.subtle {{
+      fill: #cfd9dc;
+      font-size: 12px;
+    }}
+    .arrow-line {{
+      stroke-width: 5;
+      stroke-linecap: round;
+      marker-end: url(#arrowHead);
+    }}
+    .velocity {{ stroke: #ffd6a0; }}
+    .force {{ stroke: #9ed6ff; }}
+    .wire, .rail {{
+      stroke: #ecdcb7;
+      stroke-width: 6;
+      stroke-linecap: round;
+      fill: none;
+    }}
+    .rail {{ stroke: #9dc6d3; }}
+    .rod {{
+      fill: #4f717c;
+      stroke: #bde5f0;
+      stroke-width: 3;
+      transform: translateX(var(--rod-x));
+    }}
+    .meter {{
+      fill: rgba(255,214,160,0.18);
+      stroke: var(--accent);
+      stroke-width: 5;
+    }}
+    .panel-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .mini {{
+      border-radius: 16px;
+      background: rgba(0,0,0,0.12);
+      padding: 12px;
+    }}
+    .mini-key {{
+      color: #c7d3d7;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }}
+    .mini-value {{
+      color: #fff3de;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.6;
+    }}
+    .controls {{
+      display: grid;
+      gap: 10px;
+    }}
+    .buttons {{
+      display: flex;
+      gap: 10px;
+    }}
+    button {{
+      flex: 1;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }}
+    .primary {{
+      background: var(--accent);
+      color: #171712;
+    }}
+    .secondary {{
+      background: rgba(255,255,255,0.07);
+      color: #eef3ea;
+      border: 1px solid rgba(255,255,255,0.1);
+    }}
+    .slider-row {{
+      display: grid;
+      gap: 6px;
+    }}
+    .slider-label {{
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #d3dde2;
+    }}
+    input[type="range"] {{
+      width: 100%;
+      accent-color: var(--accent);
+    }}
+    ul {{
+      margin: 0;
+      padding-left: 18px;
+      color: #e7eef1;
+      line-height: 1.7;
+      font-size: 13px;
+    }}
+  </style>
+</head>
+<body data-scene="electromagnetism" data-subtype="{subtype}" data-field="{field_type}">
+  <div class="shell">
+    <section class="card">
+      <div class="headline">
+        <h2 class="title">{title}</h2>
+        <div class="badge">{subtype_label} / {html.escape(field_type)}</div>
+      </div>
+      <div class="subtitle">{summary_line}</div>
+    </section>
+
+    <section class="card stage">
+{scene_markup}
+    </section>
+
+    <section class="card">
+      <div class="panel-grid">
+        <div class="mini">
+          <div class="mini-key">关键现象</div>
+          <div class="mini-value" id="stateText">{phenomenon_summary}</div>
+        </div>
+        <div class="mini">
+          <div class="mini-key">方向提示</div>
+          <div class="mini-value" id="directionText">{direction_hint}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="buttons">
+        <button class="primary" id="toggleBtn">切换说明</button>
+        <button class="secondary" id="resetBtn">恢复默认</button>
+      </div>
+      <label class="slider-row">
+        <div class="slider-label"><span>场强 / 运动强度</span><span id="strengthValue">3</span></div>
+        <input id="strengthSlider" type="range" min="1" max="5" step="1" value="3" />
+      </label>
+      <div class="mini">
+        <div class="mini-key">复盘重点</div>
+        <ul>{focus_html}</ul>
+      </div>
+      <div style="font-size:12px;color:#c7d3d7;">{interaction_hint}</div>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const body = document.body;
+    const toggleBtn = document.getElementById('toggleBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const strengthSlider = document.getElementById('strengthSlider');
+    const strengthValue = document.getElementById('strengthValue');
+    const stateText = document.getElementById('stateText');
+    const directionText = document.getElementById('directionText');
+    const statePrimary = {state_closed};
+    const stateSecondary = {state_alt};
+    let showingPrimary = true;
+
+    function applyStrength(level) {{
+      strengthValue.textContent = String(level);
+      root.style.setProperty('--curve', (0.55 + level * 0.18).toFixed(2));
+      root.style.setProperty('--field-opacity', (0.35 + level * 0.1).toFixed(2));
+      root.style.setProperty('--rod-x', `${{(level - 3) * 16}}px`);
+    }}
+
+    function resetView() {{
+      showingPrimary = true;
+      stateText.textContent = statePrimary;
+      directionText.textContent = stateSecondary;
+      strengthSlider.value = '3';
+      applyStrength(3);
+    }}
+
+    toggleBtn.addEventListener('click', () => {{
+      showingPrimary = !showingPrimary;
+      stateText.textContent = showingPrimary ? statePrimary : stateSecondary;
+      directionText.textContent = showingPrimary ? stateSecondary : statePrimary;
+    }});
+    resetBtn.addEventListener('click', resetView);
+    strengthSlider.addEventListener('input', () => applyStrength(Number(strengthSlider.value)));
+    resetView();
+  </script>
+</body>
+</html>"""
+
+    def _guess_electromagnetism_subtype(self, cleaned_question: str) -> str:
+        lowered = cleaned_question.lower()
+        induction_keywords = [
+            "电磁感应",
+            "感应电流",
+            "感应电动势",
+            "磁通量",
+            "导体棒",
+            "线圈",
+        ]
+        if any(keyword in lowered for keyword in induction_keywords):
+            return "electromagnetic_induction"
+        return "charged_particle"
+
+    def _build_electromagnetism_template_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        scene_spec = {
+            "title": cleaned_question[:24] or "电磁过程演示",
+            "subtype": self._guess_electromagnetism_subtype(cleaned_question),
+            "field_type": "magnetic",
+            "focus_points": [item for item in knowledge_points[:3] if item.strip()],
+            "phenomenon_summary": solution_summary or (solution_steps[0] if solution_steps else "观察场方向和运动变化。"),
+            "interaction_hint": "拖动滑块改变场强或运动强度，观察受力方向和轨迹变化。",
+            "direction_hint": "结合左手定则、右手定则或洛伦兹力方向判断。",
+        }
+        html_document = self._render_electromagnetism_scene_html(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            scene_spec=scene_spec,
+        )
+        candidate = RichArtifact(
+            artifact_type="interactive_html",
+            title=str(scene_spec["title"]),
+            description="电磁题使用本地模板渲染的演示页面。",
+            mime_type="text/html",
+            content=html_document,
+        )
+        validated = filter_subject_extension_artifacts(
+            subject="物理",
+            cleaned_question=cleaned_question,
+            artifacts=[candidate],
+        )
+        return validated[0] if validated else None
 
     def _build_physics_template_artifact(
         self,
