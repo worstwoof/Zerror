@@ -210,6 +210,8 @@ class DiagnosticService:
         if not self._should_generate_physics_html(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
         ):
             return None
         artifact = self._generate_physics_html_artifact(
@@ -225,8 +227,15 @@ class DiagnosticService:
         *,
         cleaned_question: str,
         knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
     ) -> bool:
-        scene_type = _physics_scene_type(f"{cleaned_question} {' '.join(knowledge_points)}")
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
         return scene_type in {
             "board_block",
             "incline",
@@ -236,6 +245,50 @@ class DiagnosticService:
             "circuit",
             "optics",
         }
+
+    def explain_physics_animation_unavailable(
+        self,
+        *,
+        cleaned_question: str,
+        subject: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> str:
+        normalized_subject = subject or "é—â•ƒæ‚Š"
+        if "é—â•ƒæ‚Š" not in normalized_subject:
+            return "当前题目未被识别为物理题，暂不支持生成物理动画演示。"
+
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        if scene_type == "unknown":
+            return "当前题目没有识别出明确的物理场景关键词，暂不支持自动生成动画。可以补充电路、电流、电压、受力、斜面、碰撞、光路等关键词后重试。"
+
+        return "物理动画生成失败，请稍后重试。"
+
+    def _physics_scene_type_from_context(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> str:
+        scene_source = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        return _physics_scene_type(scene_source)
 
     def _build_text_prompt(self, request: AnalysisRequest, cleaned_question: str) -> str:
         extension_hint = ""
@@ -561,7 +614,16 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
-        lowered = cleaned_question.lower()
+        lowered = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        ).lower()
         if any(token in lowered for token in ["木板", "板块", "物块", "滑块", "摩擦", "传送带", "连接体"]):
             scene_hint = "board_block"
             scene_label = "木板-物块相对运动"

@@ -167,7 +167,15 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
             solution_steps=request.solution_steps,
         )
         generated = artifact is not None
-        reason = "" if generated else "当前题目未命中可视化物理动画生成条件，或动画生成失败。"
+        reason = ""
+        if not generated:
+            reason = diagnostic_service.explain_physics_animation_unavailable(
+                cleaned_question=request.cleaned_question,
+                subject=request.subject,
+                knowledge_points=request.knowledge_points,
+                solution_summary=request.solution_summary,
+                solution_steps=request.solution_steps,
+            )
         logger.info(
             "api physics animation subject=%s generated=%s elapsed=%.2fs",
             request.subject,
