@@ -215,6 +215,21 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
+        if self._should_generate_physics_html(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        ):
+            artifact = self._generate_physics_html_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation used full html generation")
+                return artifact
         if scene_type == "circuit":
             artifact = self._generate_circuit_scene_artifact(
                 cleaned_question=cleaned_question,
@@ -252,20 +267,7 @@ class DiagnosticService:
             if artifact is not None:
                 logger.info("physics animation fell back to local electromagnetism template")
                 return artifact
-        if not self._should_generate_physics_html(
-            cleaned_question=cleaned_question,
-            knowledge_points=knowledge_points,
-            solution_summary=solution_summary,
-            solution_steps=solution_steps,
-        ):
-            return None
-        artifact = self._generate_physics_html_artifact(
-            cleaned_question=cleaned_question,
-            knowledge_points=knowledge_points,
-            solution_summary=solution_summary,
-            solution_steps=solution_steps,
-        )
-        return artifact
+        return None
 
     def _should_generate_physics_html(
         self,
