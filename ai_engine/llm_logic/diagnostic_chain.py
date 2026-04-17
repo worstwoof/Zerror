@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import logging
 import re
@@ -207,6 +208,31 @@ class DiagnosticService:
         normalized_subject = subject or "物理"
         if "物理" not in normalized_subject:
             return None
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        logger.info("physics animation scene_type=%s", scene_type)
+        if scene_type == "circuit":
+            artifact = self._generate_circuit_scene_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation used circuit scene spec renderer")
+                return artifact
+            artifact = self._build_physics_template_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation fell back to local circuit template")
+                return artifact
         if not self._should_generate_physics_html(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
@@ -580,6 +606,544 @@ class DiagnosticService:
             artifacts=[candidate],
         )
         return validated[0] if validated else None
+
+    def _generate_circuit_scene_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        prompt = self._build_circuit_scene_prompt(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        started_at = time.perf_counter()
+        try:
+            raw_spec = self.client.chat_completion(prompt)
+        except Exception as exc:
+            logger.warning(
+                "circuit scene spec generation failed elapsed=%.2fs error=%s",
+                time.perf_counter() - started_at,
+                exc,
+            )
+            return None
+
+        try:
+            scene_spec = self._parse_json(raw_spec)
+        except Exception as exc:
+            logger.warning(
+                "circuit scene spec parse failed elapsed=%.2fs error=%s",
+                time.perf_counter() - started_at,
+                exc,
+            )
+            return None
+
+        html_document = self._render_circuit_scene_html(
+            cleaned_question=cleaned_question,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            scene_spec=scene_spec,
+        )
+        candidate = RichArtifact(
+            artifact_type="interactive_html",
+            title=str(scene_spec.get("title") or "电路过程演示"),
+            description="电学题使用轻量场景规格驱动的本地渲染页面。",
+            mime_type="text/html",
+            content=html_document,
+        )
+        validated = filter_subject_extension_artifacts(
+            subject="物理",
+            cleaned_question=cleaned_question,
+            artifacts=[candidate],
+        )
+        return validated[0] if validated else None
+
+    def _build_circuit_scene_prompt(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> str:
+        points = ", ".join(knowledge_points[:4]) or "电路分析"
+        steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼连接方式、电流路径和表计变化。"
+        return f"""
+You are generating a compact circuit scene specification for a mobile WebView.
+Return JSON only. Do not output HTML. Do not output Markdown.
+
+Question:
+{cleaned_question}
+
+Knowledge points:
+{points}
+
+Solution summary:
+{solution_summary}
+
+Key steps:
+{steps}
+
+Return a JSON object with this shape:
+{{
+  "title": "short Chinese title",
+  "layout": "series|parallel|mixed",
+  "components": ["battery", "switch", "resistor", "bulb", "ammeter", "voltmeter"],
+  "focus_points": ["point 1", "point 2", "point 3"],
+  "phenomenon_summary": "one short sentence",
+  "interaction_hint": "one short sentence",
+  "current_direction": "clockwise|counterclockwise"
+}}
+
+Requirements:
+1. Keep it short and specific to the question.
+2. `components` should contain at most 6 items.
+3. `focus_points` should contain 2 to 4 short items.
+4. Prefer `parallel` when the question clearly mentions parallel branches, otherwise use `series` or `mixed`.
+5. All values should be plain strings or string arrays.
+""".strip()
+
+    def _render_circuit_scene_html(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        scene_spec: Dict[str, Any],
+    ) -> str:
+        title = html.escape(
+            str(scene_spec.get("title") or cleaned_question[:28] or "电路过程演示")
+        )
+        layout = str(scene_spec.get("layout") or self._guess_circuit_layout(cleaned_question)).lower()
+        if layout not in {"series", "parallel", "mixed"}:
+            layout = "mixed"
+
+        raw_components = scene_spec.get("components")
+        components = [
+            str(item).strip()
+            for item in raw_components
+            if str(item).strip()
+        ] if isinstance(raw_components, list) else []
+        if not components:
+            components = self._guess_circuit_components(cleaned_question, knowledge_points)
+
+        raw_focus_points = scene_spec.get("focus_points")
+        focus_points = [
+            str(item).strip()
+            for item in raw_focus_points
+            if str(item).strip()
+        ] if isinstance(raw_focus_points, list) else []
+        if not focus_points:
+            focus_points = [item for item in knowledge_points[:3] if item.strip()]
+        if not focus_points:
+            focus_points = ["先判断连接方式", "再看电流路径", "最后分析表计变化"]
+
+        phenomenon_summary = html.escape(
+            str(scene_spec.get("phenomenon_summary") or solution_summary or "观察开关状态与电流路径变化。")
+        )
+        interaction_hint = html.escape(
+            str(scene_spec.get("interaction_hint") or "切换开关并拖动电流强度，观察灯泡亮度和电流路径。")
+        )
+        current_direction = str(scene_spec.get("current_direction") or "clockwise").lower()
+        direction_label = "顺时针" if current_direction != "counterclockwise" else "逆时针"
+
+        component_labels = [html.escape(item) for item in components[:6]]
+        chips_html = "".join(f'<span class="chip">{label}</span>' for label in component_labels)
+        focus_html = "".join(
+            f"<li>{html.escape(item)}</li>" for item in focus_points[:4]
+        )
+        summary_line = html.escape(cleaned_question[:84])
+
+        if layout == "parallel":
+            svg_markup = """
+      <svg viewBox="0 0 520 260" aria-label="并联电路演示图">
+        <rect x="30" y="28" width="460" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
+        <line x1="78" y1="122" x2="108" y2="122" class="wire" />
+        <line x1="108" y1="94" x2="108" y2="150" class="wire" />
+        <line x1="92" y1="100" x2="92" y2="144" class="wire thin" />
+        <path d="M108 122 H170 V78 H360 V122" class="wire" fill="none" />
+        <path d="M170 122 V168 H360 V122" class="wire" fill="none" />
+        <circle cx="394" cy="122" r="28" class="meter" />
+        <rect x="212" y="62" width="72" height="22" rx="11" class="resistor" />
+        <rect x="212" y="156" width="72" height="22" rx="11" class="resistor alt" />
+        <circle cx="318" cy="78" r="18" class="lamp" id="lampUpper" />
+        <circle cx="318" cy="168" r="18" class="lamp" id="lampLower" />
+        <circle class="charge">
+          <animateMotion dur="2.8s" repeatCount="indefinite" path="M108 122 H170 V78 H360 V122" />
+        </circle>
+        <circle class="charge alt">
+          <animateMotion dur="3.1s" repeatCount="indefinite" path="M108 122 H170 V168 H360 V122" />
+        </circle>
+        <text x="62" y="92" class="label">电源</text>
+        <text x="382" y="128" class="label">A</text>
+        <text x="220" y="58" class="label subtle">支路 1</text>
+        <text x="220" y="152" class="label subtle">支路 2</text>
+      </svg>
+"""
+        else:
+            svg_markup = """
+      <svg viewBox="0 0 520 260" aria-label="串联电路演示图">
+        <rect x="30" y="28" width="460" height="190" rx="24" fill="rgba(255,255,255,0.03)" />
+        <line x1="80" y1="122" x2="110" y2="122" class="wire" />
+        <line x1="110" y1="92" x2="110" y2="152" class="wire" />
+        <line x1="94" y1="100" x2="94" y2="144" class="wire thin" />
+        <path d="M110 122 H186" class="wire" />
+        <line x1="186" y1="122" x2="218" y2="122" class="wire switch-base" />
+        <line x1="218" y1="122" x2="248" y2="106" class="switch-blade" id="switchBlade" />
+        <line x1="254" y1="122" x2="320" y2="122" class="wire" />
+        <rect x="320" y="108" width="72" height="28" rx="14" class="resistor" />
+        <circle cx="430" cy="122" r="24" class="lamp" id="lampMain" />
+        <path d="M454 122 H470 V182 H110 V152" class="wire" fill="none" />
+        <circle class="charge">
+          <animateMotion dur="2.9s" repeatCount="indefinite" path="M110 122 H186 L248 106 H320 H392 A38 38 0 0 1 454 122 H470 V182 H110 V152" />
+        </circle>
+        <text x="62" y="92" class="label">电源</text>
+        <text x="176" y="98" class="label subtle">S</text>
+        <text x="334" y="104" class="label subtle">R</text>
+        <text x="422" y="128" class="label">L</text>
+      </svg>
+"""
+
+        state_closed = json.dumps(
+            str(scene_spec.get("phenomenon_summary") or "闭合开关后形成完整回路，观察电流通过主要元件的路径。"),
+            ensure_ascii=False,
+        )
+        state_open = json.dumps(
+            "断开开关后回路被切断，电荷动画减弱，灯泡亮度下降。",
+            ensure_ascii=False,
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --accent: #ffd6a0;
+      --accent-2: #a7d7c5;
+      --panel: rgba(255,255,255,0.08);
+      --line: rgba(255,255,255,0.12);
+      --glow: 0.65;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(109,176,154,0.18), transparent 32%),
+        linear-gradient(180deg, #142220, #0e1514 72%);
+      color: #f5efe5;
+      padding: 14px;
+    }}
+    .shell {{ display: grid; gap: 12px; }}
+    .card {{
+      border-radius: 22px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }}
+    .headline {{
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+    }}
+    .title {{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.3;
+    }}
+    .layout-badge {{
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,214,160,0.12);
+      color: #fff3de;
+      font-size: 12px;
+      white-space: nowrap;
+    }}
+    .subtitle {{
+      margin-top: 8px;
+      color: #d6ddd7;
+      font-size: 13px;
+      line-height: 1.6;
+    }}
+    .chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }}
+    .chip {{
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(167,215,197,0.12);
+      color: #edf5f0;
+      font-size: 12px;
+    }}
+    .stage {{
+      border-radius: 22px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    }}
+    svg {{
+      width: 100%;
+      height: 280px;
+      display: block;
+    }}
+    .wire {{
+      stroke: #ecdcb7;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }}
+    .wire.thin {{
+      stroke-width: 3;
+    }}
+    .resistor {{
+      fill: #3f6760;
+      stroke: #9cd4c2;
+      stroke-width: 3;
+    }}
+    .resistor.alt {{
+      fill: #41586f;
+      stroke: #b0d0ff;
+    }}
+    .meter {{
+      fill: rgba(255,214,160,0.18);
+      stroke: var(--accent);
+      stroke-width: 5;
+    }}
+    .lamp {{
+      fill: rgba(255,214,160,0.18);
+      stroke: var(--accent);
+      stroke-width: 5;
+      filter: drop-shadow(0 0 calc(10px + 18px * var(--glow)) rgba(255,214,160,0.45));
+    }}
+    .charge {{
+      r: 6;
+      fill: #ffd6a0;
+      opacity: 0.92;
+    }}
+    .charge.alt {{
+      fill: #a7d7c5;
+    }}
+    .label {{
+      fill: #f9f4ea;
+      font-size: 14px;
+    }}
+    .label.subtle {{
+      fill: #ced9d2;
+      font-size: 12px;
+    }}
+    .switch-blade {{
+      stroke: #ffd6a0;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: transform 220ms ease;
+      transform-origin: 218px 122px;
+    }}
+    body[data-switch="open"] .switch-blade {{
+      transform: rotate(-18deg);
+    }}
+    body[data-switch="open"] .charge {{
+      opacity: 0.12;
+    }}
+    body[data-switch="open"] .lamp {{
+      filter: drop-shadow(0 0 0 rgba(255,214,160,0));
+      fill: rgba(255,214,160,0.08);
+    }}
+    .panel-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .mini {{
+      border-radius: 16px;
+      background: rgba(0,0,0,0.12);
+      padding: 12px;
+    }}
+    .mini-key {{
+      color: #c8d2cc;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }}
+    .mini-value {{
+      color: #fff3de;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.6;
+    }}
+    .controls {{
+      display: grid;
+      gap: 10px;
+    }}
+    .buttons {{
+      display: flex;
+      gap: 10px;
+    }}
+    button {{
+      flex: 1;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }}
+    .primary {{
+      background: var(--accent);
+      color: #171712;
+    }}
+    .secondary {{
+      background: rgba(255,255,255,0.07);
+      color: #eef3ea;
+      border: 1px solid rgba(255,255,255,0.1);
+    }}
+    .slider-row {{
+      display: grid;
+      gap: 6px;
+    }}
+    .slider-label {{
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #d3ddd6;
+    }}
+    input[type="range"] {{
+      width: 100%;
+      accent-color: var(--accent);
+    }}
+    ul {{
+      margin: 0;
+      padding-left: 18px;
+      color: #e7efe9;
+      line-height: 1.7;
+      font-size: 13px;
+    }}
+  </style>
+</head>
+<body data-scene="circuit" data-layout="{layout}" data-switch="closed">
+  <div class="shell">
+    <section class="card">
+      <div class="headline">
+        <h2 class="title">{title}</h2>
+        <div class="layout-badge">{html.escape(layout)} / 电流方向 {direction_label}</div>
+      </div>
+      <div class="subtitle">{summary_line}</div>
+      <div class="chips">{chips_html}</div>
+    </section>
+
+    <section class="card stage">
+{svg_markup}
+    </section>
+
+    <section class="card">
+      <div class="panel-grid">
+        <div class="mini">
+          <div class="mini-key">关键现象</div>
+          <div class="mini-value" id="stateText">{phenomenon_summary}</div>
+        </div>
+        <div class="mini">
+          <div class="mini-key">交互提示</div>
+          <div class="mini-value">{interaction_hint}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="buttons">
+        <button class="primary" id="switchBtn">断开开关</button>
+        <button class="secondary" id="resetBtn">恢复默认</button>
+      </div>
+      <label class="slider-row">
+        <div class="slider-label"><span>电流强度</span><span id="strengthValue">3</span></div>
+        <input id="strengthSlider" type="range" min="1" max="5" step="1" value="3" />
+      </label>
+      <div class="mini">
+        <div class="mini-key">复盘重点</div>
+        <ul>{focus_html}</ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const root = document.body;
+    const switchBtn = document.getElementById('switchBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const strengthSlider = document.getElementById('strengthSlider');
+    const strengthValue = document.getElementById('strengthValue');
+    const stateText = document.getElementById('stateText');
+    const stateClosed = {state_closed};
+    const stateOpen = {state_open};
+
+    function setGlow(level) {{
+      const glow = 0.2 + level * 0.16;
+      root.style.setProperty('--glow', glow.toFixed(2));
+      strengthValue.textContent = String(level);
+    }}
+
+    function setSwitchState(opened) {{
+      root.dataset.switch = opened ? 'open' : 'closed';
+      switchBtn.textContent = opened ? '闭合开关' : '断开开关';
+      stateText.textContent = opened ? stateOpen : stateClosed;
+    }}
+
+    switchBtn.addEventListener('click', () => {{
+      setSwitchState(root.dataset.switch !== 'open');
+    }});
+
+    resetBtn.addEventListener('click', () => {{
+      strengthSlider.value = '3';
+      setGlow(3);
+      setSwitchState(false);
+    }});
+
+    strengthSlider.addEventListener('input', () => {{
+      setGlow(Number(strengthSlider.value));
+    }});
+
+    setGlow(3);
+    setSwitchState(false);
+  </script>
+</body>
+</html>"""
+
+    def _guess_circuit_layout(self, cleaned_question: str) -> str:
+        lowered = cleaned_question.lower()
+        if any(token in lowered for token in ["并联", "支路", "两灯", "两个支路"]):
+            return "parallel"
+        if any(token in lowered for token in ["混联", "复杂电路", "滑动变阻器"]):
+            return "mixed"
+        return "series"
+
+    def _guess_circuit_components(
+        self,
+        cleaned_question: str,
+        knowledge_points: List[str],
+    ) -> List[str]:
+        lowered = f"{cleaned_question} {' '.join(knowledge_points)}".lower()
+        components = ["电源", "开关"]
+        mapping = [
+            ("电阻", ["电阻", "定值电阻", "r"]),
+            ("灯泡", ["灯泡", "小灯泡"]),
+            ("电流表", ["电流表", "电流计", "a表"]),
+            ("电压表", ["电压表", "v表"]),
+            ("滑动变阻器", ["滑动变阻器", "变阻器"]),
+        ]
+        for label, keywords in mapping:
+            if any(keyword in lowered for keyword in keywords):
+                components.append(label)
+        return components[:6]
 
     def _build_physics_template_artifact(
         self,
