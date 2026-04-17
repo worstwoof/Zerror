@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import time
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from backend.app.schemas.card_schema import (
     AnalysisRequest,
@@ -218,13 +218,7 @@ class DiagnosticService:
             solution_summary=solution_summary,
             solution_steps=solution_steps,
         )
-        if artifact is not None:
-            return artifact
-        return self._build_physics_template_artifact(
-            cleaned_question=cleaned_question,
-            knowledge_points=knowledge_points,
-            solution_steps=solution_steps,
-        )
+        return artifact
 
     def _should_generate_physics_html(
         self,
@@ -711,8 +705,58 @@ class DiagnosticService:
                 }
             )
         normalized["similar_questions"] = similar_questions
+        normalized["rich_artifacts"] = self._normalize_rich_artifacts(
+            normalized.get("rich_artifacts", [])
+        )
 
         return normalized
+
+    def _normalize_rich_artifacts(self, artifacts: list) -> list:
+        normalized_artifacts = []
+        for item in artifacts:
+            if not isinstance(item, dict):
+                continue
+
+            normalized_item = dict(item)
+            normalized_item["title"] = self._latexize_mixed_text(str(item.get("title", "")))
+            normalized_item["description"] = self._latexize_mixed_text(
+                str(item.get("description", ""))
+            )
+
+            mime_type = str(item.get("mime_type", "text/plain"))
+            content = str(item.get("content", ""))
+            if content.strip():
+                if mime_type == "application/json":
+                    normalized_item["content"] = self._latexize_json_content(content)
+                elif mime_type != "text/html":
+                    normalized_item["content"] = self._latexize_mixed_text(content)
+                else:
+                    normalized_item["content"] = content
+
+            normalized_artifacts.append(normalized_item)
+
+        return normalized_artifacts
+
+    def _latexize_json_content(self, content: str) -> str:
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            return content
+
+        normalized = self._normalize_nested_strings(parsed)
+        return json.dumps(normalized, ensure_ascii=False, indent=2)
+
+    def _normalize_nested_strings(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self._latexize_mixed_text(value)
+        if isinstance(value, list):
+            return [self._normalize_nested_strings(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: self._normalize_nested_strings(item)
+                for key, item in value.items()
+            }
+        return value
 
     def _latexize_mixed_text(self, text: str) -> str:
         if not text.strip():

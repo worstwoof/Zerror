@@ -15,7 +15,7 @@ class AppLatexText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalized = content.trim();
+    final normalized = _normalizeDelimiters(content).trim();
     if (normalized.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -56,5 +56,13 @@ class AppLatexText extends StatelessWidget {
       case TextAlign.justify:
         return Alignment.centerLeft;
     }
+  }
+
+  String _normalizeDelimiters(String value) {
+    return value
+        .replaceAll(r'\[', r'$$')
+        .replaceAll(r'\]', r'$$')
+        .replaceAll(r'\(', r'$')
+        .replaceAll(r'\)', r'$');
   }
 }

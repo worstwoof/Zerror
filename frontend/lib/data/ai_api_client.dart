@@ -221,6 +221,7 @@ class AiApiClient {
     required String imagePath,
     String subject = '未分类',
     String wrongReasonHint = '',
+    bool enableSubjectExtensions = false,
   }) async {
     final request = http.MultipartRequest(
       'POST',
@@ -229,7 +230,7 @@ class AiApiClient {
       ..fields['subject'] = subject
       ..fields['user_answer'] = ''
       ..fields['wrong_reason_hint'] = wrongReasonHint
-      ..fields['enable_subject_extensions'] = 'true'
+      ..fields['enable_subject_extensions'] = enableSubjectExtensions ? 'true' : 'false'
       ..files.add(await http.MultipartFile.fromPath('image', imagePath));
 
     final streamedResponse = await request.send();

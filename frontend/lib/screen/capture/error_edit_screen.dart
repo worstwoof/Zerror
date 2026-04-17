@@ -132,7 +132,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     _richArtifacts = result.richArtifacts;
     _isGeneratingPhysicsAnimation = false;
     _physicsAnimationError = null;
-    _maybeAutoGeneratePhysicsAnimation();
   }
 
   bool _supportsPhysicsAnimation() {
@@ -173,24 +172,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       return '物理';
     }
     return _subject;
-  }
-
-  void _maybeAutoGeneratePhysicsAnimation() {
-    if (!_supportsPhysicsAnimation() ||
-        _hasInteractiveHtmlArtifact() ||
-        _isGeneratingPhysicsAnimation) {
-      return;
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          !_supportsPhysicsAnimation() ||
-          _hasInteractiveHtmlArtifact() ||
-          _isGeneratingPhysicsAnimation) {
-        return;
-      }
-      _generatePhysicsAnimation();
-    });
   }
 
   bool _hasInteractiveHtmlArtifact() {

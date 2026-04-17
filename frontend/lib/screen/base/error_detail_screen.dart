@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 import 'home_screen.dart';
@@ -109,7 +110,7 @@ class ErrorDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text(
+                    AppLatexText(
                       error.topic,
                       style: const TextStyle(
                         color: AppPalette.textPrimary,
@@ -118,7 +119,7 @@ class ErrorDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(
+                    AppLatexText(
                       error.question,
                       style: const TextStyle(
                         color: AppPalette.textPrimary,
@@ -165,7 +166,7 @@ class ErrorDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: AppLatexText(
                         '当时错因：${error.reason}',
                         style: const TextStyle(
                           color: Color(0xFFE17D6B),
@@ -189,7 +190,7 @@ class ErrorDetailScreen extends StatelessWidget {
                       icon: Icons.psychology_alt_rounded,
                     ),
                     const SizedBox(height: 14),
-                    Text(
+                    AppLatexText(
                       error.myAnswer,
                       style: const TextStyle(
                         color: AppPalette.textPrimary,
@@ -212,7 +213,7 @@ class ErrorDetailScreen extends StatelessWidget {
                       icon: Icons.auto_awesome,
                     ),
                     const SizedBox(height: 14),
-                    Text(
+                    AppLatexText(
                       error.aiAnalysis,
                       style: const TextStyle(
                         color: AppPalette.textPrimary,

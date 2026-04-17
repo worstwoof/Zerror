@@ -84,7 +84,7 @@ async def analyze_image(
     subject: str = Form("通用"),
     user_answer: str = Form(""),
     wrong_reason_hint: str = Form(""),
-    enable_subject_extensions: bool = Form(True),
+    enable_subject_extensions: bool = Form(False),
 ) -> ImageAnalysisResponse:
     _ensure_credentials()
     started_at = time.perf_counter()
@@ -126,7 +126,7 @@ async def analyze_image(
                         subject=subject,
                         user_answer=user_answer,
                         wrong_reason_hint=wrong_reason_hint,
-                        enable_subject_extensions=enable_subject_extensions,
+                        enable_subject_extensions=False,
                     )
                 )
                 analysis_elapsed = time.perf_counter() - analysis_started_at

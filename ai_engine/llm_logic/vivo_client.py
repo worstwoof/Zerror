@@ -88,7 +88,7 @@ class VivoLMClient:
                 headers=self._json_headers(),
                 params={"request_id": request_id},
                 json=payload,
-                timeout=self.settings.vivo_timeout_seconds,
+                timeout=self.settings.vivo_vision_timeout_seconds,
             )
         except requests.RequestException as exc:
             raise VivoAPIError(f"vivo 多模态接口网络异常，request_id={request_id}，错误={exc}") from exc

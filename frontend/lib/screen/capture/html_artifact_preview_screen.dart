@@ -28,7 +28,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
-      ..loadHtmlString(widget.htmlContent);
+      ..loadHtmlString(_prepareHtmlForPreview(widget.htmlContent));
   }
 
   @override
@@ -110,5 +110,82 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
         ),
       ),
     );
+  }
+
+  String _prepareHtmlForPreview(String rawHtml) {
+    const mathJaxSetup = r'''
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+      displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']]
+    },
+    svg: {
+      fontCache: 'global'
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise().catch(function () {});
+    }
+  });
+</script>
+''';
+
+    final normalized = rawHtml.trim();
+    if (normalized.isEmpty) {
+      return '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  $mathJaxSetup
+</head>
+<body></body>
+</html>
+''';
+    }
+
+    if (RegExp(r'<head[^>]*>', caseSensitive: false).hasMatch(normalized)) {
+      final withMathJax = normalized.replaceFirstMapped(
+        RegExp(r'</head>', caseSensitive: false),
+        (match) => '$mathJaxSetup</head>',
+      );
+      if (withMathJax != normalized) {
+        return withMathJax;
+      }
+    }
+
+    if (RegExp(r'<html[^>]*>', caseSensitive: false).hasMatch(normalized)) {
+      return normalized.replaceFirstMapped(
+        RegExp(r'<html[^>]*>', caseSensitive: false),
+        (match) => '${match.group(0)}\n<head>\n'
+            '<meta charset="UTF-8" />\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n'
+            '$mathJaxSetup\n'
+            '</head>',
+      );
+    }
+
+    return '''
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  $mathJaxSetup
+</head>
+<body>
+$normalized
+</body>
+</html>
+''';
   }
 }
