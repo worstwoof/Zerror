@@ -2792,8 +2792,29 @@ Requirements:
     def _ensure_physics_scene_marker(self, html_document: str, *, scene_type: str) -> str:
         if not html_document or scene_type == "unknown":
             return html_document
-        if re.search(r'data-scene=["\'][a-z_]+["\']', html_document, re.IGNORECASE):
-            return html_document
+
+        existing_match = re.search(
+            r'data-scene=["\']([a-z_]+)["\']',
+            html_document,
+            re.IGNORECASE,
+        )
+        if existing_match:
+            current_scene = existing_match.group(1).lower()
+            if current_scene == scene_type:
+                return html_document
+            updated = re.sub(
+                r'data-scene=["\'][a-z_]+["\']',
+                f'data-scene="{scene_type}"',
+                html_document,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            logger.info(
+                "physics html replaced scene marker from=%s to=%s",
+                current_scene,
+                scene_type,
+            )
+            return updated
 
         updated = re.sub(
             r"<body(?![^>]*data-scene)([^>]*)>",
@@ -2804,6 +2825,11 @@ Requirements:
         )
         if updated != html_document:
             logger.info("physics html injected scene marker scene_type=%s", scene_type)
+            return updated
+        logger.warning(
+            "physics html scene marker injection skipped scene_type=%s reason=no_body_tag",
+            scene_type,
+        )
         return updated
 
     def _log_preview(self, text: str, limit: int = 800) -> str:
