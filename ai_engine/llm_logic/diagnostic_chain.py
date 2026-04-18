@@ -629,6 +629,11 @@ class DiagnosticService:
             len(html_document),
             self._log_preview(html_document),
         )
+        question_scene = _physics_scene_type(cleaned_question)
+        html_document = self._ensure_physics_scene_marker(
+            html_document,
+            scene_type=question_scene,
+        )
 
         candidate = RichArtifact(
             artifact_type="interactive_html",
@@ -653,7 +658,6 @@ class DiagnosticService:
                 if marker_match
                 else _physics_scene_type(html_document)
             )
-            question_scene = _physics_scene_type(cleaned_question)
             logger.warning(
                 "physics html artifact filtered elapsed=%.2fs question_scene=%s html_scene=%s preview=%r",
                 time.perf_counter() - started_at,
@@ -2784,6 +2788,23 @@ Requirements:
         if html_match:
             return html_match.group(0).strip()
         return ""
+
+    def _ensure_physics_scene_marker(self, html_document: str, *, scene_type: str) -> str:
+        if not html_document or scene_type == "unknown":
+            return html_document
+        if re.search(r'data-scene=["\'][a-z_]+["\']', html_document, re.IGNORECASE):
+            return html_document
+
+        updated = re.sub(
+            r"<body(?![^>]*data-scene)([^>]*)>",
+            lambda match: f'<body{match.group(1)} data-scene="{scene_type}">',
+            html_document,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        if updated != html_document:
+            logger.info("physics html injected scene marker scene_type=%s", scene_type)
+        return updated
 
     def _log_preview(self, text: str, limit: int = 800) -> str:
         preview = (text or "").strip()
