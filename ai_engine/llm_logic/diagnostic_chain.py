@@ -609,11 +609,26 @@ class DiagnosticService:
 
         html_document = self._extract_html_document(raw_html)
         if not html_document:
+            lowered_raw = raw_html.lower()
             logger.warning(
-                "physics html generation returned empty html elapsed=%.2fs",
+                "physics html generation returned empty html elapsed=%.2fs raw_len=%s has_doctype=%s has_html=%s has_body=%s has_closing_html=%s preview=%r",
                 time.perf_counter() - started_at,
+                len(raw_html),
+                "<!doctype html" in lowered_raw,
+                "<html" in lowered_raw,
+                "<body" in lowered_raw,
+                "</html>" in lowered_raw,
+                self._log_preview(raw_html),
             )
             return None
+
+        logger.info(
+            "physics html extracted elapsed=%.2fs raw_len=%s html_len=%s preview=%r",
+            time.perf_counter() - started_at,
+            len(raw_html),
+            len(html_document),
+            self._log_preview(html_document),
+        )
 
         candidate = RichArtifact(
             artifact_type="interactive_html",
@@ -627,6 +642,25 @@ class DiagnosticService:
             cleaned_question=cleaned_question,
             artifacts=[candidate],
         )
+        if not validated:
+            marker_match = re.search(
+                r'data-scene=["\']([a-z_]+)["\']',
+                html_document,
+                re.IGNORECASE,
+            )
+            html_scene = (
+                marker_match.group(1).lower()
+                if marker_match
+                else _physics_scene_type(html_document)
+            )
+            question_scene = _physics_scene_type(cleaned_question)
+            logger.warning(
+                "physics html artifact filtered elapsed=%.2fs question_scene=%s html_scene=%s preview=%r",
+                time.perf_counter() - started_at,
+                question_scene,
+                html_scene,
+                self._log_preview(html_document),
+            )
         return validated[0] if validated else None
 
     def _generate_circuit_scene_artifact(
@@ -2750,6 +2784,13 @@ Requirements:
         if html_match:
             return html_match.group(0).strip()
         return ""
+
+    def _log_preview(self, text: str, limit: int = 800) -> str:
+        preview = (text or "").strip()
+        preview = re.sub(r"\s+", " ", preview)
+        if len(preview) > limit:
+            return preview[: limit - 1] + "…"
+        return preview
 
     def _normalize_math_fields(self, parsed: dict) -> dict:
         normalized = dict(parsed)

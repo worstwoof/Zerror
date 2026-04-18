@@ -140,7 +140,16 @@ class VivoLMClient:
         self._raise_for_status(response, request_id)
         data = response.json()
         try:
-            return data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            content = choice["message"]["content"]
+            finish_reason = choice.get("finish_reason", "")
+            logger.info(
+                "vivo chat parsed request_id=%s finish_reason=%s content_len=%s",
+                request_id,
+                finish_reason or "unknown",
+                len(str(content)),
+            )
+            return content
         except (KeyError, IndexError, TypeError) as exc:
             raise VivoAPIError(
                 f"vivo 聊天接口返回结构异常，request_id={request_id}，响应={json.dumps(data, ensure_ascii=False)}"
