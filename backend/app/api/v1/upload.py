@@ -88,6 +88,8 @@ async def analyze_image(
 ) -> ImageAnalysisResponse:
     _ensure_credentials()
     started_at = time.perf_counter()
+    upload_content_type = image.content_type or ""
+    upload_filename = image.filename or ""
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="上传图片为空。")
@@ -97,6 +99,12 @@ async def analyze_image(
         ocr_result = vivo_client.ocr_image(image_bytes)
         ocr_elapsed = time.perf_counter() - ocr_started_at
         normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+        logger.info(
+            "api analysis image upload filename=%s content_type=%s image_kb=%.1f",
+            upload_filename,
+            upload_content_type or "unknown",
+            len(image_bytes) / 1024,
+        )
         request_payload = AnalysisRequest(
             question_text=normalized_text,
             subject=subject,
@@ -110,7 +118,7 @@ async def analyze_image(
             analysis = diagnostic_service.analyze_image(
                 request_payload,
                 image_bytes=image_bytes,
-                mime_type=image.content_type or "image/png",
+                mime_type=upload_content_type or "image/png",
                 ocr_draft=normalized_text,
             )
             analysis_elapsed = time.perf_counter() - analysis_started_at
@@ -204,5 +212,8 @@ def _should_fallback_to_text_analysis(exc: VivoAPIError) -> bool:
         "timed out",
         "connection aborted",
         "connection reset",
+        "invalid base64_image_url",
+        "\"code\": \"1010\"",
+        "\"code\":\"1010\"",
     ]
     return any(marker in message for marker in fallback_markers)

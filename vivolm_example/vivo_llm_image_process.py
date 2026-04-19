@@ -5,7 +5,7 @@ import requests
 # 配置参数
 AppKey = "sk-xuanji-2026209917-VVB5SXd0TGxlYUZiZ2Rocw=="  # 请替换为你自己的 AppKey
 BASE_URL = "https://api-ai.vivo.com.cn/v1"
-MODEL_NAME = "qwen3.5-plus"
+MODEL_NAME = "Doubao-Seed-2.0-pro"
 
 # 本地图片转base64工具函数，传本地图时使用
 def image_to_base64(image_path):
@@ -31,7 +31,7 @@ def sync_image_chat():
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "生成这道题的网页动画演示，并返回网页源代码"},
+                    {"type": "text", "text": "生成答案解析"},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -44,7 +44,7 @@ def sync_image_chat():
                               # JPEG图片："url":  f"data:image/jpeg;base64,{base64_image}"
                               # WEBP图片："url":  f"data:image/webp;base64,{base64_image}"
                               # "url":  f"data:image/<IMAGE_FORMAT>;base64,{base64_image}"
-                            "url": image_to_base64(r"F:\d2l from the scratch\aigc\picture\image5.png")
+                            "url": image_to_base64(r"F:\d2l from the scratch\aigc\picture\image6.png")
                         }
                     }
                 ]

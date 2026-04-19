@@ -122,12 +122,20 @@ class DiagnosticService:
         solution_steps = [str(item) for item in parsed.get("solution_steps", []) if str(item).strip()]
         solution_summary = str(parsed.get("solution_summary", "请结合详细步骤继续完善解析。"))
 
+        scene_brief_source = "model"
         if not scene_brief:
+            scene_brief_source = "fallback"
             scene_brief = self._fallback_scene_brief(
                 cleaned_question=cleaned_question,
                 knowledge_points=knowledge_points,
                 solution_summary=solution_summary,
             )
+        logger.info(
+            "analysis response scene_brief source=%s len=%s preview=%r",
+            scene_brief_source,
+            len(scene_brief),
+            self._log_preview(scene_brief, limit=220),
+        )
 
         review_data = parsed.get("review_plan") or {}
         review_plan = ReviewPlan(
@@ -415,6 +423,11 @@ class DiagnosticService:
                     break
 
         return f"""
+Return JSON only.
+You must include `scene_brief`.
+`scene_brief` should describe image-derived scene structure, not a generic explanation.
+Prefer: objects, relative positions, arrows, directions, boundaries, tracks, field regions, plates, rails, optical paths, circuit connections, labels.
+If the image does not clearly show scene structure, return an empty string for `scene_brief`.
 你是“错题都队”的学科辅导 AI，需要稳定输出适合前端直接消费的 JSON。
 
 请基于以下输入，输出一个 JSON 对象，不要输出 Markdown，不要加代码块围栏。
@@ -483,6 +496,12 @@ class DiagnosticService:
                     break
 
         return f"""
+Return JSON only.
+You must include `scene_brief`.
+`scene_brief` should describe image-derived scene structure, not a generic explanation.
+Prefer: objects, relative positions, arrows, directions, boundaries, tracks, field regions, plates, rails, optical paths, circuit connections, labels.
+If the image does not clearly show scene structure, return an empty string for `scene_brief`.
+
 你是“错题都队”的多模态学科辅导 AI，需要基于“题目图片 + OCR 草稿”输出稳定的 JSON。
 
 请把“图片内容”作为第一信息源，把“OCR 草稿”作为辅助参考，优先纠正 OCR 中的错字、公式、上下标、积分符号、根号、分式、图形标注和换行错误。

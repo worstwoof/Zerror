@@ -68,6 +68,18 @@ class VivoLMClient:
     def vision_completion(self, prompt: str, image_bytes: bytes, mime_type: str = "image/png") -> str:
         request_id = str(uuid.uuid4())
         started_at = time.perf_counter()
+        normalized_mime_type = self._normalize_image_mime_type(
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+        )
+        logger.info(
+            "vivo vision image request_id=%s model=%s mime_type=%s normalized_mime_type=%s image_kb=%.1f",
+            request_id,
+            self.settings.vivo_vision_model,
+            mime_type,
+            normalized_mime_type,
+            len(image_bytes) / 1024,
+        )
         payload = {
             "model": self.settings.vivo_vision_model,
             "messages": [
@@ -78,7 +90,7 @@ class VivoLMClient:
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": self._build_data_uri(image_bytes, mime_type),
+                                "url": self._build_data_uri(image_bytes, normalized_mime_type),
                             },
                         },
                     ],
@@ -274,3 +286,32 @@ class VivoLMClient:
     def _build_data_uri(self, image_bytes: bytes, mime_type: str) -> str:
         encoded = base64.b64encode(image_bytes).decode("utf-8")
         return f"data:{mime_type};base64,{encoded}"
+
+    def _normalize_image_mime_type(self, *, image_bytes: bytes, mime_type: str) -> str:
+        sniffed_mime_type = self._sniff_image_mime_type(image_bytes)
+        if sniffed_mime_type:
+            return sniffed_mime_type
+
+        normalized = (mime_type or "").strip().lower()
+        aliases = {
+            "image/jpg": "image/jpeg",
+            "image/pjpeg": "image/jpeg",
+            "image/x-png": "image/png",
+            "application/octet-stream": "image/jpeg",
+        }
+        if normalized in aliases:
+            return aliases[normalized]
+        if normalized.startswith("image/"):
+            return normalized
+        return "image/jpeg"
+
+    def _sniff_image_mime_type(self, image_bytes: bytes) -> str:
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if image_bytes.startswith((b"GIF87a", b"GIF89a")):
+            return "image/gif"
+        if len(image_bytes) >= 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+            return "image/webp"
+        return ""
