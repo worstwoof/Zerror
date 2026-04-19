@@ -2669,6 +2669,99 @@ Requirements:
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
+        combined_text = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                " ".join(knowledge_points[:3]),
+                solution_summary,
+            ]
+            if part and part.strip()
+        )
+        scene_hint = _physics_scene_type(combined_text)
+        if scene_hint == "unknown":
+            scene_hint = "mechanics"
+
+        scene_labels = {
+            "board_block": "木板与物块",
+            "incline": "斜面运动",
+            "projectile": "抛体运动",
+            "collision": "碰撞过程",
+            "optics": "光学成像",
+            "circuit": "电路过程",
+            "electromagnetism": "电磁过程",
+            "mechanics": "力学过程",
+        }
+        scene_goals = {
+            "board_block": "突出木板、物块、相对滑动趋势和关键受力变化。",
+            "incline": "突出物体沿斜面的运动、受力方向和速度变化。",
+            "projectile": "突出轨迹、速度方向变化和关键位置关系。",
+            "collision": "突出碰撞前后速度、形变或动量变化。",
+            "optics": "突出光线传播路径、成像位置或反射折射过程。",
+            "circuit": "突出电路连接关系、电流方向和元件状态变化。",
+            "electromagnetism": "突出电场/磁场方向、粒子或导体运动以及力的方向。",
+            "mechanics": "突出题目中的主要物体、运动过程和关键物理量变化。",
+        }
+        scene_direction = {
+            "board_block": "必须把木板和物块都画出来，动画围绕相对运动或摩擦作用展开。",
+            "incline": "必须出现斜面、物体和沿斜面的运动，不要改成平地模板。",
+            "projectile": "必须出现抛射轨迹或曲线运动，不要退化成普通平移方块。",
+            "collision": "必须出现两个或多个相互作用对象，体现碰撞前后状态变化。",
+            "optics": "必须出现真实光路、透镜/镜面或像的位置，不要改成力学场景。",
+            "circuit": "必须出现真实电路结构与元件连接，不要改成受力示意图。",
+            "electromagnetism": "必须出现电场线、磁场区域、粒子/导体运动轨迹或受力方向，不要改成木板小车模板。",
+            "mechanics": "动画必须围绕题目里的对象和过程，不要生成无关的通用页面。",
+        }
+        control_hint = {
+            "board_block": "可提供 1 到 2 个控件，例如推力或摩擦因数。",
+            "incline": "可提供 1 到 2 个控件，例如倾角或初速度。",
+            "projectile": "可提供 1 到 2 个控件，例如初速度或发射角。",
+            "collision": "可提供 1 到 2 个控件，例如质量比或碰撞前速度。",
+            "optics": "可提供 1 到 2 个控件，例如物距或焦距。",
+            "circuit": "可提供 1 到 2 个控件，例如开关状态或电阻大小。",
+            "electromagnetism": "可提供 1 到 2 个控件，例如场强、磁感应强度、速度或电荷量。",
+            "mechanics": "可提供 1 到 2 个最关键的参数控件。",
+        }
+
+        focus_points = [
+            self._display_plain_text(point, limit=18)
+            for point in knowledge_points[:3]
+            if str(point).strip()
+        ]
+        focus_text = " / ".join(point for point in focus_points if point) or "受力、运动和关键物理量变化"
+
+        animation_goal = self._display_plain_text(solution_summary, limit=88)
+        if not animation_goal:
+            animation_goal = scene_goals.get(scene_hint, scene_goals["mechanics"])
+
+        question_excerpt = self._display_plain_text(cleaned_question, limit=120)
+        scene_label = scene_labels.get(scene_hint, "物理过程")
+        return f"""
+你是一个擅长把物理题情景做成移动端交互动画的前端工程师。
+
+请直接输出一个完整、可运行的 HTML 文档，且只能输出 HTML 本身，不要输出 JSON、Markdown、解释或代码围栏。
+
+题目文本：
+{cleaned_question}
+
+场景类型：{scene_label}
+场景提示：{scene_direction.get(scene_hint, scene_direction["mechanics"])}
+知识聚焦：{focus_text}
+动画目标：{animation_goal}
+题目摘录：{question_excerpt}
+
+生成要求：
+1. 输出必须是完整 HTML，包含 `<!DOCTYPE html>`、`<html>`、`<head>`、`<body>`。
+2. 在 `<body>` 标签上设置 `data-scene="{scene_hint}"`。
+3. 页面是手机竖屏优先，主体是一个大的动画区域，文字尽量少，不要长篇题干解析。
+4. 动画要贴合这道题的具体情景，优先展示对象、运动、场、方向、连接关系，不要套通用木板/方块模板。
+5. 可以使用原生 HTML、CSS、SVG、Canvas、JavaScript；不要依赖任何外部 CDN、库或网络资源。
+6. 最多只保留 1 到 2 个必要控件。{control_hint.get(scene_hint, control_hint["mechanics"])}
+7. 视觉上要清晰、有层次，适合 WebView 直接展示；标签尽量短，用中文。
+8. 如果题目包含公式或符号，请直接在页面中用正常排版展示，不要把大段 LaTeX 源码塞进正文。
+9. 不需要复述完整题目，不需要展示解题步骤，不需要生成答题卡式说明区。
+10. 重点是“把题目的物理过程演示出来”，而不是做一个通用教学模板。
+""".strip()
         lowered = " ".join(
             part.strip()
             for part in [
@@ -2755,12 +2848,6 @@ Requirements:
 
 当前场景必须满足：
 {scene_requirements}
-
-如果题目属于板块运动或木板-物块模型，请优先展示：
-- 木板和物块两个对象
-- 相对滑动或共同运动
-- 摩擦力方向
-- 速度/位移/相对位置变化
 
 再次强调：只输出完整 HTML，不要输出任何额外说明。
 """.strip()
