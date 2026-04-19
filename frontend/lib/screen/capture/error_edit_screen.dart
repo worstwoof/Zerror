@@ -47,6 +47,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   String _selectedErrorReason = '';
   String _subject = '通用';
   String _solutionSummary = '';
+  String _sceneBrief = '';
   String _mistakeDiagnosis = '';
   String _reviewFocus = '';
   List<int> _reviewSchedule = const [];
@@ -122,6 +123,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   void _applyAnalysisResult(AnalysisResult result) {
     _subject = result.subject;
+    _sceneBrief = result.sceneBrief;
     _knowledgePoints = result.knowledgePoints;
     _solutionSummary = result.solutionSummary;
     _solutionSteps = result.solutionSteps;
@@ -218,6 +220,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       final result = await _apiClient.generatePhysicsAnimation(
         PhysicsAnimationPayload(
           cleanedQuestion: questionText,
+          sceneBrief: _sceneBrief,
           subject: _resolvedPhysicsSubject(),
           knowledgePoints: _knowledgePoints,
           solutionSummary: _solutionSummary,

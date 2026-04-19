@@ -117,9 +117,17 @@ class DiagnosticService:
         normalize_elapsed = time.perf_counter() - normalize_started_at
         subject = str(parsed.get("subject") or request.subject or "通用")
         cleaned_question = str(parsed.get("cleaned_question") or default_cleaned_question)
+        scene_brief = str(parsed.get("scene_brief", "")).strip()
         knowledge_points = [str(item) for item in parsed.get("knowledge_points", []) if str(item).strip()]
         solution_steps = [str(item) for item in parsed.get("solution_steps", []) if str(item).strip()]
         solution_summary = str(parsed.get("solution_summary", "请结合详细步骤继续完善解析。"))
+
+        if not scene_brief:
+            scene_brief = self._fallback_scene_brief(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+            )
 
         review_data = parsed.get("review_plan") or {}
         review_plan = ReviewPlan(
@@ -173,6 +181,7 @@ class DiagnosticService:
         response = AnalysisResponse(
             question_text=request.question_text,
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             subject=subject,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
@@ -200,6 +209,7 @@ class DiagnosticService:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         subject: str,
         knowledge_points: List[str],
         solution_summary: str,
@@ -210,6 +220,7 @@ class DiagnosticService:
             return None
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -217,12 +228,14 @@ class DiagnosticService:
         logger.info("physics animation scene_type=%s", scene_type)
         if self._should_generate_physics_html(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
         ):
             artifact = self._generate_physics_html_artifact(
                 cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
                 knowledge_points=knowledge_points,
                 solution_summary=solution_summary,
                 solution_steps=solution_steps,
@@ -273,12 +286,14 @@ class DiagnosticService:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> bool:
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -298,6 +313,7 @@ class DiagnosticService:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         subject: str,
         knowledge_points: List[str],
         solution_summary: str,
@@ -309,6 +325,7 @@ class DiagnosticService:
 
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -322,6 +339,7 @@ class DiagnosticService:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
@@ -330,6 +348,7 @@ class DiagnosticService:
             part.strip()
             for part in [
                 cleaned_question,
+                scene_brief,
                 " ".join(knowledge_points),
                 solution_summary,
                 " ".join(solution_steps),
@@ -337,6 +356,53 @@ class DiagnosticService:
             if part and part.strip()
         )
         return _physics_scene_type(scene_source)
+
+    def _fallback_scene_brief(
+        self,
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+    ) -> str:
+        scene_type = _physics_scene_type(
+            " ".join(
+                part.strip()
+                for part in [
+                    cleaned_question,
+                    " ".join(knowledge_points),
+                    solution_summary,
+                ]
+                if part and part.strip()
+            )
+        )
+        scene_templates = {
+            "board_block": "画面重点放在木板与物块的相对位置、运动方向和摩擦作用。",
+            "incline": "画面重点放在斜面、物体位置、速度方向和沿斜面的受力关系。",
+            "projectile": "画面重点放在抛射轨迹、关键位置和速度方向变化。",
+            "collision": "画面重点放在多个物体的接触过程以及碰撞前后状态变化。",
+            "optics": "画面重点放在光路、透镜或镜面位置，以及像或光线方向变化。",
+            "circuit": "画面重点放在元件连接关系、电流路径、开关或表计状态变化。",
+            "electromagnetism": "画面重点放在场区范围、粒子或导体位置、运动方向和受力方向。",
+            "mechanics": "画面重点放在题目对象、空间位置关系和主要运动过程。",
+            "unknown": "画面重点放在题目对象、空间位置关系和主要运动过程。",
+        }
+        question_excerpt = self._display_plain_text(cleaned_question, limit=72)
+        focus_points = [
+            self._display_plain_text(item, limit=14)
+            for item in knowledge_points[:3]
+            if str(item).strip()
+        ]
+        focus_text = "、".join(item for item in focus_points if item)
+        summary_excerpt = self._display_plain_text(solution_summary, limit=48)
+
+        parts = [scene_templates.get(scene_type, scene_templates["unknown"])]
+        if question_excerpt:
+            parts.append(f"题目片段：{question_excerpt}")
+        if focus_text:
+            parts.append(f"关注：{focus_text}")
+        if summary_excerpt:
+            parts.append(f"解析提示：{summary_excerpt}")
+        return " ".join(parts).strip()
 
     def _build_text_prompt(self, request: AnalysisRequest, cleaned_question: str) -> str:
         extension_hint = ""
@@ -586,12 +652,14 @@ class DiagnosticService:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
         prompt = self._build_physics_html_prompt(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -629,7 +697,13 @@ class DiagnosticService:
             len(html_document),
             self._log_preview(html_document),
         )
-        question_scene = _physics_scene_type(cleaned_question)
+        question_scene = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
         html_document = self._ensure_physics_scene_marker(
             html_document,
             scene_type=question_scene,
@@ -2665,6 +2739,7 @@ Requirements:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
@@ -2673,6 +2748,7 @@ Requirements:
             part.strip()
             for part in [
                 cleaned_question,
+                scene_brief,
                 " ".join(knowledge_points[:3]),
                 solution_summary,
             ]
@@ -2735,6 +2811,9 @@ Requirements:
             animation_goal = scene_goals.get(scene_hint, scene_goals["mechanics"])
 
         question_excerpt = self._display_plain_text(cleaned_question, limit=120)
+        scene_brief_text = self._display_plain_text(scene_brief, limit=120)
+        if scene_brief_text:
+            animation_goal = f"{scene_brief_text} {animation_goal}".strip()
         scene_label = scene_labels.get(scene_hint, "物理过程")
         return f"""
 你是一个擅长把物理题情景做成移动端交互动画的前端工程师。
@@ -2930,6 +3009,7 @@ Requirements:
         normalized = dict(parsed)
         text_fields = [
             "cleaned_question",
+            "scene_brief",
             "solution_summary",
             "mistake_diagnosis",
         ]

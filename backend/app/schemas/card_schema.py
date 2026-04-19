@@ -44,6 +44,7 @@ class AnalysisRequest(BaseModel):
 class AnalysisResponse(BaseModel):
     question_text: str
     cleaned_question: str
+    scene_brief: str = ""
     subject: str
     knowledge_points: List[str] = Field(default_factory=list)
     solution_summary: str
@@ -68,6 +69,7 @@ class ImageAnalysisResponse(AnalysisResponse):
 
 class PhysicsAnimationRequest(BaseModel):
     cleaned_question: str = Field(..., min_length=1)
+    scene_brief: str = ""
     subject: str = Field(default="物理")
     knowledge_points: List[str] = Field(default_factory=list)
     solution_summary: str = ""

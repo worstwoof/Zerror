@@ -161,6 +161,7 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
     try:
         artifact = diagnostic_service.generate_physics_animation(
             cleaned_question=request.cleaned_question,
+            scene_brief=request.scene_brief,
             subject=request.subject,
             knowledge_points=request.knowledge_points,
             solution_summary=request.solution_summary,
@@ -171,6 +172,7 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
         if not generated:
             reason = diagnostic_service.explain_physics_animation_unavailable(
                 cleaned_question=request.cleaned_question,
+                scene_brief=request.scene_brief,
                 subject=request.subject,
                 knowledge_points=request.knowledge_points,
                 solution_summary=request.solution_summary,

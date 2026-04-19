@@ -32,6 +32,7 @@ class SimilarQuestionItem {
 
 class AnalysisResult {
   final String subject;
+  final String sceneBrief;
   final List<String> knowledgePoints;
   final String solutionSummary;
   final List<String> solutionSteps;
@@ -43,6 +44,7 @@ class AnalysisResult {
 
   const AnalysisResult({
     required this.subject,
+    required this.sceneBrief,
     required this.knowledgePoints,
     required this.solutionSummary,
     required this.solutionSteps,
@@ -61,6 +63,7 @@ class AnalysisResult {
         .toList();
 
     return AnalysisResult(
+      sceneBrief: (json['scene_brief'] ?? '').toString(),
       subject: (json['subject'] ?? '未分类').toString(),
       knowledgePoints: (json['knowledge_points'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
@@ -111,6 +114,7 @@ class ImageAnalysisPayload {
 
 class PhysicsAnimationPayload {
   final String cleanedQuestion;
+  final String sceneBrief;
   final String subject;
   final List<String> knowledgePoints;
   final String solutionSummary;
@@ -118,6 +122,7 @@ class PhysicsAnimationPayload {
 
   const PhysicsAnimationPayload({
     required this.cleanedQuestion,
+    required this.sceneBrief,
     required this.subject,
     required this.knowledgePoints,
     required this.solutionSummary,
@@ -127,6 +132,7 @@ class PhysicsAnimationPayload {
   Map<String, dynamic> toJson() {
     return {
       'cleaned_question': cleanedQuestion,
+      'scene_brief': sceneBrief,
       'subject': subject,
       'knowledge_points': knowledgePoints,
       'solution_summary': solutionSummary,
