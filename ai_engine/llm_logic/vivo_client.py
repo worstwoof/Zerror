@@ -33,6 +33,12 @@ class VivoLMClient:
             "max_tokens": self.settings.vivo_max_tokens,
             "stream": False,
         }
+        payload.update(
+            self._build_thinking_payload(
+                model_name=self.settings.vivo_text_model,
+                thinking_mode=self.settings.vivo_text_thinking_mode,
+            )
+        )
         try:
             response = requests.post(
                 f"{self.settings.vivo_base_url}/chat/completions",
@@ -82,6 +88,12 @@ class VivoLMClient:
             "max_tokens": self.settings.vivo_max_tokens,
             "stream": False,
         }
+        payload.update(
+            self._build_thinking_payload(
+                model_name=self.settings.vivo_vision_model,
+                thinking_mode=self.settings.vivo_vision_thinking_mode,
+            )
+        )
         try:
             response = requests.post(
                 f"{self.settings.vivo_base_url}/chat/completions",
@@ -154,6 +166,51 @@ class VivoLMClient:
             raise VivoAPIError(
                 f"vivo 聊天接口返回结构异常，request_id={request_id}，响应={json.dumps(data, ensure_ascii=False)}"
             ) from exc
+
+    def _build_thinking_payload(self, *, model_name: str, thinking_mode: str) -> Dict[str, Any]:
+        normalized_mode = self._normalize_thinking_mode(thinking_mode)
+        if normalized_mode == "auto":
+            return {}
+
+        lowered_model = (model_name or "").lower()
+        if "qwen" in lowered_model:
+            enabled = normalized_mode == "enabled"
+            logger.info(
+                "vivo thinking config model=%s field=enable_thinking value=%s",
+                model_name,
+                enabled,
+            )
+            return {"enable_thinking": enabled}
+
+        if any(token in lowered_model for token in ["deepseek", "doubao", "volc"]):
+            logger.info(
+                "vivo thinking config model=%s field=thinking.type value=%s",
+                model_name,
+                normalized_mode,
+            )
+            return {"thinking": {"type": normalized_mode}}
+
+        logger.info(
+            "vivo thinking config skipped model=%s unsupported_mode_mapping=%s",
+            model_name,
+            normalized_mode,
+        )
+        return {}
+
+    def _normalize_thinking_mode(self, thinking_mode: str) -> str:
+        normalized = (thinking_mode or "auto").strip().lower()
+        aliases = {
+            "auto": "auto",
+            "enabled": "enabled",
+            "enable": "enabled",
+            "true": "enabled",
+            "on": "enabled",
+            "disabled": "disabled",
+            "disable": "disabled",
+            "false": "disabled",
+            "off": "disabled",
+        }
+        return aliases.get(normalized, "auto")
 
     def _extract_ocr_text(self, data: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
         candidates = [
