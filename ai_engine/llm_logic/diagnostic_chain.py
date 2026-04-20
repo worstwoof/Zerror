@@ -1482,6 +1482,26 @@ Requirements:
             )
             return None
 
+        scene_spec = self._enrich_electromagnetism_scene_spec(
+            scene_spec=scene_spec,
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        logger.info(
+            "electromagnetism scene spec subtype=%s field=%s marker=%s trajectory=%s velocity=%s force=%s rod=%s title=%s",
+            scene_spec.get("subtype"),
+            scene_spec.get("field_type"),
+            scene_spec.get("field_marker"),
+            scene_spec.get("trajectory"),
+            scene_spec.get("velocity_direction"),
+            scene_spec.get("force_direction"),
+            scene_spec.get("rod_motion_direction"),
+            self._display_plain_text(str(scene_spec.get("title") or ""), limit=24),
+        )
+
         html_document = self._render_electromagnetism_scene_html_v2(
             cleaned_question=cleaned_question,
             knowledge_points=knowledge_points,
@@ -2687,6 +2707,300 @@ Requirements:
             return "electromagnetic_induction"
         return "charged_particle"
 
+    def _enrich_electromagnetism_scene_spec(
+        self,
+        *,
+        scene_spec: Dict[str, Any],
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> Dict[str, Any]:
+        enriched = dict(scene_spec)
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                solution_summary,
+                " ".join(knowledge_points),
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        guessed_subtype = self._guess_electromagnetism_subtype(combined_context)
+        guessed_field_type = self._guess_electromagnetism_field_type(
+            cleaned_question=combined_context,
+            knowledge_points=[],
+        )
+        subtype = self._electromagnetism_choice(
+            enriched.get("subtype"),
+            {"charged_particle", "electromagnetic_induction"},
+            guessed_subtype,
+        )
+        field_type = self._electromagnetism_choice(
+            enriched.get("field_type"),
+            {"magnetic", "electric", "mixed"},
+            guessed_field_type,
+        )
+
+        enriched["subtype"] = subtype
+        enriched["field_type"] = field_type
+        enriched["field_marker"] = self._electromagnetism_choice(
+            enriched.get("field_marker"),
+            {"cross", "dot", "line"},
+            self._infer_electromagnetism_field_marker(
+                combined_context=combined_context,
+                field_type=field_type,
+            ),
+        )
+        enriched["trajectory"] = self._electromagnetism_choice(
+            enriched.get("trajectory"),
+            {"arc_up", "arc_down", "straight", "circle"},
+            self._infer_electromagnetism_trajectory(combined_context),
+        )
+        enriched["charge_sign"] = self._electromagnetism_choice(
+            enriched.get("charge_sign"),
+            {"positive", "negative", "unknown"},
+            self._infer_electromagnetism_charge_sign(combined_context),
+        )
+        enriched["velocity_direction"] = self._electromagnetism_choice(
+            enriched.get("velocity_direction"),
+            {"left", "right", "up", "down"},
+            self._infer_electromagnetism_velocity_direction(
+                combined_context,
+                subtype,
+            ),
+        )
+        enriched["force_direction"] = self._electromagnetism_choice(
+            enriched.get("force_direction"),
+            {"up", "down", "left", "right", "none"},
+            self._infer_electromagnetism_force_direction(combined_context),
+        )
+        enriched["rod_motion_direction"] = self._electromagnetism_choice(
+            enriched.get("rod_motion_direction"),
+            {"left", "right"},
+            self._infer_electromagnetism_rod_direction(combined_context),
+        )
+
+        if not self._display_plain_text(str(enriched.get("title") or ""), limit=24):
+            enriched["title"] = self._guess_electromagnetism_title(
+                cleaned_question=combined_context or cleaned_question,
+                subtype=subtype,
+                field_type=field_type,
+            )
+        if not self._display_plain_text(
+            str(enriched.get("phenomenon_summary") or ""),
+            limit=60,
+        ):
+            enriched["phenomenon_summary"] = (
+                self._display_plain_text(solution_summary, limit=60)
+                or self._guess_electromagnetism_summary(
+                    cleaned_question=combined_context or cleaned_question,
+                    subtype=subtype,
+                    field_type=field_type,
+                )
+            )
+        if not self._display_plain_text(
+            str(enriched.get("interaction_hint") or ""),
+            limit=48,
+        ):
+            if subtype == "electromagnetic_induction":
+                enriched["interaction_hint"] = "拖动导体棒速度或磁场强度，观察感应电流和指针偏转变化。"
+            elif field_type == "electric":
+                enriched["interaction_hint"] = "调节电场强度和初速度，观察粒子偏转轨迹与受力方向变化。"
+            else:
+                enriched["interaction_hint"] = "调节磁场强度和速度，观察粒子轨迹弯曲程度与受力方向变化。"
+        if not self._display_plain_text(
+            str(enriched.get("direction_hint") or ""),
+            limit=48,
+        ):
+            enriched["direction_hint"] = self._build_electromagnetism_direction_hint(
+                combined_context=combined_context,
+                subtype=subtype,
+                velocity_direction=str(enriched["velocity_direction"]),
+                force_direction=str(enriched["force_direction"]),
+                rod_motion_direction=str(enriched["rod_motion_direction"]),
+            )
+
+        raw_focus_points = enriched.get("focus_points")
+        focus_points = [
+            str(item).strip()
+            for item in raw_focus_points
+            if str(item).strip()
+        ] if isinstance(raw_focus_points, list) else []
+        if not focus_points:
+            focus_points = self._build_electromagnetism_focus_points(
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                subtype=subtype,
+                field_type=field_type,
+            )
+        enriched["focus_points"] = focus_points[:4]
+        return enriched
+
+    def _infer_electromagnetism_field_marker(
+        self,
+        *,
+        combined_context: str,
+        field_type: str,
+    ) -> str:
+        lowered = combined_context.lower()
+        if field_type == "electric":
+            return "line"
+        if any(
+            token in lowered
+            for token in ["垂直纸面向里", "进入纸面", "入纸面", "纸面向里", "向里", "叉", "×"]
+        ):
+            return "cross"
+        if any(
+            token in lowered
+            for token in ["垂直纸面向外", "离开纸面", "出纸面", "纸面向外", "向外", "点", "·", "⊙"]
+        ):
+            return "dot"
+        return "cross" if field_type == "magnetic" else "line"
+
+    def _infer_electromagnetism_trajectory(self, combined_context: str) -> str:
+        lowered = combined_context.lower()
+        if any(token in lowered for token in ["圆周", "圆形", "圆轨道", "圆周运动", "回旋"]):
+            return "circle"
+        if any(token in lowered for token in ["直线", "不偏转", "匀速", "沿直线"]):
+            return "straight"
+        if any(token in lowered for token in ["向上偏", "上偏", "向上弯", "向上偏转", "向上弯曲"]):
+            return "arc_up"
+        if any(token in lowered for token in ["向下偏", "下偏", "向下弯", "向下偏转", "向下弯曲"]):
+            return "arc_down"
+        return "arc_up"
+
+    def _infer_electromagnetism_charge_sign(self, combined_context: str) -> str:
+        lowered = combined_context.lower()
+        if any(token in lowered for token in ["负电", "带负电", "负粒子", "电子"]):
+            return "negative"
+        if any(token in lowered for token in ["正电", "带正电", "正粒子", "正离子", "质子"]):
+            return "positive"
+        return "unknown"
+
+    def _infer_electromagnetism_velocity_direction(
+        self,
+        combined_context: str,
+        subtype: str,
+    ) -> str:
+        direction = self._infer_direction_from_context(
+            combined_context,
+            keywords=["速度", "初速度", "射入", "飞入", "进入", "粒子", "带电粒子"],
+            allowed={"right", "left", "up", "down"},
+        )
+        if direction:
+            return direction
+        direction = self._infer_direction_from_context(
+            combined_context,
+            keywords=["导体棒", "金属棒", "棒", "滑杆"],
+            allowed={"right", "left"},
+        )
+        if direction:
+            return direction
+        if subtype == "electromagnetic_induction":
+            return "right"
+        return "right"
+
+    def _infer_electromagnetism_force_direction(self, combined_context: str) -> str:
+        direction = self._infer_direction_from_context(
+            combined_context,
+            keywords=["受力", "洛伦兹力", "安培力", "电场力", "偏转"],
+            allowed={"right", "left", "up", "down"},
+        )
+        if direction:
+            return direction
+        if any(token in combined_context.lower() for token in ["不受力", "受力为零", "无偏转"]):
+            return "none"
+        return "up"
+
+    def _infer_electromagnetism_rod_direction(self, combined_context: str) -> str:
+        direction = self._infer_direction_from_context(
+            combined_context,
+            keywords=["导体棒", "金属棒", "棒", "滑杆"],
+            allowed={"right", "left"},
+        )
+        return direction or "right"
+
+    def _infer_direction_from_context(
+        self,
+        text: str,
+        *,
+        keywords: List[str],
+        allowed: set[str],
+    ) -> str:
+        direction_patterns = [
+            ("right", ["向右", "从左向右", "自左向右", "朝右"]),
+            ("left", ["向左", "从右向左", "自右向左", "朝左"]),
+            ("up", ["向上", "自下向上", "从下向上", "朝上"]),
+            ("down", ["向下", "自上向下", "从上向下", "朝下"]),
+        ]
+
+        normalized = re.sub(r"\s+", "", text)
+        for keyword in keywords:
+            for direction, aliases in direction_patterns:
+                if direction not in allowed:
+                    continue
+                for alias in aliases:
+                    if re.search(rf"{re.escape(keyword)}[^，。；,.:\n]{{0,12}}{re.escape(alias)}", normalized):
+                        return direction
+                    if re.search(rf"{re.escape(alias)}[^，。；,.:\n]{{0,8}}{re.escape(keyword)}", normalized):
+                        return direction
+        return ""
+
+    def _build_electromagnetism_direction_hint(
+        self,
+        *,
+        combined_context: str,
+        subtype: str,
+        velocity_direction: str,
+        force_direction: str,
+        rod_motion_direction: str,
+    ) -> str:
+        direction_labels = {
+            "left": "左",
+            "right": "右",
+            "up": "上",
+            "down": "下",
+        }
+        if subtype == "electromagnetic_induction":
+            if rod_motion_direction in direction_labels:
+                return f"先看导体棒向{direction_labels[rod_motion_direction]}运动，再结合磁场方向判断感应电流方向。"
+            return "先看导体棒运动方向，再结合磁场方向判断感应电流方向。"
+        if force_direction == "none":
+            return "粒子合力接近零，重点观察它是否保持直线运动。"
+        if velocity_direction in direction_labels and force_direction in direction_labels:
+            return (
+                f"先看速度方向向{direction_labels[velocity_direction]}，再结合场方向判断受力是否指向"
+                f"{direction_labels[force_direction]}。"
+            )
+        if "右手定则" in combined_context or "左手定则" in combined_context:
+            return "结合题目中的手指定则，按场方向和运动方向判断受力或电流方向。"
+        return "结合场方向、运动方向和受力方向，判断粒子偏转或感应电流的变化。"
+
+    def _build_electromagnetism_focus_points(
+        self,
+        *,
+        scene_brief: str,
+        knowledge_points: List[str],
+        subtype: str,
+        field_type: str,
+    ) -> List[str]:
+        focus_points = [
+            self._display_plain_text(item, limit=20)
+            for item in [scene_brief, *knowledge_points]
+        ]
+        normalized = [item for item in focus_points if item]
+        if normalized:
+            return normalized[:4]
+        if subtype == "electromagnetic_induction":
+            return ["导体棒运动方向", "磁场区域范围", "感应电流方向"]
+        if field_type == "electric":
+            return ["极板位置关系", "粒子入场方向", "电场力方向"]
+        return ["磁场方向", "粒子速度方向", "洛伦兹力方向"]
+
     def _electromagnetism_choice(
         self,
         value: Any,
@@ -2856,7 +3170,7 @@ Requirements:
         scene_spec = {
             "title": cleaned_question[:24] or "电磁过程演示",
             "subtype": self._guess_electromagnetism_subtype(cleaned_question),
-            "field_type": "magnetic",
+            "field_type": guessed_field_type,
             "focus_points": [item for item in knowledge_points[:3] if item.strip()],
             "phenomenon_summary": solution_summary or (solution_steps[0] if solution_steps else "观察场方向和运动变化。"),
             "interaction_hint": "拖动滑块改变场强或运动强度，观察受力方向和轨迹变化。",
