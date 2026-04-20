@@ -234,6 +234,28 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
+        if scene_type == "circuit":
+            artifact = self._generate_circuit_scene_artifact(
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation used circuit scene spec renderer")
+                return artifact
+        if scene_type == "electromagnetism":
+            artifact = self._generate_electromagnetism_scene_artifact(
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is not None:
+                logger.info("physics animation used electromagnetism scene spec renderer")
+                return artifact
         if self._should_generate_physics_html(
             cleaned_question=cleaned_question,
             scene_brief=scene_brief,
@@ -252,15 +274,6 @@ class DiagnosticService:
                 logger.info("physics animation used full html generation")
                 return artifact
         if scene_type == "circuit":
-            artifact = self._generate_circuit_scene_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation used circuit scene spec renderer")
-                return artifact
             artifact = self._build_physics_template_artifact(
                 cleaned_question=cleaned_question,
                 knowledge_points=knowledge_points,
@@ -270,15 +283,6 @@ class DiagnosticService:
                 logger.info("physics animation fell back to local circuit template")
                 return artifact
         if scene_type == "electromagnetism":
-            artifact = self._generate_electromagnetism_scene_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation used electromagnetism scene spec renderer")
-                return artifact
             artifact = self._build_electromagnetism_template_artifact(
                 cleaned_question=cleaned_question,
                 knowledge_points=knowledge_points,
@@ -764,12 +768,14 @@ If the image does not clearly show scene structure, return an empty string for `
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
         prompt = self._build_circuit_scene_prompt(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -819,18 +825,23 @@ If the image does not clearly show scene structure, return an empty string for `
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
         points = ", ".join(knowledge_points[:4]) or "电路分析"
         steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼连接方式、电流路径和表计变化。"
+        scene_brief_text = self._display_plain_text(scene_brief, limit=180) or "未提供可靠图示摘要"
         return f"""
 You are generating a compact circuit scene specification for a mobile WebView.
 Return JSON only. Do not output HTML. Do not output Markdown.
 
 Question:
 {cleaned_question}
+
+Image-derived scene brief:
+{scene_brief_text}
 
 Knowledge points:
 {points}
@@ -854,10 +865,12 @@ Return a JSON object with this shape:
 
 Requirements:
 1. Keep it short and specific to the question.
-2. `components` should contain at most 6 items.
-3. `focus_points` should contain 2 to 4 short items.
-4. Prefer `parallel` when the question clearly mentions parallel branches, otherwise use `series` or `mixed`.
-5. All values should be plain strings or string arrays.
+2. Treat the image-derived scene brief as high-priority evidence for wiring layout, branch structure, meter position, switch state, and current path.
+3. If the question text and scene brief conflict, prefer the scene brief for spatial layout and connection structure.
+4. `components` should contain at most 6 items.
+5. `focus_points` should contain 2 to 4 short items.
+6. Prefer `parallel` when the question or scene brief clearly mentions parallel branches, otherwise use `series` or `mixed`.
+7. All values should be plain strings or string arrays.
 """.strip()
 
     def _render_circuit_scene_html(
@@ -1302,12 +1315,14 @@ Requirements:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
         prompt = self._build_electromagnetism_scene_prompt(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
@@ -1357,18 +1372,23 @@ Requirements:
         self,
         *,
         cleaned_question: str,
+        scene_brief: str,
         knowledge_points: List[str],
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
         points = ", ".join(knowledge_points[:4]) or "电磁分析"
         steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼场的方向、受力方向和关键现象。"
+        scene_brief_text = self._display_plain_text(scene_brief, limit=180) or "未提供可靠图示摘要"
         return f"""
 You are generating a compact electromagnetism scene specification for a mobile WebView.
 Return JSON only. Do not output HTML. Do not output Markdown.
 
 Question:
 {cleaned_question}
+
+Image-derived scene brief:
+{scene_brief_text}
 
 Knowledge points:
 {points}
@@ -1398,12 +1418,14 @@ Return a JSON object with this shape:
 
 Requirements:
 1. Keep it short and specific to the question.
-2. Prefer `charged_particle` for 粒子偏转、洛伦兹力、圆周轨迹.
-3. Prefer `electromagnetic_induction` for 导体棒、线圈、磁通量、感应电流.
-4. `focus_points` should contain 2 to 4 short items.
-5. Use `field_marker=cross` for magnetic field into the page, `dot` for out of the page.
-6. Use `trajectory` and `force_direction` only when they are clear from the question or the solution.
-7. All values should be plain strings or string arrays.
+2. Treat the image-derived scene brief as high-priority evidence for field direction, field region, particle or rod position, motion direction, and force direction.
+3. If the question text and scene brief conflict, prefer the scene brief for spatial layout and directions.
+4. Prefer `charged_particle` for 粒子偏转、洛伦兹力、圆周轨迹.
+5. Prefer `electromagnetic_induction` for 导体棒、线圈、磁通量、感应电流.
+6. `focus_points` should contain 2 to 4 short items.
+7. Use `field_marker=cross` for magnetic field into the page, `dot` for out of the page.
+8. Use `trajectory` and `force_direction` only when they are clear from the question, scene brief, or solution.
+9. All values should be plain strings or string arrays.
 """.strip()
 
     def _render_electromagnetism_scene_html(
