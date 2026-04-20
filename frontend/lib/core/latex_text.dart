@@ -34,8 +34,8 @@ class AppLatexText extends StatelessWidget {
           equationStyle: style.copyWith(
             fontSize: style.fontSize == null ? null : style.fontSize! + 1,
           ),
-          onErrorFallback: (failedFormula) => Text(
-            failedFormula,
+          onErrorFallback: (_) => Text(
+            normalized,
             textAlign: textAlign,
             style: style,
           ),

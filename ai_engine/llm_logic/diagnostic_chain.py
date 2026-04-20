@@ -4,6 +4,7 @@ import html
 import json
 import logging
 import re
+import string
 import time
 from typing import Any, Dict, List
 
@@ -626,7 +627,11 @@ If the image does not clearly show scene structure, return an empty string for `
 
             if char == "\\":
                 next_char = text[index + 1] if index + 1 < length else ""
-                if next_char in valid_escapes:
+                if (
+                    next_char in valid_escapes
+                    and not self._is_latex_command_escape(text, index)
+                    and not self._is_broken_unicode_escape(text, index)
+                ):
                     result.append(char)
                     escape_active = True
                 else:
@@ -640,6 +645,135 @@ If the image does not clearly show scene structure, return an empty string for `
             index += 1
 
         return "".join(result)
+
+    def _is_latex_command_escape(self, text: str, slash_index: int) -> bool:
+        command_start = slash_index + 1
+        if command_start >= len(text) or not text[command_start].isalpha():
+            return False
+
+        command_end = command_start
+        while command_end < len(text) and text[command_end].isalpha():
+            command_end += 1
+
+        command = text[command_start:command_end]
+        common_latex_commands = {
+            "alpha",
+            "approx",
+            "bar",
+            "because",
+            "begin",
+            "beta",
+            "boxed",
+            "cdot",
+            "circ",
+            "cos",
+            "cot",
+            "csc",
+            "Delta",
+            "delta",
+            "displaystyle",
+            "div",
+            "dot",
+            "dfrac",
+            "end",
+            "epsilon",
+            "eta",
+            "exists",
+            "exp",
+            "forall",
+            "frac",
+            "gamma",
+            "Gamma",
+            "ge",
+            "geq",
+            "hat",
+            "iint",
+            "in",
+            "infty",
+            "int",
+            "iota",
+            "kappa",
+            "lambda",
+            "Lambda",
+            "ldots",
+            "left",
+            "le",
+            "leq",
+            "lim",
+            "ln",
+            "log",
+            "max",
+            "min",
+            "mu",
+            "nabla",
+            "neq",
+            "notin",
+            "omega",
+            "Omega",
+            "oint",
+            "operatorname",
+            "overbrace",
+            "overleftarrow",
+            "overline",
+            "overrightarrow",
+            "partial",
+            "perp",
+            "phi",
+            "Phi",
+            "pi",
+            "Pi",
+            "pm",
+            "prod",
+            "propto",
+            "psi",
+            "Psi",
+            "quad",
+            "qquad",
+            "rho",
+            "rightarrow",
+            "Rightarrow",
+            "right",
+            "sec",
+            "sigma",
+            "Sigma",
+            "sim",
+            "sin",
+            "sqrt",
+            "subset",
+            "subseteq",
+            "sum",
+            "tan",
+            "tau",
+            "text",
+            "textbf",
+            "textit",
+            "theta",
+            "Theta",
+            "times",
+            "to",
+            "triangle",
+            "underline",
+            "underbrace",
+            "varDelta",
+            "varepsilon",
+            "varphi",
+            "varpi",
+            "varrho",
+            "varsigma",
+            "vartheta",
+            "vec",
+            "widehat",
+        }
+        return command in common_latex_commands
+
+    def _is_broken_unicode_escape(self, text: str, slash_index: int) -> bool:
+        if slash_index + 1 >= len(text) or text[slash_index + 1] != "u":
+            return False
+
+        unicode_digits = text[slash_index + 2:slash_index + 6]
+        if len(unicode_digits) != 4:
+            return True
+        return any(char not in string.hexdigits for char in unicode_digits)
 
     def _subject_extension_detail(self, subject_name: str) -> str:
         if subject_name == "物理":
