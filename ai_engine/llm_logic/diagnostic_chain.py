@@ -809,7 +809,7 @@ If the image does not clearly show scene structure, return an empty string for `
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
-        prompt = self._build_physics_html_prompt(
+        prompt = self._build_physics_html_prompt_relaxed(
             cleaned_question=cleaned_question,
             scene_brief=scene_brief,
             knowledge_points=knowledge_points,
@@ -3300,12 +3300,12 @@ Requirements:
         ]
         focus_text = " / ".join(point for point in focus_points if point) or "对象、方向、关键物理量变化"
 
-        animation_goal = self._display_plain_text(solution_summary, limit=64)
+        animation_goal = self._display_plain_text(solution_summary, limit=140)
         if not animation_goal:
             animation_goal = scene_goals.get(scene_hint, scene_goals["mechanics"])
 
-        question_excerpt = self._display_plain_text(cleaned_question, limit=72)
-        scene_brief_text = self._display_plain_text(scene_brief, limit=72)
+        question_excerpt = self._display_plain_text(cleaned_question, limit=220)
+        scene_brief_text = self._display_plain_text(scene_brief, limit=260)
         if scene_brief_text:
             animation_goal = f"{scene_brief_text} {animation_goal}".strip()
         scene_label = scene_labels.get(scene_hint, "物理过程")
@@ -3328,6 +3328,91 @@ Requirements:
 6. 优先用简洁的 SVG、Canvas 或少量 DOM 实现，CSS 和 JS 都尽量短。
 7. 控制整体体量，尽量不超过 250 行，不超过约 6000 个英文字符；宁可简洁，也要保证完整闭合并可运行。
 8. 如果内容过多，优先保留动画本体、对象标签和关键控件，删掉解释文字。
+""".strip()
+
+    def _build_physics_html_prompt_relaxed(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> str:
+        combined_text = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points[:4]),
+                solution_summary,
+                " ".join(solution_steps[:3]),
+            ]
+            if part and part.strip()
+        )
+        scene_hint = _physics_scene_type(combined_text)
+        if scene_hint == "unknown":
+            scene_hint = "mechanics"
+
+        scene_labels = {
+            "board_block": "木板与物块",
+            "incline": "斜面运动",
+            "projectile": "抛体运动",
+            "collision": "碰撞过程",
+            "optics": "光学成像",
+            "circuit": "电路过程",
+            "electromagnetism": "电磁过程",
+            "mechanics": "力学过程",
+        }
+        focus_points = [
+            self._display_plain_text(point, limit=28)
+            for point in knowledge_points[:4]
+            if str(point).strip()
+        ]
+        focus_text = " / ".join(point for point in focus_points if point) or "对象、方向、关键物理量变化"
+        question_excerpt = self._display_plain_text(cleaned_question, limit=320)
+        scene_brief_text = self._display_plain_text(scene_brief, limit=420)
+        summary_text = self._display_plain_text(solution_summary, limit=220)
+        steps_text = "\n".join(
+            f"- {self._display_plain_text(step, limit=80)}"
+            for step in solution_steps[:3]
+            if self._display_plain_text(step, limit=80)
+        ) or "- No reliable step summary was extracted."
+
+        return f"""
+You are designing a single-file interactive physics animation page for a mobile WebView.
+Return only complete HTML. Do not return JSON, Markdown, explanations, comments, or code fences.
+
+Question excerpt:
+{question_excerpt}
+
+Scene type:
+{scene_labels.get(scene_hint, "物理过程")}
+
+Image-derived scene brief:
+{scene_brief_text or "No reliable image-derived scene brief was extracted."}
+
+Knowledge focus:
+{focus_text}
+
+Solution summary:
+{summary_text or "No concise solution summary was extracted."}
+
+Key steps:
+{steps_text}
+
+Requirements:
+1. Output must start with `<!DOCTYPE html>` and end with `</html>`, and the `<body>` must contain `data-scene="{scene_hint}"`.
+2. Build a complete single-file page with inline CSS and JavaScript only. Do not rely on external CDNs, images, fonts, or scripts.
+3. Reconstruct the specific scene in this exact problem, not a generic physics demo shell.
+4. If the prompt mentions axes, quadrants, boundaries, marked points, field regions, paths, angles, labels, arrows, plates, rails, lenses, circuit branches, or other spatial structure, show those elements directly in the page.
+5. Do not default to a generic black-background canvas demo with one bottom toolbar unless that layout is truly necessary for this exact problem.
+6. The page may be moderately rich and detailed if that helps faithfully present the setup. Do not over-compress the design just to make it minimal.
+7. You may use SVG, Canvas, or DOM/CSS/JS, whichever best represents the scene faithfully. Prefer scene fidelity and clarity over extreme brevity.
+8. Include appropriate labels, arrows, axes, point names, field markers, region blocks, or small status cards when useful, but keep the focus on the animation rather than turning it into a long text explanation page.
+9. Do not restate the full problem or full derivation. Do not output raw LaTeX source. Concise physics labels are allowed.
+10. Make the result feel purpose-built for this exact problem rather than interchangeable with other physics animations.
+11. If the scene is structurally complex, spend enough layout/detail budget to render the actual setup clearly instead of collapsing everything into a generic template.
 """.strip()
 
     def _extract_html_document(self, raw_output: str) -> str:
