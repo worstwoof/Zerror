@@ -40,10 +40,7 @@ class VivoLMClient:
         resolved_thinking_mode = thinking_mode or self.settings.vivo_text_thinking_mode
         resolved_reasoning_effort = reasoning_effort or self.settings.vivo_text_reasoning_effort
         resolved_max_tokens = max_tokens or self.settings.vivo_max_tokens
-        resolved_timeout_seconds = timeout_seconds or min(
-            self.settings.vivo_timeout_seconds,
-            self.settings.vivo_vision_timeout_seconds,
-        )
+        resolved_timeout_seconds = timeout_seconds or self.settings.vivo_timeout_seconds
         payload = {
             "model": resolved_model_name,
             "messages": messages or [{"role": "user", "content": prompt}],
