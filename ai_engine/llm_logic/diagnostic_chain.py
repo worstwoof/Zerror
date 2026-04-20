@@ -963,25 +963,25 @@ If the image does not clearly show scene structure, return an empty string for `
         steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼连接方式、电流路径和表计变化。"
         scene_brief_text = self._display_plain_text(scene_brief, limit=180) or "未提供可靠图示摘要"
         return f"""
-You are generating a compact circuit scene specification for a mobile WebView.
-Return JSON only. Do not output HTML. Do not output Markdown.
+你正在为移动端 WebView 生成一份精简的电路场景规格。
+只返回 JSON，不要输出 HTML，也不要输出 Markdown。
 
-Question:
+题目：
 {cleaned_question}
 
-Image-derived scene brief:
+图像场景摘要：
 {scene_brief_text}
 
-Knowledge points:
+知识点：
 {points}
 
-Solution summary:
+解题摘要：
 {solution_summary}
 
-Key steps:
+关键步骤：
 {steps}
 
-Return a JSON object with this shape:
+按下面的结构返回一个 JSON 对象：
 {{
   "title": "short Chinese title",
   "layout": "series|parallel|mixed",
@@ -992,14 +992,14 @@ Return a JSON object with this shape:
   "current_direction": "clockwise|counterclockwise"
 }}
 
-Requirements:
-1. Keep it short and specific to the question.
-2. Treat the image-derived scene brief as high-priority evidence for wiring layout, branch structure, meter position, switch state, and current path.
-3. If the question text and scene brief conflict, prefer the scene brief for spatial layout and connection structure.
-4. `components` should contain at most 6 items.
-5. `focus_points` should contain 2 to 4 short items.
-6. Prefer `parallel` when the question or scene brief clearly mentions parallel branches, otherwise use `series` or `mixed`.
-7. All values should be plain strings or string arrays.
+要求：
+1. 内容要简短，并且紧扣这道题。
+2. 把图像场景摘要视为高优先级证据，用来判断接线布局、支路结构、表计位置、开关状态和电流路径。
+3. 如果题干与图像场景摘要冲突，优先采用图像场景摘要中的空间布局和连接结构。
+4. `components` 最多包含 6 项。
+5. `focus_points` 需要包含 2 到 4 个简短要点。
+6. 如果题目或图像摘要明确提到并联支路，优先使用 `parallel`，否则用 `series` 或 `mixed`。
+7. 所有值都应为普通字符串或字符串数组。
 """.strip()
 
     def _render_circuit_scene_html(
@@ -1540,25 +1540,25 @@ Requirements:
         steps = "\n".join(f"- {step}" for step in solution_steps[:3]) or "- 提炼场的方向、受力方向和关键现象。"
         scene_brief_text = self._display_plain_text(scene_brief, limit=180) or "未提供可靠图示摘要"
         return f"""
-You are generating a compact electromagnetism scene specification for a mobile WebView.
-Return JSON only. Do not output HTML. Do not output Markdown.
+你正在为移动端 WebView 生成一份精简的电磁场景规格。
+只返回 JSON，不要输出 HTML，也不要输出 Markdown。
 
-Question:
+题目：
 {cleaned_question}
 
-Image-derived scene brief:
+图像场景摘要：
 {scene_brief_text}
 
-Knowledge points:
+知识点：
 {points}
 
-Solution summary:
+解题摘要：
 {solution_summary}
 
-Key steps:
+关键步骤：
 {steps}
 
-Return a JSON object with this shape:
+按下面的结构返回一个 JSON 对象：
 {{
   "title": "short Chinese title",
   "subtype": "charged_particle|electromagnetic_induction",
@@ -3377,42 +3377,42 @@ Requirements:
             f"- {self._display_plain_text(step, limit=80)}"
             for step in solution_steps[:3]
             if self._display_plain_text(step, limit=80)
-        ) or "- No reliable step summary was extracted."
+        ) or "- 暂未提取到可靠的分步摘要。"
 
         return f"""
-You are designing a single-file interactive physics animation page for a mobile WebView.
-Return only complete HTML. Do not return JSON, Markdown, explanations, comments, or code fences.
+你是一名擅长把物理题图和题目情景转化为移动端交互动画的前端工程师。
+只输出完整 HTML，不要输出 JSON、Markdown、解释、注释或代码围栏。
 
-Question excerpt:
+题目摘录：
 {question_excerpt}
 
-Scene type:
+场景类型：
 {scene_labels.get(scene_hint, "物理过程")}
 
-Image-derived scene brief:
-{scene_brief_text or "No reliable image-derived scene brief was extracted."}
+图像场景摘要：
+{scene_brief_text or "未提取到可靠的图像场景摘要。"}
 
-Knowledge focus:
+知识聚焦：
 {focus_text}
 
-Solution summary:
-{summary_text or "No concise solution summary was extracted."}
+解题摘要：
+{summary_text or "暂未提取到简明解题摘要。"}
 
-Key steps:
+关键步骤：
 {steps_text}
 
-Requirements:
-1. Output must start with `<!DOCTYPE html>` and end with `</html>`, and the `<body>` must contain `data-scene="{scene_hint}"`.
-2. Build a complete single-file page with inline CSS and JavaScript only. Do not rely on external CDNs, images, fonts, or scripts.
-3. Reconstruct the specific scene in this exact problem, not a generic physics demo shell.
-4. If the prompt mentions axes, quadrants, boundaries, marked points, field regions, paths, angles, labels, arrows, plates, rails, lenses, circuit branches, or other spatial structure, show those elements directly in the page.
-5. Do not default to a generic black-background canvas demo with one bottom toolbar unless that layout is truly necessary for this exact problem.
-6. The page may be moderately rich and detailed if that helps faithfully present the setup. Do not over-compress the design just to make it minimal.
-7. You may use SVG, Canvas, or DOM/CSS/JS, whichever best represents the scene faithfully. Prefer scene fidelity and clarity over extreme brevity.
-8. Include appropriate labels, arrows, axes, point names, field markers, region blocks, or small status cards when useful, but keep the focus on the animation rather than turning it into a long text explanation page.
-9. Do not restate the full problem or full derivation. Do not output raw LaTeX source. Concise physics labels are allowed.
-10. Make the result feel purpose-built for this exact problem rather than interchangeable with other physics animations.
-11. If the scene is structurally complex, spend enough layout/detail budget to render the actual setup clearly instead of collapsing everything into a generic template.
+生成要求：
+1. 输出必须从 `<!DOCTYPE html>` 开始，到 `</html>` 结束，并且 `<body>` 必须包含 `data-scene="{scene_hint}"`。
+2. 生成完整的单文件页面，只使用内联 CSS 和 JavaScript，不依赖外部 CDN、图片、字体或脚本。
+3. 优先还原这道题的具体情景，不要生成通用物理演示壳。
+4. 如果题目或图像摘要中出现坐标轴、象限、边界、标记点、场区、轨迹、角度、标签、箭头、极板、导轨、透镜、电路支路等空间结构，必须尽量直接画在页面里。
+5. 不要默认生成“黑色背景 + 中央 canvas + 底部滑块栏”的通用布局，除非这种布局确实最适合当前题目。
+6. 页面可以适当丰富和完整，只要有助于准确呈现题目情景；不要为了极简而牺牲场景还原度。
+7. 可以使用 SVG、Canvas，或 DOM/CSS/JS 的组合，选择最能准确表达该题场景的实现方式。优先保证场景还原和视觉清晰，而不是极端简短。
+8. 必要时加入标签、箭头、坐标轴、点名、场方向标记、区域块、状态卡片或少量控件，但重点仍然是动画和图形本身，不要变成长篇文字解析页。
+9. 不要复述完整题干或完整推导过程，不要输出未渲染的 LaTeX 源码；可以显示简洁的物理量、点名、轴名和参数符号。
+10. 让页面看起来像是专门为这道题设计的，而不是可以套到任何物理动画上的通用模板。
+11. 如果场景结构复杂，可以多花一些布局和细节把真实情景画清楚，不要把复杂题压缩成泛化模板。
 """.strip()
 
     def _extract_html_document(self, raw_output: str) -> str:
