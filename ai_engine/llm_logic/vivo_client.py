@@ -23,26 +23,44 @@ class VivoLMClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def chat_completion(self, prompt: str, messages: List[Dict[str, Any]] | None = None) -> str:
+    def chat_completion(
+        self,
+        prompt: str,
+        messages: List[Dict[str, Any]] | None = None,
+        *,
+        model_name: str | None = None,
+        thinking_mode: str | None = None,
+        reasoning_effort: str | None = None,
+        max_tokens: int | None = None,
+        timeout_seconds: int | None = None,
+    ) -> str:
         request_id = str(uuid.uuid4())
         started_at = time.perf_counter()
+        resolved_model_name = model_name or self.settings.vivo_text_model
+        resolved_thinking_mode = thinking_mode or self.settings.vivo_text_thinking_mode
+        resolved_reasoning_effort = reasoning_effort or self.settings.vivo_text_reasoning_effort
+        resolved_max_tokens = max_tokens or self.settings.vivo_max_tokens
+        resolved_timeout_seconds = timeout_seconds or min(
+            self.settings.vivo_timeout_seconds,
+            self.settings.vivo_vision_timeout_seconds,
+        )
         payload = {
-            "model": self.settings.vivo_text_model,
+            "model": resolved_model_name,
             "messages": messages or [{"role": "user", "content": prompt}],
             "temperature": 0.3,
-            "max_tokens": self.settings.vivo_max_tokens,
+            "max_tokens": resolved_max_tokens,
             "stream": False,
         }
         payload.update(
             self._build_thinking_payload(
-                model_name=self.settings.vivo_text_model,
-                thinking_mode=self.settings.vivo_text_thinking_mode,
+                model_name=resolved_model_name,
+                thinking_mode=resolved_thinking_mode,
             )
         )
         payload.update(
             self._build_reasoning_payload(
-                model_name=self.settings.vivo_text_model,
-                reasoning_effort=self.settings.vivo_text_reasoning_effort,
+                model_name=resolved_model_name,
+                reasoning_effort=resolved_reasoning_effort,
             )
         )
         try:
@@ -51,13 +69,13 @@ class VivoLMClient:
                 headers=self._json_headers(),
                 params={"request_id": request_id},
                 json=payload,
-                timeout=min(self.settings.vivo_timeout_seconds, self.settings.vivo_vision_timeout_seconds),
+                timeout=resolved_timeout_seconds,
             )
         except requests.RequestException as exc:
             logger.warning(
                 "vivo chat failed request_id=%s model=%s elapsed=%.2fs error=%s",
                 request_id,
-                self.settings.vivo_text_model,
+                resolved_model_name,
                 time.perf_counter() - started_at,
                 exc,
             )
@@ -65,11 +83,21 @@ class VivoLMClient:
         logger.info(
             "vivo chat finished request_id=%s model=%s status=%s elapsed=%.2fs",
             request_id,
-            self.settings.vivo_text_model,
+            resolved_model_name,
             response.status_code,
             time.perf_counter() - started_at,
         )
         return self._extract_chat_content(response, request_id)
+
+    def animation_chat_completion(self, prompt: str) -> str:
+        return self.chat_completion(
+            prompt,
+            model_name=self.settings.vivo_animation_model,
+            thinking_mode=self.settings.vivo_animation_thinking_mode,
+            reasoning_effort=self.settings.vivo_animation_reasoning_effort,
+            max_tokens=self.settings.vivo_animation_max_tokens,
+            timeout_seconds=self.settings.vivo_animation_timeout_seconds,
+        )
 
     def vision_completion(self, prompt: str, image_bytes: bytes, mime_type: str = "image/png") -> str:
         request_id = str(uuid.uuid4())

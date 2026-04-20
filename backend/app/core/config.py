@@ -58,9 +58,14 @@ class Settings:
     vivo_vision_thinking_mode: str
     vivo_text_reasoning_effort: str
     vivo_vision_reasoning_effort: str
+    vivo_animation_model: str
+    vivo_animation_thinking_mode: str
+    vivo_animation_reasoning_effort: str
     vivo_timeout_seconds: int
     vivo_vision_timeout_seconds: int
+    vivo_animation_timeout_seconds: int
     vivo_max_tokens: int
+    vivo_animation_max_tokens: int
     debug: bool
 
     @property
@@ -105,9 +110,38 @@ def get_settings() -> Settings:
         vivo_vision_thinking_mode=_get_setting("VIVO_VISION_THINKING_MODE", file_values, "auto"),
         vivo_text_reasoning_effort=_get_setting("VIVO_TEXT_REASONING_EFFORT", file_values, "auto"),
         vivo_vision_reasoning_effort=_get_setting("VIVO_VISION_REASONING_EFFORT", file_values, "auto"),
+        vivo_animation_model=_get_setting(
+            "VIVO_ANIMATION_MODEL",
+            file_values,
+            _get_setting("VIVO_TEXT_MODEL", file_values, "Doubao-Seed-2.0-mini"),
+        ),
+        vivo_animation_thinking_mode=_get_setting(
+            "VIVO_ANIMATION_THINKING_MODE",
+            file_values,
+            _get_setting("VIVO_TEXT_THINKING_MODE", file_values, "auto"),
+        ),
+        vivo_animation_reasoning_effort=_get_setting(
+            "VIVO_ANIMATION_REASONING_EFFORT",
+            file_values,
+            _get_setting("VIVO_TEXT_REASONING_EFFORT", file_values, "auto"),
+        ),
         vivo_timeout_seconds=int(_get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120")),
         vivo_vision_timeout_seconds=int(_get_setting("VIVO_VISION_TIMEOUT_SECONDS", file_values, "90")),
+        vivo_animation_timeout_seconds=int(
+            _get_setting(
+                "VIVO_ANIMATION_TIMEOUT_SECONDS",
+                file_values,
+                _get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120"),
+            )
+        ),
         vivo_max_tokens=int(_get_setting("VIVO_MAX_TOKENS", file_values, "4096")),
+        vivo_animation_max_tokens=int(
+            _get_setting(
+                "VIVO_ANIMATION_MAX_TOKENS",
+                file_values,
+                _get_setting("VIVO_MAX_TOKENS", file_values, "4096"),
+            )
+        ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )
 

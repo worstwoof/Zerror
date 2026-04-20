@@ -685,7 +685,7 @@ If the image does not clearly show scene structure, return an empty string for `
         )
         started_at = time.perf_counter()
         try:
-            raw_html = self.client.chat_completion(prompt)
+            raw_html = self.client.animation_chat_completion(prompt)
         except Exception as exc:
             logger.warning(
                 "physics html generation failed elapsed=%.2fs error=%s",
@@ -776,7 +776,7 @@ If the image does not clearly show scene structure, return an empty string for `
         )
         started_at = time.perf_counter()
         try:
-            raw_spec = self.client.chat_completion(prompt)
+            raw_spec = self.client.animation_chat_completion(prompt)
         except Exception as exc:
             logger.warning(
                 "circuit scene spec generation failed elapsed=%.2fs error=%s",
@@ -1314,7 +1314,7 @@ Requirements:
         )
         started_at = time.perf_counter()
         try:
-            raw_spec = self.client.chat_completion(prompt)
+            raw_spec = self.client.animation_chat_completion(prompt)
         except Exception as exc:
             logger.warning(
                 "electromagnetism scene spec generation failed elapsed=%.2fs error=%s",
