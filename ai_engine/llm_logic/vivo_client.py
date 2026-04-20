@@ -39,6 +39,12 @@ class VivoLMClient:
                 thinking_mode=self.settings.vivo_text_thinking_mode,
             )
         )
+        payload.update(
+            self._build_reasoning_payload(
+                model_name=self.settings.vivo_text_model,
+                reasoning_effort=self.settings.vivo_text_reasoning_effort,
+            )
+        )
         try:
             response = requests.post(
                 f"{self.settings.vivo_base_url}/chat/completions",
@@ -104,6 +110,12 @@ class VivoLMClient:
             self._build_thinking_payload(
                 model_name=self.settings.vivo_vision_model,
                 thinking_mode=self.settings.vivo_vision_thinking_mode,
+            )
+        )
+        payload.update(
+            self._build_reasoning_payload(
+                model_name=self.settings.vivo_vision_model,
+                reasoning_effort=self.settings.vivo_vision_reasoning_effort,
             )
         )
         try:
@@ -209,6 +221,27 @@ class VivoLMClient:
         )
         return {}
 
+    def _build_reasoning_payload(self, *, model_name: str, reasoning_effort: str) -> Dict[str, Any]:
+        normalized_effort = self._normalize_reasoning_effort(reasoning_effort)
+        if normalized_effort == "auto":
+            return {}
+
+        lowered_model = (model_name or "").lower()
+        if not any(token in lowered_model for token in ["qwen", "deepseek", "doubao", "volc"]):
+            logger.info(
+                "vivo reasoning config skipped model=%s unsupported_effort_mapping=%s",
+                model_name,
+                normalized_effort,
+            )
+            return {}
+
+        logger.info(
+            "vivo reasoning config model=%s field=reasoning_effort value=%s",
+            model_name,
+            normalized_effort,
+        )
+        return {"reasoning_effort": normalized_effort}
+
     def _normalize_thinking_mode(self, thinking_mode: str) -> str:
         normalized = (thinking_mode or "auto").strip().lower()
         aliases = {
@@ -221,6 +254,21 @@ class VivoLMClient:
             "disable": "disabled",
             "false": "disabled",
             "off": "disabled",
+        }
+        return aliases.get(normalized, "auto")
+
+    def _normalize_reasoning_effort(self, reasoning_effort: str) -> str:
+        normalized = (reasoning_effort or "auto").strip().lower()
+        aliases = {
+            "": "auto",
+            "auto": "auto",
+            "default": "auto",
+            "minimal": "minimal",
+            "none": "minimal",
+            "off": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
         }
         return aliases.get(normalized, "auto")
 

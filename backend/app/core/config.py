@@ -56,6 +56,8 @@ class Settings:
     vivo_vision_model: str
     vivo_text_thinking_mode: str
     vivo_vision_thinking_mode: str
+    vivo_text_reasoning_effort: str
+    vivo_vision_reasoning_effort: str
     vivo_timeout_seconds: int
     vivo_vision_timeout_seconds: int
     vivo_max_tokens: int
@@ -101,6 +103,8 @@ def get_settings() -> Settings:
         vivo_vision_model=_get_setting("VIVO_VISION_MODEL", file_values, "qwen3.5-plus"),
         vivo_text_thinking_mode=_get_setting("VIVO_TEXT_THINKING_MODE", file_values, "auto"),
         vivo_vision_thinking_mode=_get_setting("VIVO_VISION_THINKING_MODE", file_values, "auto"),
+        vivo_text_reasoning_effort=_get_setting("VIVO_TEXT_REASONING_EFFORT", file_values, "auto"),
+        vivo_vision_reasoning_effort=_get_setting("VIVO_VISION_REASONING_EFFORT", file_values, "auto"),
         vivo_timeout_seconds=int(_get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120")),
         vivo_vision_timeout_seconds=int(_get_setting("VIVO_VISION_TIMEOUT_SECONDS", file_values, "90")),
         vivo_max_tokens=int(_get_setting("VIVO_MAX_TOKENS", file_values, "4096")),

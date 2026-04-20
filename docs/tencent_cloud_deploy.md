@@ -132,9 +132,22 @@ VIVO_API_BASE_URL=https://api-ai.vivo.com.cn/v1
 VIVO_OCR_URL=https://api-ai.vivo.com.cn/ocr/general_recognition
 VIVO_TEXT_MODEL=Doubao-Seed-2.0-mini
 VIVO_VISION_MODEL=qwen3.5-plus
+VIVO_TEXT_THINKING_MODE=auto
+VIVO_VISION_THINKING_MODE=auto
+VIVO_TEXT_REASONING_EFFORT=auto
+VIVO_VISION_REASONING_EFFORT=auto
 VIVO_TIMEOUT_SECONDS=120
+VIVO_VISION_TIMEOUT_SECONDS=90
 VIVO_MAX_TOKENS=4096
 ```
+
+说明：
+
+- `VIVO_TEXT_REASONING_EFFORT` 和 `VIVO_VISION_REASONING_EFFORT` 可选值为 `auto`、`minimal`、`low`、`medium`、`high`
+- `auto` 表示不主动下发该字段，让上游模型走默认行为
+- 如果你更重视速度，通常可以优先尝试：
+  - 文本模型：`low`
+  - 视觉模型：`minimal`
 
 ## 7. 启动后端
 
