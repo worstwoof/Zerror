@@ -2819,135 +2819,40 @@ Requirements:
         }
 
         focus_points = [
-            self._display_plain_text(point, limit=18)
-            for point in knowledge_points[:3]
+            self._display_plain_text(point, limit=14)
+            for point in knowledge_points[:2]
             if str(point).strip()
         ]
-        focus_text = " / ".join(point for point in focus_points if point) or "受力、运动和关键物理量变化"
+        focus_text = " / ".join(point for point in focus_points if point) or "对象、方向、关键物理量变化"
 
-        animation_goal = self._display_plain_text(solution_summary, limit=88)
+        animation_goal = self._display_plain_text(solution_summary, limit=64)
         if not animation_goal:
             animation_goal = scene_goals.get(scene_hint, scene_goals["mechanics"])
 
-        question_excerpt = self._display_plain_text(cleaned_question, limit=120)
-        scene_brief_text = self._display_plain_text(scene_brief, limit=120)
+        question_excerpt = self._display_plain_text(cleaned_question, limit=72)
+        scene_brief_text = self._display_plain_text(scene_brief, limit=72)
         if scene_brief_text:
             animation_goal = f"{scene_brief_text} {animation_goal}".strip()
         scene_label = scene_labels.get(scene_hint, "物理过程")
         return f"""
-你是一个擅长把物理题情景做成移动端交互动画的前端工程师。
+你是一个擅长把物理题情景压缩成移动端交互动画的前端工程师。
+只输出完整 HTML，不要输出 JSON、Markdown、解释、注释或代码围栏。
 
-请直接输出一个完整、可运行的 HTML 文档，且只能输出 HTML 本身，不要输出 JSON、Markdown、解释或代码围栏。
-
-题目文本：
-{cleaned_question}
-
+题目摘录：{question_excerpt}
 场景类型：{scene_label}
 场景提示：{scene_direction.get(scene_hint, scene_direction["mechanics"])}
 知识聚焦：{focus_text}
 动画目标：{animation_goal}
-题目摘录：{question_excerpt}
 
 生成要求：
-1. 输出必须是完整 HTML，包含 `<!DOCTYPE html>`、`<html>`、`<head>`、`<body>`。
-2. 在 `<body>` 标签上设置 `data-scene="{scene_hint}"`。
-3. 页面是手机竖屏优先，主体是一个大的动画区域，文字尽量少，不要长篇题干解析。
-4. 动画要贴合这道题的具体情景，优先展示对象、运动、场、方向、连接关系，不要套通用木板/方块模板。
-5. 可以使用原生 HTML、CSS、SVG、Canvas、JavaScript；不要依赖任何外部 CDN、库或网络资源。
-6. 最多只保留 1 到 2 个必要控件。{control_hint.get(scene_hint, control_hint["mechanics"])}
-7. 视觉上要清晰、有层次，适合 WebView 直接展示；标签尽量短，用中文。
-8. 如果题目包含公式或符号，请直接在页面中用正常排版展示，不要把大段 LaTeX 源码塞进正文。
-9. 不需要复述完整题目，不需要展示解题步骤，不需要生成答题卡式说明区。
-10. 重点是“把题目的物理过程演示出来”，而不是做一个通用教学模板。
-""".strip()
-        lowered = " ".join(
-            part.strip()
-            for part in [
-                cleaned_question,
-                " ".join(knowledge_points),
-                solution_summary,
-                " ".join(solution_steps),
-            ]
-            if part and part.strip()
-        ).lower()
-        if any(token in lowered for token in ["木板", "板块", "物块", "滑块", "摩擦", "传送带", "连接体"]):
-            scene_hint = "board_block"
-            scene_label = "木板-物块相对运动"
-            scene_requirements = (
-                "- 画面里必须出现木板和物块两个对象\n"
-                "- 必须体现相对滑动或共同运动\n"
-                "- 必须体现摩擦力方向和速度/位移变化"
-            )
-        elif any(token in lowered for token in ["斜面", "斜坡", "倾角", "沿斜面"]):
-            scene_hint = "incline"
-            scene_label = "斜面运动"
-            scene_requirements = (
-                "- 画面里必须出现斜面和物体\n"
-                "- 必须体现重力、支持力、摩擦力或沿斜面运动趋势\n"
-                "- 参数控制优先选择角度、摩擦系数、质量"
-            )
-        elif any(token in lowered for token in ["平抛", "斜抛", "抛体", "抛出", "射程", "落点"]):
-            scene_hint = "projectile"
-            scene_label = "抛体运动"
-            scene_requirements = (
-                "- 画面里必须出现轨迹、落点或飞行过程\n"
-                "- 参数控制优先选择初速度、角度、发射高度\n"
-                "- 不要退化成静态受力图"
-            )
-        elif any(token in lowered for token in ["碰撞", "相碰", "弹性碰撞", "非弹性碰撞", "对心碰撞"]):
-            scene_hint = "collision"
-            scene_label = "碰撞过程"
-            scene_requirements = (
-                "- 画面里必须出现两个对象碰撞前后状态\n"
-                "- 必须体现碰撞瞬间和碰后速度变化\n"
-                "- 参数控制优先选择质量、初速度、恢复系数"
-            )
-        elif any(token in lowered for token in ["光路", "透镜", "折射", "反射", "焦距", "成像"]):
-            scene_hint = "optics"
-            scene_label = "光学成像/光路"
-            scene_requirements = "- 必须出现真实光路、透镜或反射/折射过程"
-        elif any(token in lowered for token in ["电路", "电流", "电压", "电阻", "串联", "并联"]):
-            scene_hint = "circuit"
-            scene_label = "电路过程"
-            scene_requirements = "- 必须出现真实电路结构、电流状态或开关变化"
-        else:
-            scene_hint = "mechanics"
-            scene_label = "一般力学过程"
-            scene_requirements = "- 画面要围绕题目里的对象和过程，不要做成无关模板"
-
-        focus_points = "；".join(knowledge_points[:4]) or "受力分析、运动过程、关键参数变化"
-        step_text = "\n".join(f"- {step}" for step in solution_steps[:4]) or "- 根据题目情景设计合适的动态演示"
-        return f"""
-你是一个移动端物理可视化页面生成器。请只输出一个完整可运行的单文件 HTML 页面，不要输出 JSON，不要输出 Markdown 代码块，不要加任何解释文字。
-
-目标：
-为下面这道具体物理题生成一个适合手机 WebView 直接加载的动画演示页面。页面的重点是“还原题目情景并展示过程”，不是复述题干。
-
-题目信息：
-- 题目：{cleaned_question}
-- 当前识别场景：{scene_label}
-- body 标签必须包含：data-scene="{scene_hint}"
-- 核心知识点：{focus_points}
-- 解析摘要：{solution_summary}
-- 关键步骤：
-{step_text}
-
-硬性要求：
-1. 只输出 HTML 源码，从 <!DOCTYPE html> 开始，到 </html> 结束。
-2. 必须是单文件 HTML，所有 CSS 和 JavaScript 内联，不依赖外部 CDN、外部图片、外部字体、外部脚本。
-3. 页面适配手机竖屏，默认宽度友好，动画区域清晰。
-4. 不要在页面里重复大段题干，不要塞满文字说明；只保留简短标题、少量关键参数、必要按钮和标签。
-5. 页面中的文本必须是普通可读文本或 Unicode 字符，不要出现 $...$、\\frac、\\sqrt 这类 LaTeX 源码。
-6. 动画必须贴合题目情景。如果是木板-物块、板块运动、摩擦、连接体、斜面、碰撞、平抛等题，必须体现对应对象、相对运动、受力方向或关键状态变化。
-7. 页面建议包含开始/暂停、重置，以及 1 到 3 个与题目相关的参数控制项，例如质量、初速度、摩擦系数、角度、外力等。
-8. 画面以对象和过程为主，不要做成通用光路、电路或无关模板。
-9. 动画与标签要尽量符合题目场景，宁可简洁，也不要错场景。
-10. 请在 `<body>` 标签上显式写出 `data-scene="{scene_hint}"`，方便前端校验场景是否匹配。
-
-当前场景必须满足：
-{scene_requirements}
-
-再次强调：只输出完整 HTML，不要输出任何额外说明。
+1. 输出必须从 `<!DOCTYPE html>` 开始，到 `</html>` 结束，且 `<body>` 必须包含 `data-scene="{scene_hint}"`。
+2. 只做单文件、最小可运行 HTML：内联 CSS 和 JS，不依赖外部 CDN、图片、字体、脚本。
+3. 页面以动画区域为主，文字极少；只保留短标题、1 句短提示、1 到 2 个必要控件。{control_hint.get(scene_hint, control_hint["mechanics"])}
+4. 动画必须贴合这道题的具体对象、方向、运动、场或连接关系，不要套通用木板/方块模板。
+5. 不要复述题干，不要展示解题步骤，不要长段说明，不要 LaTeX 源码，不要多余装饰。
+6. 优先用简洁的 SVG、Canvas 或少量 DOM 实现，CSS 和 JS 都尽量短。
+7. 控制整体体量，尽量不超过 250 行，不超过约 6000 个英文字符；宁可简洁，也要保证完整闭合并可运行。
+8. 如果内容过多，优先保留动画本体、对象标签和关键控件，删掉解释文字。
 """.strip()
 
     def _extract_html_document(self, raw_output: str) -> str:
