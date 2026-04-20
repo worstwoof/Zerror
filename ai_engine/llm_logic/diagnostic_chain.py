@@ -235,6 +235,18 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
+        logger.info("physics animation attempting direct html generation")
+        artifact = self._generate_physics_html_artifact(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        if artifact is not None:
+            logger.info("physics animation used direct html generation")
+            return artifact
+
         if scene_type == "circuit":
             artifact = self._generate_circuit_scene_artifact(
                 cleaned_question=cleaned_question,
@@ -244,7 +256,7 @@ class DiagnosticService:
                 solution_steps=solution_steps,
             )
             if artifact is not None:
-                logger.info("physics animation used circuit scene spec renderer")
+                logger.info("physics animation fell back to circuit scene spec renderer")
                 return artifact
         if scene_type == "electromagnetism":
             artifact = self._generate_electromagnetism_scene_artifact(
@@ -255,24 +267,7 @@ class DiagnosticService:
                 solution_steps=solution_steps,
             )
             if artifact is not None:
-                logger.info("physics animation used electromagnetism scene spec renderer")
-                return artifact
-        if self._should_generate_physics_html(
-            cleaned_question=cleaned_question,
-            scene_brief=scene_brief,
-            knowledge_points=knowledge_points,
-            solution_summary=solution_summary,
-            solution_steps=solution_steps,
-        ):
-            artifact = self._generate_physics_html_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation used full html generation")
+                logger.info("physics animation fell back to electromagnetism scene spec renderer")
                 return artifact
         if scene_type == "circuit":
             artifact = self._build_physics_template_artifact(
@@ -1471,6 +1466,11 @@ Requirements:
                 exc,
             )
             return None
+        logger.info(
+            "electromagnetism raw spec elapsed=%.2fs preview=%s",
+            time.perf_counter() - started_at,
+            self._log_preview(raw_spec, limit=1200),
+        )
 
         try:
             scene_spec = self._parse_json(raw_spec)
@@ -1481,6 +1481,11 @@ Requirements:
                 exc,
             )
             return None
+        logger.info(
+            "electromagnetism parsed spec elapsed=%.2fs content=%s",
+            time.perf_counter() - started_at,
+            self._log_preview(json.dumps(scene_spec, ensure_ascii=False), limit=1200),
+        )
 
         scene_spec = self._enrich_electromagnetism_scene_spec(
             scene_spec=scene_spec,
@@ -1491,7 +1496,7 @@ Requirements:
             solution_steps=solution_steps,
         )
         logger.info(
-            "electromagnetism scene spec subtype=%s field=%s marker=%s trajectory=%s velocity=%s force=%s rod=%s title=%s",
+            "electromagnetism final spec subtype=%s field=%s marker=%s trajectory=%s velocity=%s force=%s rod=%s title=%s",
             scene_spec.get("subtype"),
             scene_spec.get("field_type"),
             scene_spec.get("field_marker"),
