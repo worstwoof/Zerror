@@ -423,11 +423,11 @@ class DiagnosticService:
                     break
 
         return f"""
-Return JSON only.
-You must include `scene_brief`.
-`scene_brief` should describe image-derived scene structure, not a generic explanation.
-Prefer: objects, relative positions, arrows, directions, boundaries, tracks, field regions, plates, rails, optical paths, circuit connections, labels.
-If the image does not clearly show scene structure, return an empty string for `scene_brief`.
+只返回 JSON。
+必须包含 `scene_brief`。
+`scene_brief` 应描述图像中的场景结构，而不是泛泛解释。
+优先描述：对象、相对位置、箭头、方向、边界、轨迹、场区、极板、导轨、光路、电路连接、标签。
+如果图像里无法清楚看出场景结构，就让 `scene_brief` 返回空字符串。
 你是“错题都队”的学科辅导 AI，需要稳定输出适合前端直接消费的 JSON。
 
 请基于以下输入，输出一个 JSON 对象，不要输出 Markdown，不要加代码块围栏。
@@ -496,11 +496,11 @@ If the image does not clearly show scene structure, return an empty string for `
                     break
 
         return f"""
-Return JSON only.
-You must include `scene_brief`.
-`scene_brief` should describe image-derived scene structure, not a generic explanation.
-Prefer: objects, relative positions, arrows, directions, boundaries, tracks, field regions, plates, rails, optical paths, circuit connections, labels.
-If the image does not clearly show scene structure, return an empty string for `scene_brief`.
+只返回 JSON。
+必须包含 `scene_brief`。
+`scene_brief` 应描述图像中的场景结构，而不是泛泛解释。
+优先描述：对象、相对位置、箭头、方向、边界、轨迹、场区、极板、导轨、光路、电路连接、标签。
+如果图像里无法清楚看出场景结构，就让 `scene_brief` 返回空字符串。
 
 你是“错题都队”的多模态学科辅导 AI，需要基于“题目图片 + OCR 草稿”输出稳定的 JSON。
 
@@ -1575,16 +1575,16 @@ If the image does not clearly show scene structure, return an empty string for `
   "direction_hint": "one short sentence"
 }}
 
-Requirements:
-1. Keep it short and specific to the question.
-2. Treat the image-derived scene brief as high-priority evidence for field direction, field region, particle or rod position, motion direction, and force direction.
-3. If the question text and scene brief conflict, prefer the scene brief for spatial layout and directions.
-4. Prefer `charged_particle` for 粒子偏转、洛伦兹力、圆周轨迹.
-5. Prefer `electromagnetic_induction` for 导体棒、线圈、磁通量、感应电流.
-6. `focus_points` should contain 2 to 4 short items.
-7. Use `field_marker=cross` for magnetic field into the page, `dot` for out of the page.
-8. Use `trajectory` and `force_direction` only when they are clear from the question, scene brief, or solution.
-9. All values should be plain strings or string arrays.
+要求：
+1. 内容要简短，并且紧扣这道题。
+2. 把图像场景摘要视为高优先级证据，用来判断场方向、场区范围、粒子或导体棒位置、运动方向和受力方向。
+3. 如果题干与图像场景摘要冲突，优先采用图像场景摘要中的空间布局和方向信息。
+4. 粒子偏转、洛伦兹力、圆周轨迹相关题优先使用 `charged_particle`。
+5. 导体棒、线圈、磁通量、感应电流相关题优先使用 `electromagnetic_induction`。
+6. `focus_points` 需要包含 2 到 4 个简短要点。
+7. 磁场垂直纸面向里时使用 `field_marker=cross`，垂直纸面向外时使用 `dot`。
+8. 只有当题干、图像摘要或解题摘要中能明确判断时，才填写具体的 `trajectory` 和 `force_direction`。
+9. 所有值都应为普通字符串或字符串数组。
 """.strip()
 
     def _render_electromagnetism_scene_html(
