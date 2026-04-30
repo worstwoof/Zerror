@@ -23,13 +23,15 @@ class ErrorPreviewScreen extends StatefulWidget {
 class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
   static const Rect _defaultSelection = Rect.fromLTWH(0.12, 0.18, 0.76, 0.46);
   static const double _minSelectionEdge = 24;
+  static const double _handleTouchRadius = 22;
 
   final AiApiClient _apiClient = const AiApiClient();
   bool _isRecognizing = false;
   Size? _sourceImageSize;
   Rect _selection = _defaultSelection;
-  Offset? _dragStart;
-  Offset? _dragCurrent;
+  _SelectionDragMode _dragMode = _SelectionDragMode.none;
+  Offset? _dragStartPoint;
+  Rect? _dragStartRect;
 
   @override
   void initState() {
@@ -209,45 +211,102 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
     if (point == null) {
       return;
     }
+
+    final selectionRect = _selectionRectForPaint(imageRect);
+    final handle = _hitTestHandle(point, selectionRect);
+    final mode = handle ??
+        (selectionRect.contains(point)
+            ? _SelectionDragMode.move
+            : _SelectionDragMode.create);
+
+    final seedRect = mode == _SelectionDragMode.create
+        ? Rect.fromPoints(point, point)
+        : selectionRect;
+
     setState(() {
-      _dragStart = point;
-      _dragCurrent = point;
+      _dragMode = mode;
+      _dragStartPoint = point;
+      _dragStartRect = seedRect;
+      if (mode == _SelectionDragMode.create) {
+        _selection = _normalizedRect(seedRect, imageRect);
+      }
     });
   }
 
   void _handlePanUpdate(DragUpdateDetails details, Rect imageRect) {
-    if (_dragStart == null) {
+    if (_dragMode == _SelectionDragMode.none ||
+        _dragStartPoint == null ||
+        _dragStartRect == null) {
       return;
     }
+
     final point = _clampPointToImage(details.localPosition, imageRect);
     if (point == null) {
       return;
     }
-    setState(() {
-      _dragCurrent = point;
-    });
-  }
 
-  void _handlePanEnd(Rect imageRect) {
-    if (_dragStart == null || _dragCurrent == null) {
+    Rect nextRect;
+    switch (_dragMode) {
+      case _SelectionDragMode.create:
+        nextRect = Rect.fromPoints(_dragStartPoint!, point);
+        break;
+      case _SelectionDragMode.move:
+        nextRect = _translateRect(
+          _dragStartRect!,
+          point - _dragStartPoint!,
+          imageRect,
+        );
+        break;
+      case _SelectionDragMode.resizeTopLeft:
+        nextRect = _resizeRect(
+          _dragStartRect!,
+          left: point.dx,
+          top: point.dy,
+          imageRect: imageRect,
+        );
+        break;
+      case _SelectionDragMode.resizeTopRight:
+        nextRect = _resizeRect(
+          _dragStartRect!,
+          right: point.dx,
+          top: point.dy,
+          imageRect: imageRect,
+        );
+        break;
+      case _SelectionDragMode.resizeBottomLeft:
+        nextRect = _resizeRect(
+          _dragStartRect!,
+          left: point.dx,
+          bottom: point.dy,
+          imageRect: imageRect,
+        );
+        break;
+      case _SelectionDragMode.resizeBottomRight:
+        nextRect = _resizeRect(
+          _dragStartRect!,
+          right: point.dx,
+          bottom: point.dy,
+          imageRect: imageRect,
+        );
+        break;
+      case _SelectionDragMode.none:
+        return;
+    }
+
+    if (nextRect.width < _minSelectionEdge || nextRect.height < _minSelectionEdge) {
       return;
     }
 
-    final rawRect = Rect.fromPoints(_dragStart!, _dragCurrent!);
-    if (rawRect.width >= _minSelectionEdge && rawRect.height >= _minSelectionEdge) {
-      setState(() {
-        _selection = Rect.fromLTWH(
-          ((rawRect.left - imageRect.left) / imageRect.width).clamp(0.0, 1.0),
-          ((rawRect.top - imageRect.top) / imageRect.height).clamp(0.0, 1.0),
-          (rawRect.width / imageRect.width).clamp(0.0, 1.0),
-          (rawRect.height / imageRect.height).clamp(0.0, 1.0),
-        );
-      });
-    }
-
     setState(() {
-      _dragStart = null;
-      _dragCurrent = null;
+      _selection = _normalizedRect(nextRect, imageRect);
+    });
+  }
+
+  void _handlePanEnd() {
+    setState(() {
+      _dragMode = _SelectionDragMode.none;
+      _dragStartPoint = null;
+      _dragStartRect = null;
     });
   }
 
@@ -262,9 +321,6 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
   }
 
   Rect _selectionRectForPaint(Rect imageRect) {
-    if (_dragStart != null && _dragCurrent != null) {
-      return Rect.fromPoints(_dragStart!, _dragCurrent!);
-    }
     return Rect.fromLTWH(
       imageRect.left + imageRect.width * _selection.left,
       imageRect.top + imageRect.height * _selection.top,
@@ -273,11 +329,74 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
     );
   }
 
+  Rect _normalizedRect(Rect rect, Rect imageRect) {
+    return Rect.fromLTWH(
+      ((rect.left - imageRect.left) / imageRect.width).clamp(0.0, 1.0),
+      ((rect.top - imageRect.top) / imageRect.height).clamp(0.0, 1.0),
+      (rect.width / imageRect.width).clamp(0.0, 1.0),
+      (rect.height / imageRect.height).clamp(0.0, 1.0),
+    );
+  }
+
+  Rect _translateRect(Rect rect, Offset delta, Rect imageRect) {
+    var shifted = rect.shift(delta);
+    if (shifted.left < imageRect.left) {
+      shifted = shifted.shift(Offset(imageRect.left - shifted.left, 0));
+    }
+    if (shifted.right > imageRect.right) {
+      shifted = shifted.shift(Offset(imageRect.right - shifted.right, 0));
+    }
+    if (shifted.top < imageRect.top) {
+      shifted = shifted.shift(Offset(0, imageRect.top - shifted.top));
+    }
+    if (shifted.bottom > imageRect.bottom) {
+      shifted = shifted.shift(Offset(0, imageRect.bottom - shifted.bottom));
+    }
+    return shifted;
+  }
+
+  Rect _resizeRect(
+    Rect rect, {
+    double? left,
+    double? top,
+    double? right,
+    double? bottom,
+    required Rect imageRect,
+  }) {
+    final nextLeft =
+        (left ?? rect.left).clamp(imageRect.left, rect.right - _minSelectionEdge);
+    final nextTop =
+        (top ?? rect.top).clamp(imageRect.top, rect.bottom - _minSelectionEdge);
+    final nextRight =
+        (right ?? rect.right).clamp(rect.left + _minSelectionEdge, imageRect.right);
+    final nextBottom =
+        (bottom ?? rect.bottom).clamp(rect.top + _minSelectionEdge, imageRect.bottom);
+
+    return Rect.fromLTRB(nextLeft, nextTop, nextRight, nextBottom);
+  }
+
+  _SelectionDragMode? _hitTestHandle(Offset point, Rect rect) {
+    final handles = <_SelectionDragMode, Offset>{
+      _SelectionDragMode.resizeTopLeft: rect.topLeft,
+      _SelectionDragMode.resizeTopRight: rect.topRight,
+      _SelectionDragMode.resizeBottomLeft: rect.bottomLeft,
+      _SelectionDragMode.resizeBottomRight: rect.bottomRight,
+    };
+
+    for (final entry in handles.entries) {
+      if ((entry.value - point).distance <= _handleTouchRadius) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
   void _resetSelection() {
     setState(() {
       _selection = _defaultSelection;
-      _dragStart = null;
-      _dragCurrent = null;
+      _dragMode = _SelectionDragMode.none;
+      _dragStartPoint = null;
+      _dragStartRect = null;
     });
   }
 
@@ -345,7 +464,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                     behavior: HitTestBehavior.opaque,
                     onPanStart: (details) => _handlePanStart(details, imageRect),
                     onPanUpdate: (details) => _handlePanUpdate(details, imageRect),
-                    onPanEnd: (_) => _handlePanEnd(imageRect),
+                    onPanEnd: (_) => _handlePanEnd(),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -458,6 +577,16 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       ),
     );
   }
+}
+
+enum _SelectionDragMode {
+  none,
+  create,
+  move,
+  resizeTopLeft,
+  resizeTopRight,
+  resizeBottomLeft,
+  resizeBottomRight,
 }
 
 class _SelectionOverlayPainter extends CustomPainter {
