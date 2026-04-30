@@ -143,7 +143,7 @@
 
 为了便于 MVP 演示，当前后端已经支持一组“按学科兜底生成”的扩展内容：
 
-- 数学：默认补充 `chart_spec`，返回结构化图表/几何草图建议，适合后续对接 ECharts、Canvas 或自定义坐标系渲染。
+- 数学：默认补充 `chart_spec`，返回结构化图表/几何草图建议。当前会按题型细分为 `function`、`geometry`、`conic`、`calculus`、`statistics`、`probability`、`sequence`、`vector`、`linear_algebra`、`algebra` 等场景，并补充公式、可视化图层、交互参数、标注和易错检查，适合后续对接 ECharts、Canvas 或自定义坐标系渲染。
 - 物理：默认补充 `interactive_html`，返回可嵌入 WebView 的小型 HTML 演示页，当前覆盖受力运动、电路、光路三类模板。
 - 化学：默认补充 `study_card`，返回 JSON 卡片集合，适合做翻卡式复习界面。
 - 编程：默认补充 `code_snippet`，返回 JSON 结构的代码骨架、调试清单与执行步骤。
@@ -164,7 +164,7 @@
   "title": "函数图像联动分析",
   "description": "为数学题生成一个可继续接图表渲染器的结构化图像方案。",
   "mime_type": "application/json",
-  "content": "{ \"renderer\": \"generic_chart_spec\", \"scene\": \"function\", ... }"
+  "content": "{ \"renderer\": \"generic_chart_spec\", \"version\": 2, \"scene\": \"function\", \"expressions\": [...], \"visual_model\": {...}, ... }"
 }
 ```
 

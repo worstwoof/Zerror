@@ -1805,6 +1805,20 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         return '几何构型';
       case 'statistics':
         return '统计图表';
+      case 'probability':
+        return '概率事件';
+      case 'sequence':
+        return '数列递推';
+      case 'vector':
+        return '向量关系';
+      case 'linear_algebra':
+        return '线性代数';
+      case 'conic':
+        return '圆锥曲线';
+      case 'calculus':
+        return '导数积分';
+      case 'algebra':
+        return '代数拆解';
       default:
         return scene;
     }

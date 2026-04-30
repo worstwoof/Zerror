@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "可以额外返回一个 rich_artifacts 项，用 chart_spec 或 interactive_html 展示函数图像、几何构型或步骤可视化。",
+    "数学": "可以额外返回一个 rich_artifacts 项，优先用 chart_spec 表达函数图像、几何构型、圆锥曲线、概率统计、数列、向量或线性代数结构；内容必须是可解析 JSON，不要只写文字摘要。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
@@ -784,7 +784,13 @@ class DiagnosticService:
             )
         if subject_name == "数学":
             return (
-                "如果返回 chart_spec 或 interactive_html，请优先围绕函数图像、几何构型、统计图或步骤可视化来设计，不要只返回文字摘要。"
+                "如果返回 chart_spec，请严格满足以下要求："
+                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、scene、title、knowledge_points、plot_suggestions、student_tasks 和 step_mapping；"
+                "2. scene 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
+                "3. plot_suggestions 每项使用 {label, value}，value 直接写给学生看的短句，不要嵌套复杂对象；"
+                "4. 能提取公式时，把关键公式放入 expressions 数组，优先用 LaTeX；"
+                "5. visual_model 可描述坐标系、图层、标注、可交互参数，但不要依赖外部图片或 CDN；"
+                "6. 内容要围绕本题具体对象，比如函数零点、几何辅助线、圆锥曲线焦点、事件树、数列递推、向量投影或矩阵变换。"
             )
         if subject_name == "化学":
             return (
