@@ -34,7 +34,7 @@ class ProfileScreen extends StatelessWidget {
             decoration: BoxDecoration(gradient: AppPalette.appBackground),
           ),
           Image.asset(
-            'assets/images/auth_bg.png',
+            'assets/images/background_dark.png',
             fit: BoxFit.cover,
             filterQuality: FilterQuality.low,
             excludeFromSemantics: true,

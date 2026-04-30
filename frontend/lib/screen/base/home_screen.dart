@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Positioned.fill(
             child: Image.asset(
-              'assets/images/background_dark.png',
+              'assets/images/splash_bg.png',
               fit: BoxFit.cover,
               filterQuality: FilterQuality.low,
               excludeFromSemantics: true,
@@ -76,9 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    AppPalette.matchaMist.withValues(alpha: 0.05),
-                    AppPalette.pineGreen.withValues(alpha: 0.10),
-                    AppPalette.night.withValues(alpha: 0.52),
+                    AppPalette.night.withValues(alpha: 0.42),
+                    AppPalette.pineGreen.withValues(alpha: 0.36),
+                    AppPalette.night.withValues(alpha: 0.76),
                   ],
                 ),
               ),
@@ -103,53 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(28, 0, 28, 22),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: 66,
-              decoration: BoxDecoration(
-                color: AppPalette.kombuGreen.withValues(alpha: 0.62),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.10)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(index: 0, icon: Icons.home_rounded, label: '\u9996\u9875'),
-                  GestureDetector(
-                    onTap: () => _showAddActionSheet(context),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppPalette.honeyOrange, AppPalette.almondCream],
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppPalette.honeyOrange.withValues(alpha: 0.28),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.add_rounded, color: AppPalette.night, size: 28),
-                    ),
-                  ),
-                  _buildNavItem(index: 1, icon: Icons.person_rounded, label: '\u6211\u7684'),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar: _buildAnimatedBottomNav(context),
     );
   }
 
@@ -163,7 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
         : store.errors.first;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 38, 24, 120),
+      padding: EdgeInsets.fromLTRB(
+          24, MediaQuery.of(context).padding.top + 38, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -207,7 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.bolt_rounded,
                       label: '\u667a\u80fd\u7ec4\u5377',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const SmartQuizScreen()),
                       ),
                     ),
                   ),
@@ -217,7 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.folder_special_rounded,
                       label: '\u9519\u9898\u6863\u6848',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const ErrorArchiveScreen()),
                       ),
                     ),
                   ),
@@ -227,7 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.event_note_rounded,
                       label: '\u5b66\u4e60\u8ba1\u5212',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const LearningPlanScreen()),
                       ),
                     ),
                   ),
@@ -266,7 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildEmptyHomeTab(BuildContext context, AppStore store) {
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 38, 24, 120),
+      padding: EdgeInsets.fromLTRB(
+          24, MediaQuery.of(context).padding.top + 38, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -310,7 +269,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.bolt_rounded,
                       label: '智能组卷',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const SmartQuizScreen()),
                       ),
                     ),
                   ),
@@ -320,7 +280,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.folder_special_rounded,
                       label: '错题档案',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const ErrorArchiveScreen()),
                       ),
                     ),
                   ),
@@ -330,7 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.event_note_rounded,
                       label: '学习计划',
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const LearningPlanScreen()),
                       ),
                     ),
                   ),
@@ -406,7 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           height: 66,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(22),
-                            border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.18)),
+                            border: Border.all(
+                                color: AppPalette.pastelGrey
+                                    .withValues(alpha: 0.18)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -441,7 +405,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppPalette.almondCream.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(999),
@@ -457,13 +422,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 18),
                     AppPanel(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 16),
                       color: AppPalette.pastelGrey.withValues(alpha: 0.06),
                       child: Row(
                         children: [
-                          Expanded(child: _drawerMetric('\u9519\u9898', '${store.totalErrors}')),
-                          Expanded(child: _drawerMetric('\u6536\u85cf', '${store.favoriteCount}')),
-                          Expanded(child: _drawerMetric('\u8fde\u7eed', '${store.studyStreakDays}\u5929')),
+                          Expanded(
+                              child: _drawerMetric(
+                                  '\u9519\u9898', '${store.totalErrors}')),
+                          Expanded(
+                              child: _drawerMetric(
+                                  '\u6536\u85cf', '${store.favoriteCount}')),
+                          Expanded(
+                              child: _drawerMetric('\u8fde\u7eed',
+                                  '${store.studyStreakDays}\u5929')),
                         ],
                       ),
                     ),
@@ -477,7 +449,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.restore_from_trash_rounded,
                             title: '\u9519\u9898\u56de\u6536\u7ad9',
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const RecycleBinScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const RecycleBinScreen()),
                             ),
                           ),
                           _drawerItem(
@@ -485,7 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.insert_chart_outlined_rounded,
                             title: '\u5b66\u4e60\u6570\u636e\u770b\u677f',
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const DataDashboardScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const DataDashboardScreen()),
                             ),
                           ),
                           _drawerItem(
@@ -493,7 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.settings_outlined,
                             title: '\u7cfb\u7edf\u8bbe\u7f6e',
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen()),
                             ),
                           ),
                         ],
@@ -508,7 +483,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         await store.signOutUser();
                         if (!context.mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const LoginScreen()),
                           (route) => false,
                         );
                       },
@@ -535,7 +511,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+        Text(label,
+            style:
+                const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
       ],
     );
   }
@@ -564,20 +542,23 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
             child: Row(
               children: [
-                Icon(icon, color: isDanger ? Colors.redAccent : AppPalette.matchaMist),
+                Icon(icon,
+                    color: isDanger ? Colors.redAccent : AppPalette.matchaMist),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
-                      color: isDanger ? Colors.redAccent : AppPalette.textPrimary,
+                      color:
+                          isDanger ? Colors.redAccent : AppPalette.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 if (!isDanger)
-                  const Icon(Icons.chevron_right_rounded, color: AppPalette.textSecondary),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppPalette.textSecondary),
               ],
             ),
           ),
@@ -586,40 +567,160 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildAnimatedBottomNav(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      height: 44 + bottomPadding,
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      decoration: BoxDecoration(
+        color: AppPalette.night.withValues(alpha: 0.92),
+        border: Border(
+          top: BorderSide(
+            color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildNavItem(
+                    index: 0,
+                    icon: Icons.home_rounded,
+                  ),
+                ),
+                Expanded(child: _buildCaptureNavAction(context)),
+                Expanded(
+                  child: _buildNavItem(
+                    index: 1,
+                    icon: Icons.person_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNavItem({
     required int index,
     required IconData icon,
-    required String label,
   }) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _onNavTapped(index),
-      child: SizedBox(
-        width: 76,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 26,
-              color: isSelected
-                  ? AppPalette.matchaMist
-                  : AppPalette.textSecondary.withValues(alpha: 0.72),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: isSelected ? 1 : 0),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutBack,
+        builder: (context, value, child) {
+          final iconSize = 34 + 14 * value;
+          final iconTop = 5 - 24 * value;
+          final scale = 1 + 0.06 * value;
+          return SizedBox.expand(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  top: iconTop,
+                  left: 0,
+                  right: 0,
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        width: iconSize,
+                        height: iconSize,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppPalette.pineGreen
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppPalette.pineGreen
+                                        .withValues(alpha: 0.26),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 9),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                          child: Icon(
+                            icon,
+                            size: isSelected ? 25 : 24,
+                            color: isSelected
+                                ? AppPalette.almondCream
+                                : AppPalette.textSecondary
+                                    .withValues(alpha: 0.72),
+                          ),
+                        ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? AppPalette.textPrimary
-                    : AppPalette.textSecondary.withValues(alpha: 0.72),
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCaptureNavAction(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showAddActionSheet(context),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: -24,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppPalette.honeyOrange, AppPalette.almondCream],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppPalette.honeyOrange.withValues(alpha: 0.30),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: AppPalette.night,
+                  size: 32,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -684,7 +785,11 @@ class _HomeScreenState extends State<HomeScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppPalette.pineGreen, AppPalette.kombuGreen, AppPalette.artichoke],
+              colors: [
+                AppPalette.pineGreen,
+                AppPalette.kombuGreen,
+                AppPalette.artichoke
+              ],
             ),
             borderRadius: BorderRadius.circular(28),
           ),
@@ -695,7 +800,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(999),
@@ -729,7 +835,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 18),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: AppPalette.almondCream,
                         borderRadius: BorderRadius.circular(16),
@@ -778,7 +885,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final image = await picker.pickImage(source: source);
     if (!mounted || image == null) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ErrorPreviewScreen(imagePath: image.path)),
+      MaterialPageRoute(
+          builder: (_) => ErrorPreviewScreen(imagePath: image.path)),
     );
   }
 
@@ -811,7 +919,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _sheetAction(
                   icon: Icons.camera_alt_rounded,
                   title: '\u62cd\u7167\u5f55\u5165',
-                  subtitle: '\u62cd\u4e00\u5f20\u9898\u76ee\u7167\u7247\uff0c\u81ea\u52a8\u8bc6\u522b\u8fdb\u5165\u9884\u89c8\u3002',
+                  subtitle:
+                      '\u62cd\u4e00\u5f20\u9898\u76ee\u7167\u7247\uff0c\u81ea\u52a8\u8bc6\u522b\u8fdb\u5165\u9884\u89c8\u3002',
                   filled: true,
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -822,7 +931,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _sheetAction(
                   icon: Icons.photo_library_rounded,
                   title: '\u4ece\u76f8\u518c\u5bfc\u5165',
-                  subtitle: '\u9009\u62e9\u5df2\u6709\u8bd5\u5377\u6216\u622a\u56fe\u5bfc\u5165\u9519\u9898\u6d41\u8f6c\u3002',
+                  subtitle:
+                      '\u9009\u62e9\u5df2\u6709\u8bd5\u5377\u6216\u622a\u56fe\u5bfc\u5165\u9519\u9898\u6d41\u8f6c\u3002',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _pickImage(ImageSource.gallery);
@@ -832,11 +942,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 _sheetAction(
                   icon: Icons.edit_note_rounded,
                   title: '\u624b\u52a8\u8bb0\u5f55',
-                  subtitle: '\u9002\u5408\u5f55\u5165\u516c\u5f0f\u9898\u3001\u4e3b\u89c2\u9898\u548c\u8865\u5145\u7b14\u8bb0\u3002',
+                  subtitle:
+                      '\u9002\u5408\u5f55\u5165\u516c\u5f0f\u9898\u3001\u4e3b\u89c2\u9898\u548c\u8865\u5145\u7b14\u8bb0\u3002',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ManualEntryScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const ManualEntryScreen()),
                     );
                   },
                 ),
@@ -855,11 +967,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
     bool filled = false,
   }) {
-    final background =
-        filled ? AppPalette.matchaMist : AppPalette.pastelGrey.withValues(alpha: 0.08);
+    final background = filled
+        ? AppPalette.matchaMist
+        : AppPalette.pastelGrey.withValues(alpha: 0.08);
     final titleColor = filled ? AppPalette.night : AppPalette.textPrimary;
-    final subtitleColor =
-        filled ? AppPalette.night.withValues(alpha: 0.70) : AppPalette.textSecondary;
+    final subtitleColor = filled
+        ? AppPalette.night.withValues(alpha: 0.70)
+        : AppPalette.textSecondary;
     final iconColor = filled ? AppPalette.night : AppPalette.matchaMist;
 
     return Material(
@@ -943,7 +1057,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       color: AppPalette.kombuGreen,
       alignment: Alignment.center,
-      child: Icon(Icons.person_rounded, color: AppPalette.textPrimary, size: iconSize),
+      child: Icon(Icons.person_rounded,
+          color: AppPalette.textPrimary, size: iconSize),
     );
   }
 
@@ -954,7 +1069,9 @@ class _HomeScreenState extends State<HomeScreen> {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color, blurRadius: 120, spreadRadius: 12)],
+          boxShadow: [
+            BoxShadow(color: color, blurRadius: 120, spreadRadius: 12)
+          ],
         ),
       ),
     );

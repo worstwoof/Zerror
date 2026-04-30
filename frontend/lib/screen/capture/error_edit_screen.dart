@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
+import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
 import '../../data/file_upload_client.dart';
@@ -235,9 +236,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           _upsertInteractiveHtmlArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
-          _physicsAnimationError = result.reason.trim().isEmpty
-              ? '当前题目暂时无法生成动画演示。'
-              : result.reason;
+          _physicsAnimationError =
+              result.reason.trim().isEmpty ? '当前题目暂时无法生成动画演示。' : result.reason;
         }
       });
 
@@ -365,7 +365,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   NewErrorDraft _buildDraft(String question) {
     final subject = _subject == '通用' ? _inferSubject(question) : _subject;
     final topic = _inferTopic(question, subject);
-    final reason = _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
+    final reason =
+        _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
     final reflection = _reflectionController.text.trim();
 
     final summaryParts = <String>[
@@ -386,7 +387,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       reason: reason,
       tags: _buildTags(subject, topic),
       myAnswer: reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection,
-      aiAnalysis: summaryParts.isEmpty ? _buildFallbackAnalysis(subject, topic) : summaryParts.join('\n\n'),
+      aiAnalysis: summaryParts.isEmpty
+          ? _buildFallbackAnalysis(subject, topic)
+          : summaryParts.join('\n\n'),
       isFavorite: false,
       isMastered: false,
     );
@@ -394,13 +397,22 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _guessSubject(String questionText) {
     final content = questionText.toLowerCase();
-    if (content.contains('矩阵') || content.contains('特征值') || content.contains('函数') || content.contains('导数')) {
+    if (content.contains('矩阵') ||
+        content.contains('特征值') ||
+        content.contains('函数') ||
+        content.contains('导数')) {
       return '数学';
     }
-    if (content.contains('受力') || content.contains('加速度') || content.contains('电路') || content.contains('速度')) {
+    if (content.contains('受力') ||
+        content.contains('加速度') ||
+        content.contains('电路') ||
+        content.contains('速度')) {
       return '物理';
     }
-    if (content.contains('cache') || content.contains('cpu') || content.contains('算法') || content.contains('java')) {
+    if (content.contains('cache') ||
+        content.contains('cpu') ||
+        content.contains('算法') ||
+        content.contains('java')) {
       return '计算机';
     }
     return '通用';
@@ -408,13 +420,17 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _inferSubject(String question) {
     final lower = question.toLowerCase();
-    if (question.contains('矩阵') || question.contains('特征值') || question.contains('线代')) {
+    if (question.contains('矩阵') ||
+        question.contains('特征值') ||
+        question.contains('线代')) {
       return '线性代数';
     }
     if (lower.contains('kmp') || question.contains('数据结构')) {
       return '数据结构';
     }
-    if (lower.contains('java') || question.contains('接口') || question.contains('策略')) {
+    if (lower.contains('java') ||
+        question.contains('接口') ||
+        question.contains('策略')) {
       return 'Java';
     }
     if (question.contains('贝叶斯') || question.contains('概率')) {
@@ -476,7 +492,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         actions: [
           IconButton(
             onPressed: _isAiThinking ? null : _generateAiAnalysis,
-            icon: const Icon(Icons.refresh_rounded, color: AppPalette.textPrimary),
+            icon: const Icon(Icons.refresh_rounded,
+                color: AppPalette.textPrimary),
             tooltip: '重新生成解析',
           ),
         ],
@@ -515,7 +532,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(color: AppPalette.almondCream),
+            const RoseThreeLoader(size: 156),
             const SizedBox(height: 24),
             const Text(
               '知芽 AI 正在深度分析题目...',
@@ -526,7 +543,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               _selectedErrorReason.isEmpty
                   ? '正在生成归因、知识点和后续训练建议'
                   : '正在结合“$_selectedErrorReason”重新分析',
-              style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+              style: const TextStyle(
+                  color: AppPalette.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -535,7 +553,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildAnalysisDashboard() {
-    final subject = _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
+    final subject =
+        _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
     final topic = _inferTopic(_questionController.text, subject);
 
     return SingleChildScrollView(
@@ -865,7 +884,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             final index = entry.key;
             final question = entry.value;
             return Padding(
-              padding: EdgeInsets.only(bottom: index == _similarQuestions.length - 1 ? 0 : 12),
+              padding: EdgeInsets.only(
+                  bottom: index == _similarQuestions.length - 1 ? 0 : 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -960,7 +980,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _isAiThinking ? null : _generateAiAnalysis,
-              icon: const Icon(Icons.auto_awesome, color: AppPalette.matchaMist, size: 18),
+              icon: const Icon(Icons.auto_awesome,
+                  color: AppPalette.matchaMist, size: 18),
               label: const Text(
                 '结合当前题目重新分析',
                 style: TextStyle(color: AppPalette.matchaMist),
@@ -1033,7 +1054,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               SizedBox(
                 height: 42,
                 child: OutlinedButton.icon(
-                  onPressed: _isGeneratingPhysicsAnimation ? null : _generatePhysicsAnimation,
+                  onPressed: _isGeneratingPhysicsAnimation
+                      ? null
+                      : _generatePhysicsAnimation,
                   icon: _isGeneratingPhysicsAnimation
                       ? const SizedBox(
                           width: 16,
@@ -1110,9 +1133,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final content = (artifact['content'] ?? '').toString().trim();
 
     final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
-    final displayDescription = description.isEmpty
-        ? _fallbackArtifactDescription(type)
-        : description;
+    final displayDescription =
+        description.isEmpty ? _fallbackArtifactDescription(type) : description;
     final previewText = _artifactPreviewText(type, mimeType, content);
 
     return Container(
@@ -1308,10 +1330,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildChartSpecArtifact(Map<String, dynamic> data) {
     final scene = (data['scene'] ?? '').toString();
-    final knowledgePoints = (data['knowledge_points'] as List<dynamic>? ?? const [])
-        .map((item) => item.toString())
-        .where((item) => item.trim().isNotEmpty)
-        .toList();
+    final knowledgePoints =
+        (data['knowledge_points'] as List<dynamic>? ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.trim().isNotEmpty)
+            .toList();
     final suggestions = (data['plot_suggestions'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .toList();
@@ -1327,13 +1350,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (scene.isNotEmpty) _buildArtifactMetaChip('场景', _chartSceneLabel(scene)),
+        if (scene.isNotEmpty)
+          _buildArtifactMetaChip('场景', _chartSceneLabel(scene)),
         if (knowledgePoints.isNotEmpty) ...[
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: knowledgePoints.map((item) => _buildArtifactMetaPill(item)).toList(),
+            children: knowledgePoints
+                .map((item) => _buildArtifactMetaPill(item))
+                .toList(),
           ),
         ],
         if (suggestions.isNotEmpty) ...[
@@ -1376,21 +1402,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           _buildArtifactSectionTitle('和解题步骤的对应关系'),
           const SizedBox(height: 8),
           ...stepMapping.asMap().entries.map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildArtifactInfoTile(
-                label: '步骤 ${entry.key + 1}',
-                child: AppLatexText(
-                  entry.value,
-                  style: const TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 13,
-                    height: 1.5,
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildArtifactInfoTile(
+                    label: '步骤 ${entry.key + 1}',
+                    child: AppLatexText(
+                      entry.value,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
         ],
       ],
     );
@@ -1454,10 +1480,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         .map((item) => item.toString())
         .where((item) => item.trim().isNotEmpty)
         .toList();
-    final debugChecklist = (data['debug_checklist'] as List<dynamic>? ?? const [])
-        .map((item) => item.toString())
-        .where((item) => item.trim().isNotEmpty)
-        .toList();
+    final debugChecklist =
+        (data['debug_checklist'] as List<dynamic>? ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.trim().isNotEmpty)
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1481,7 +1508,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             decoration: BoxDecoration(
               color: AppPalette.night.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+              border: Border.all(
+                  color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,

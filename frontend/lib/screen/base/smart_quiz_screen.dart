@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import 'quiz_paper_screen.dart';
 
@@ -45,7 +46,10 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
   @override
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
-    final subjects = ['全部学科', ...store.subjectOptions.where((item) => item != '全部')];
+    final subjects = [
+      '全部学科',
+      ...store.subjectOptions.where((item) => item != '全部')
+    ];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -66,7 +70,9 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
       ),
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
-        child: _isGenerating ? _buildGeneratingState() : _buildConfigForm(subjects),
+        child: _isGenerating
+            ? _buildGeneratingState()
+            : _buildConfigForm(subjects),
       ),
       bottomNavigationBar: _isGenerating
           ? null
@@ -98,7 +104,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            CircularProgressIndicator(color: AppPalette.almondCream),
+            RoseThreeLoader(size: 156),
             SizedBox(height: 24),
             Text(
               'AI 正在调取错题档案...',
@@ -187,7 +193,9 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
                 backgroundColor: AppPalette.pastelGrey.withValues(alpha: 0.08),
                 checkmarkColor: AppPalette.matchaMist,
                 labelStyle: TextStyle(
-                  color: isSelected ? AppPalette.matchaMist : AppPalette.textSecondary,
+                  color: isSelected
+                      ? AppPalette.matchaMist
+                      : AppPalette.textSecondary,
                 ),
                 side: BorderSide(
                   color: isSelected
@@ -232,7 +240,8 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
           ...List.generate(_strategies.length, (index) {
             final item = _strategies[index];
             return Padding(
-              padding: EdgeInsets.only(bottom: index == _strategies.length - 1 ? 0 : 12),
+              padding: EdgeInsets.only(
+                  bottom: index == _strategies.length - 1 ? 0 : 12),
               child: _strategyCard(index, item.$1, item.$2, item.$3),
             );
           }),
@@ -241,7 +250,8 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
     );
   }
 
-  Widget _strategyCard(int index, String title, String subtitle, IconData icon) {
+  Widget _strategyCard(
+      int index, String title, String subtitle, IconData icon) {
     final isSelected = _selectedStrategy == index;
     return InkWell(
       onTap: () => setState(() => _selectedStrategy = index),
@@ -292,9 +302,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
               ),
             ),
             Icon(
-              isSelected
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
+              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
               color: isSelected
                   ? AppPalette.matchaMist
                   : AppPalette.textSecondary.withValues(alpha: 0.3),
