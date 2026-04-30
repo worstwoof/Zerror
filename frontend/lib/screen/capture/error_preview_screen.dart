@@ -80,6 +80,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       final croppedImagePath = await _cropSelectionToTempFile();
       final payload = await _apiClient.analyzeImage(
         imagePath: croppedImagePath,
+        enableSubjectExtensions: true,
       );
       if (!mounted) {
         return;

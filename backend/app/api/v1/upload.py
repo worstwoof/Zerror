@@ -84,7 +84,7 @@ async def analyze_image(
     subject: str = Form("通用"),
     user_answer: str = Form(""),
     wrong_reason_hint: str = Form(""),
-    enable_subject_extensions: bool = Form(False),
+    enable_subject_extensions: bool = Form(True),
 ) -> ImageAnalysisResponse:
     _ensure_credentials()
     started_at = time.perf_counter()
@@ -100,10 +100,11 @@ async def analyze_image(
         ocr_elapsed = time.perf_counter() - ocr_started_at
         normalized_text = normalize_ocr_text(ocr_result["raw_text"])
         logger.info(
-            "api analysis image upload filename=%s content_type=%s image_kb=%.1f",
+            "api analysis image upload filename=%s content_type=%s image_kb=%.1f enable_subject_extensions=%s",
             upload_filename,
             upload_content_type or "unknown",
             len(image_bytes) / 1024,
+            enable_subject_extensions,
         )
         request_payload = AnalysisRequest(
             question_text=normalized_text,
@@ -134,7 +135,7 @@ async def analyze_image(
                         subject=subject,
                         user_answer=user_answer,
                         wrong_reason_hint=wrong_reason_hint,
-                        enable_subject_extensions=False,
+                        enable_subject_extensions=enable_subject_extensions,
                     )
                 )
                 analysis_elapsed = time.perf_counter() - analysis_started_at
@@ -148,11 +149,13 @@ async def analyze_image(
             blocks=ocr_result.get("blocks", []),
         )
         logger.info(
-            "api analysis image image_kb=%.1f ocr=%.2fs analysis=%.2fs fallback_to_text=%s total=%.2fs",
+            "api analysis image image_kb=%.1f ocr=%.2fs analysis=%.2fs fallback_to_text=%s enable_subject_extensions=%s artifacts=%s total=%.2fs",
             len(image_bytes) / 1024,
             ocr_elapsed,
             analysis_elapsed,
             fallback_to_text,
+            enable_subject_extensions,
+            len(analysis.rich_artifacts),
             time.perf_counter() - started_at,
         )
         return ImageAnalysisResponse(
