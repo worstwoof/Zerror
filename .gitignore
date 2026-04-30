@@ -1,5 +1,62 @@
-﻿node_modules/
+# Dependencies and build outputs
+node_modules/
 build/
-.env
+dist/
+*.egg-info/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and runtime output
+*.log
+server.err
+server.out
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Frontend / Flutter generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+coverage/
+
+# Android / Gradle generated files
+.gradle/
+local.properties
+.cxx/
+*.keystore
+*.jks
+key.properties
+
+# Windows / native build artifacts
+x64/
+x86/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Bundles / archives generated locally
+*.bundle
