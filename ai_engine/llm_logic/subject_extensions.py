@@ -109,82 +109,35 @@ def _build_math_chart_spec(
     scene = _math_scene_type(cleaned_question, knowledge_points)
     profile = _math_scene_profile(scene)
     expressions = _math_extract_expressions(cleaned_question)
-    parameters = _math_detect_parameters(cleaned_question)
-    focus = knowledge_points[0] if knowledge_points else profile["fallback_focus"]
     title = profile["title"]
-
-    visual_model = {
-        "coordinate_system": profile["coordinate_system"],
-        "layers": [
-            {
-                "id": "core_object",
-                "type": profile["core_layer_type"],
-                "label": focus,
-                "source": expressions[0] if expressions else "根据题干中的核心关系式补全",
-            },
-            {
-                "id": "constraints",
-                "type": "annotation",
-                "label": "题设条件",
-                "source": "标出定义域、取值范围、已知点、边界条件或事件条件。",
-            },
-            {
-                "id": "solution_path",
-                "type": "guide",
-                "label": "解题推进",
-                "source": solution_steps[0] if solution_steps else profile["default_step"],
-            },
-        ],
-        "controls": [
-            {
-                "name": name,
-                "label": f"参数 {name}",
-                "default": 1,
-                "min": -5,
-                "max": 5,
-                "step": 0.5,
-            }
-            for name in parameters[:4]
-        ],
-        "annotations": profile["annotations"],
-    }
+    solution_path = _math_solution_path(profile, solution_steps)
 
     content = {
         "renderer": "generic_chart_spec",
-        "version": 2,
+        "version": 3,
         "scene": scene,
+        "topic_type": scene,
         "title": title,
         "question_excerpt": cleaned_question[:220],
         "knowledge_points": knowledge_points[:4],
         "expressions": expressions[:4],
-        "visual_model": visual_model,
-        "plot_suggestions": [
-            {
-                "label": "核心对象",
-                "value": focus,
-            },
-            {
-                "label": "推荐坐标/画法",
-                "value": profile["drawing_hint"],
-            },
-            {
-                "label": "关键观察",
-                "value": profile["observation_hint"],
-            },
-            {
-                "label": "可交互参数",
-                "value": "、".join(parameters[:4]) if parameters else profile["parameter_hint"],
-            },
-        ],
-        "student_tasks": profile["student_tasks"],
-        "step_mapping": solution_steps[:3],
-        "render_hints": profile["render_hints"],
-        "misconception_checks": profile["misconception_checks"],
+        "core_idea": profile["core_idea"],
+        "formula_transformations": _math_formula_transformations(
+            scene,
+            profile=profile,
+            expressions=expressions,
+            solution_steps=solution_steps,
+            cleaned_question=cleaned_question,
+        ),
+        "solution_path": solution_path,
+        "mistake_traps": profile["mistake_traps"],
+        "review_checklist": profile["review_checklist"],
+        "visual_hint": profile["visual_hint"],
     }
     return RichArtifact(
         artifact_type="chart_spec",
         title=title,
-        description="为数学题生成可接图表、几何草图或步骤可视化组件的结构化方案。",
+        description="把数学错题整理成可直接复盘的关键思路、变形路径和自查清单。",
         mime_type="application/json",
         content=json.dumps(content, ensure_ascii=False, indent=2),
     )
@@ -214,153 +167,236 @@ def _math_scene_type(cleaned_question: str, knowledge_points: List[str]) -> str:
 def _math_scene_profile(scene: str) -> dict:
     profiles = {
         "function": {
-            "title": "函数图像联动分析",
-            "fallback_focus": "题目中的主函数或核心关系式",
-            "coordinate_system": "cartesian_2d",
-            "core_layer_type": "curve",
-            "drawing_hint": "建立直角坐标系，标出定义域、截距、零点、极值点、单调区间和对称性。",
-            "observation_hint": "先看图像的关键点和整体走势，再把代数变形对应到图像变化。",
-            "parameter_hint": "可把系数、平移量或区间端点作为滑块。",
-            "default_step": "先确定定义域和关键点，再分析单调性、极值或交点。",
-            "student_tasks": [
-                "先观察定义域、零点、对称性，再判断图像走势。",
-                "把题目中的关键参数作为滑块，观察平移、伸缩和交点变化。",
+            "title": "函数题复盘卡",
+            "core_idea": "函数题的核心是把代数条件和图像特征互相翻译，先抓定义域、零点、单调性、极值和对称性，再回到题目目标。",
+            "formula_focus": "把题目中的函数式、方程或不等式整理成能判断零点、交点、单调性或最值的形式。",
+            "default_transformations": [
+                "整理函数表达式，先确认定义域和参数限制。",
+                "把方程或不等式转化为零点、交点、单调性或最值问题。",
+                "结合端点、极值点和区间开闭检查结论是否完整。",
             ],
-            "render_hints": ["优先画坐标轴、网格、函数曲线和关键点标签。", "若有多个函数，使用不同颜色并标出交点。"],
-            "annotations": ["定义域", "零点/交点", "极值点", "单调区间"],
-            "misconception_checks": ["不要把图像交点误当作函数零点。", "检查端点能否取到以及区间开闭。"],
+            "solution_path": [
+                {"action": "先定范围", "reason": "定义域和区间端点会决定后续变形是否等价。"},
+                {"action": "找关键点", "reason": "零点、极值点和交点通常就是分类讨论的分界。"},
+                {"action": "用图像校验代数结论", "reason": "图像能快速发现漏掉的端点、重根或无解区间。"},
+            ],
+            "mistake_traps": ["忽略定义域或端点能否取到。", "把交点、零点、极值点混为一谈。", "参数讨论时漏掉临界值。"],
+            "review_checklist": ["定义域是否先写清楚。", "每次平方、开方、约分是否保持等价。", "端点、重根和无解情形是否检查。"],
+            "visual_hint": "若题目涉及零点、交点、最值或参数范围，可画一张简洁函数草图，只标定义域、关键点和区间变化。",
         },
         "geometry": {
-            "title": "几何构型草图建议",
-            "fallback_focus": "题目中的核心图形与约束关系",
-            "coordinate_system": "plane_geometry",
-            "core_layer_type": "shape",
-            "drawing_hint": "先画骨架图，再叠加中点、垂线、角平分线、平行线或切线等辅助元素。",
-            "observation_hint": "优先寻找不变量：角、边长比例、圆周角、相似关系或面积关系。",
-            "parameter_hint": "可把角度、边长比例或动点位置作为滑块。",
-            "default_step": "先固定已知点线面关系，再补辅助线并寻找相似、全等或圆关系。",
-            "student_tasks": [
-                "先固定关键点与约束，再逐步标出边、角或切线关系。",
-                "把题目中的不变量写进图中，减少纯文字推理负担。",
+            "title": "几何题复盘卡",
+            "core_idea": "几何题要先把已知关系落到图上，再寻找不变量和辅助线，让相似、全等、圆、平行或面积关系自然出现。",
+            "formula_focus": "把边角关系、比例关系、圆关系或面积关系整理成可直接使用的条件。",
+            "default_transformations": [
+                "标出已知边、角、平行、垂直、切线或中点关系。",
+                "寻找能连接已知与目标的辅助线或关键圆。",
+                "用相似、全等、圆周角或面积关系推进结论。",
             ],
-            "render_hints": ["保持图形比例清晰，已知条件用标签标注。", "辅助线使用虚线，结论对象使用高亮。"],
-            "annotations": ["已知边角", "辅助线", "相似/全等关系", "目标结论"],
-            "misconception_checks": ["不要默认图形按比例精确。", "区分已知垂直、可证垂直和看起来垂直。"],
+            "solution_path": [
+                {"action": "重画结构图", "reason": "把条件显性化，避免靠视觉猜结论。"},
+                {"action": "锁定目标关系", "reason": "知道要证明边、角、比例还是面积，才能选择辅助线。"},
+                {"action": "寻找不变量", "reason": "相似、圆周角、平行线比例和面积不变量常是突破口。"},
+            ],
+            "mistake_traps": ["默认图形按比例精确。", "把看起来垂直或相等当成已知。", "辅助线画了但没有服务目标结论。"],
+            "review_checklist": ["每个图上标记是否都有题设或推理依据。", "辅助线是否连接了已知和目标。", "结论是否回到题目要求而不是停在中间关系。"],
+            "visual_hint": "建议画一张干净骨架图：已知条件实线标注，辅助线用虚线，目标关系用高亮标出。",
         },
         "conic": {
-            "title": "圆锥曲线结构图",
-            "fallback_focus": "圆锥曲线的标准方程、焦点和几何性质",
-            "coordinate_system": "cartesian_2d",
-            "core_layer_type": "conic",
-            "drawing_hint": "在坐标系中画出曲线、焦点、准线、顶点、渐近线或动点轨迹。",
-            "observation_hint": "把方程参数和几何量对应起来，重点观察焦点、离心率和轨迹约束。",
-            "parameter_hint": "可把 a、b、c、e 或斜率作为滑块。",
-            "default_step": "先化为标准形式，再定位焦点、顶点、准线或渐近线。",
-            "student_tasks": ["先把方程化成标准形式。", "再把参数与焦点、离心率、渐近线或切线条件对应。"],
-            "render_hints": ["曲线和焦点必须同屏展示。", "若有直线交点，标出弦中点、斜率或面积对象。"],
-            "annotations": ["焦点", "顶点", "准线/渐近线", "动点轨迹"],
-            "misconception_checks": ["检查 a、b、c 的大小关系。", "注意椭圆和双曲线焦点位置差异。"],
+            "title": "圆锥曲线复盘卡",
+            "core_idea": "圆锥曲线题要把方程参数和几何意义绑定起来，重点盯标准形式、焦点、离心率、准线、渐近线、弦和切线条件。",
+            "formula_focus": "先化标准方程，再把 $a,b,c,e$、焦点、准线、渐近线或直线斜率对应起来。",
+            "default_transformations": [
+                "把方程化成标准形式，确认曲线类型和焦点方向。",
+                "写出核心参数关系，例如椭圆 $a^2=b^2+c^2$ 或双曲线 $c^2=a^2+b^2$。",
+                "把直线、弦、切线或动点条件转成代数方程。",
+            ],
+            "solution_path": [
+                {"action": "先判曲线和方向", "reason": "焦点位置、参数关系和渐近线公式都依赖曲线类型。"},
+                {"action": "列参数关系", "reason": "圆锥曲线计算常在 $a,b,c,e$ 之间转换。"},
+                {"action": "把几何条件代数化", "reason": "弦长、中点、切线和面积最终都要落到方程上。"},
+            ],
+            "mistake_traps": ["椭圆和双曲线的 $a,b,c$ 关系混用。", "焦点在 x 轴还是 y 轴判断错误。", "联立直线后漏掉判别式或根与系数关系。"],
+            "review_checklist": ["曲线类型、焦点方向和标准形式是否确认。", "$a,b,c,e$ 关系是否写对。", "直线联立后的判别式、韦达关系是否用完整。"],
+            "visual_hint": "若涉及焦点、准线、弦或切线，可画坐标草图标出曲线方向、焦点和直线位置。",
         },
         "calculus": {
-            "title": "导数与积分过程图",
-            "fallback_focus": "函数变化率、切线、面积或极值关系",
-            "coordinate_system": "cartesian_2d",
-            "core_layer_type": "curve",
-            "drawing_hint": "画出函数曲线、切线/法线、单调区间、极值点和积分面积区域。",
-            "observation_hint": "把导数符号对应到增减，把积分上下限对应到面积边界。",
-            "parameter_hint": "可把切点、积分上下限或参数系数作为滑块。",
-            "default_step": "先求导或确定积分区间，再把符号变化与图形区域对应。",
-            "student_tasks": ["用导数符号表标出单调区间。", "把切线斜率或积分面积直接标在图上。"],
-            "render_hints": ["导数为零的位置用竖线标记。", "积分区域用半透明色填充。"],
-            "annotations": ["切点", "极值点", "导数符号", "积分区域"],
-            "misconception_checks": ["导数为零不一定是极值。", "定积分有符号，面积问题需确认上下方关系。"],
+            "title": "导数积分复盘卡",
+            "core_idea": "导数积分题要先识别结构：对称区间看奇偶性，三角式看恒等变形，乘积型积分优先考虑分部积分或换元。",
+            "formula_focus": "重点整理奇偶性、三角恒等变形、换元、分部积分和上下限变化。",
+            "default_transformations": [
+                "先观察积分区间是否对称，判断被积函数的奇偶性。",
+                "遇到三角函数先做恒等变形，例如半角、平方降幂或和差化积。",
+                "乘积型或含 $e^x$、$x$ 的积分，优先考虑分部积分或换元。",
+            ],
+            "solution_path": [
+                {"action": "先看区间和结构", "reason": "对称性、周期性和上下限往往能直接简化计算。"},
+                {"action": "再做恒等变形", "reason": "三角式、根式或指数乘积通常需要先整理成可积形式。"},
+                {"action": "选择积分工具", "reason": "换元处理复合结构，分部积分处理乘积结构。"},
+                {"action": "代回上下限并检查符号", "reason": "定积分最容易在上下限和符号处出错。"},
+            ],
+            "mistake_traps": ["对称区间内没有先判断奇偶性。", "三角半角或平方降幂公式写错。", "分部积分忘记边界项或符号。", "换元后没有同步更改上下限。"],
+            "review_checklist": ["是否先检查对称区间、奇偶性或周期性。", "三角恒等变形是否逐步写清。", "分部积分的 $u,dv$ 选择是否让问题变简单。", "上下限、边界项和符号是否最后复核。"],
+            "visual_hint": "定积分题通常不需要复杂图像；若涉及面积或奇偶性，可只画区间对称关系和函数奇偶示意。",
         },
         "statistics": {
-            "title": "统计分布可视化建议",
-            "fallback_focus": "样本数据、统计量和分布形态",
-            "coordinate_system": "statistical_chart",
-            "core_layer_type": "bar_or_box_plot",
-            "drawing_hint": "先列数据表，再映射到柱状图、折线图、散点图或箱线图。",
-            "observation_hint": "对比集中趋势、离散程度和异常值，而不是只盯单个数值。",
-            "parameter_hint": "可把分组、样本量或频率区间作为切换项。",
-            "default_step": "先整理样本和频数，再计算均值、方差或概率。",
-            "student_tasks": ["先整理样本空间或频数表。", "对比期望、方差或频率变化时，分系列展示。"],
-            "render_hints": ["柱状图要标清类别和频数。", "箱线图要标出四分位和异常点。"],
-            "annotations": ["均值", "方差", "频率", "异常值"],
-            "misconception_checks": ["不要混淆频数和频率。", "样本方差和总体方差公式不同。"],
+            "title": "统计题复盘卡",
+            "core_idea": "统计题先整理数据口径，再区分频数、频率、均值、方差、标准差和异常值，最后回到题目要比较的量。",
+            "formula_focus": "把样本、频数、频率、均值和方差公式分清楚，避免口径混乱。",
+            "default_transformations": ["先列清数据表或频数表。", "按题目要求计算集中趋势或离散程度。", "对比结论要说明数据口径和比较对象。"],
+            "solution_path": [
+                {"action": "整理数据口径", "reason": "频数、频率和样本量不清会导致后面全错。"},
+                {"action": "选择统计量", "reason": "均值看水平，方差/标准差看波动，不能混用。"},
+                {"action": "解释结果", "reason": "统计题通常要求把数字翻译成实际结论。"},
+            ],
+            "mistake_traps": ["频数和频率混淆。", "样本方差和总体方差公式混用。", "只算数字但没有回答实际含义。"],
+            "review_checklist": ["样本总数是否核对。", "频数、频率、均值、方差是否各自口径一致。", "最后结论是否回应题目问题。"],
+            "visual_hint": "数据比较题可用简单表格、柱状图或箱线图辅助观察集中趋势和波动。",
         },
         "probability": {
-            "title": "概率事件结构图",
-            "fallback_focus": "样本空间、事件关系和概率计算路径",
-            "coordinate_system": "event_space",
-            "core_layer_type": "tree_or_venn",
-            "drawing_hint": "用树状图、韦恩图或表格拆分样本空间，并标出互斥、独立或条件概率关系。",
-            "observation_hint": "先判断事件是否互斥、独立或有条件，再决定乘法、加法或补集策略。",
-            "parameter_hint": "可把试验次数、成功概率或条件事件作为控件。",
-            "default_step": "先列样本空间，再按事件关系写概率表达式。",
-            "student_tasks": ["先把随机试验拆成阶段或分类。", "标出每条路径或每个区域对应的概率。"],
-            "render_hints": ["树状图每条边显示条件概率。", "韦恩图要标出交、并、补区域。"],
-            "annotations": ["样本空间", "互斥/独立", "条件概率", "补事件"],
-            "misconception_checks": ["独立事件和互斥事件不是一回事。", "条件概率要更新样本空间。"],
+            "title": "概率题复盘卡",
+            "core_idea": "概率题先拆样本空间和事件关系，再判断互斥、独立、条件概率或补事件，最后选择加法、乘法或分类讨论。",
+            "formula_focus": "把事件、条件、交并补关系和路径概率写清楚。",
+            "default_transformations": ["列出样本空间或分阶段试验。", "判断事件关系：互斥、独立、条件或补事件。", "用加法公式、乘法公式或全概率思路计算。"],
+            "solution_path": [
+                {"action": "先拆事件", "reason": "事件边界不清会导致重复计数或漏算。"},
+                {"action": "判断关系", "reason": "互斥、独立和条件概率对应不同公式。"},
+                {"action": "按路径或区域计算", "reason": "树状图或韦恩图能防止重复和遗漏。"},
+            ],
+            "mistake_traps": ["把互斥事件当独立事件。", "条件概率没有更新样本空间。", "分类讨论有重叠或遗漏。"],
+            "review_checklist": ["样本空间是否完整。", "事件是否有交叉或条件限制。", "每一类概率相加前是否互斥。"],
+            "visual_hint": "分阶段试验建议画树状图；集合关系复杂时建议画韦恩图。",
         },
         "sequence": {
-            "title": "数列递推与趋势图",
-            "fallback_focus": "数列通项、递推关系和求和结构",
-            "coordinate_system": "discrete_index",
-            "core_layer_type": "discrete_points",
-            "drawing_hint": "以 n 为横轴画离散点或阶梯图，并把递推箭头、差分或累加区域标出来。",
-            "observation_hint": "观察相邻项关系、增长趋势和求和结构，再决定公式法、递推法或裂项法。",
-            "parameter_hint": "可把 n、首项、公差、公比或递推参数作为滑块。",
-            "default_step": "先写出前几项，再寻找差分、比值或递推不变量。",
-            "student_tasks": ["列出前 3 到 5 项，观察差分或比值。", "把通项和前 n 项和分别标成两条序列。"],
-            "render_hints": ["离散点不要连成连续函数。", "递推关系用箭头标出从 n 到 n+1 的变化。"],
-            "annotations": ["首项", "公差/公比", "递推箭头", "前 n 项和"],
-            "misconception_checks": ["不要把数列当连续函数处理。", "注意 n 的起始值。"],
+            "title": "数列题复盘卡",
+            "core_idea": "数列题要从前几项、相邻项关系、递推结构和求和方式入手，判断是等差等比、差分、裂项还是构造新数列。",
+            "formula_focus": "整理通项、递推式、差分、比值和前 n 项和之间的关系。",
+            "default_transformations": ["先写出前几项观察规律。", "比较差分、比值或递推不变量。", "根据结构选择公式法、递推法、错位相减或裂项相消。"],
+            "solution_path": [
+                {"action": "列前几项", "reason": "规律和起始下标通常先从具体项暴露出来。"},
+                {"action": "找相邻关系", "reason": "差分、比值和递推式决定方法。"},
+                {"action": "选择求和策略", "reason": "等差等比、错位相减、裂项相消适用场景不同。"},
+            ],
+            "mistake_traps": ["把数列当连续函数处理。", "忽略 n 的起始值。", "求和时上下限错位。"],
+            "review_checklist": ["前几项是否和通项一致。", "递推式的起始条件是否使用。", "求和上下限和项数是否核对。"],
+            "visual_hint": "一般不需要连续图像；可用表格列出 n、a_n、S_n 或相邻项差分。",
         },
         "vector": {
-            "title": "向量关系示意图",
-            "fallback_focus": "向量坐标、夹角、投影或线性组合",
-            "coordinate_system": "vector_plane",
-            "core_layer_type": "vector",
-            "drawing_hint": "画出向量起点、终点、合成平行四边形、投影线和夹角。",
-            "observation_hint": "把代数坐标和几何方向对应起来，重点看夹角、投影和线性组合。",
-            "parameter_hint": "可把向量分量、夹角或比例系数作为滑块。",
-            "default_step": "先统一起点或坐标，再计算数量积、模长或投影。",
-            "student_tasks": ["统一向量起点后再比较方向。", "把数量积与夹角/投影关系写在图旁。"],
-            "render_hints": ["向量箭头要有方向和标签。", "投影线用虚线，合向量用强调色。"],
-            "annotations": ["起点/终点", "夹角", "投影", "合向量"],
-            "misconception_checks": ["向量平移不改变向量本身。", "数量积为 0 表示垂直而不是向量为 0。"],
+            "title": "向量题复盘卡",
+            "core_idea": "向量题要把坐标运算和几何意义对应起来，重点关注起点统一、线性组合、数量积、模长、夹角和投影。",
+            "formula_focus": "整理向量坐标、数量积、模长、夹角或投影公式。",
+            "default_transformations": ["统一向量起点或坐标表示。", "把几何条件转成数量积、模长或线性组合。", "用坐标运算验证方向、夹角和长度。"],
+            "solution_path": [
+                {"action": "统一表示", "reason": "不同起点的向量要先平移或坐标化。"},
+                {"action": "转成运算", "reason": "垂直、夹角、投影和共线都有对应代数条件。"},
+                {"action": "回到几何意义", "reason": "计算结果要解释为方向、长度或位置关系。"},
+            ],
+            "mistake_traps": ["向量平移后忘记方向不变。", "数量积为 0 的含义误解。", "夹角公式漏掉模长或符号。"],
+            "review_checklist": ["向量起点或坐标是否统一。", "数量积、模长、夹角公式是否完整。", "最后结论是否解释几何关系。"],
+            "visual_hint": "若涉及夹角、投影或合向量，可画箭头图标出方向、投影线和合成关系。",
         },
         "linear_algebra": {
-            "title": "线性代数结构图",
-            "fallback_focus": "矩阵、向量空间、特征值或线性变换",
-            "coordinate_system": "matrix_transform",
-            "core_layer_type": "matrix_map",
-            "drawing_hint": "用矩阵表格、向量映射或特征方向示意图展示变换前后关系。",
-            "observation_hint": "把矩阵运算看成空间变换，重点观察基向量、特征方向和维数变化。",
-            "parameter_hint": "可把矩阵元素、特征值或变换系数作为控件。",
-            "default_step": "先确定矩阵结构，再分析秩、行列式、逆矩阵或特征值。",
-            "student_tasks": ["标出矩阵作用前后的基向量。", "把特征值对应的伸缩倍数写在特征方向旁。"],
-            "render_hints": ["矩阵块和向量箭头并列展示。", "若涉及行变换，展示每一步矩阵变化。"],
-            "annotations": ["基向量", "特征方向", "秩/维数", "行变换"],
-            "misconception_checks": ["矩阵乘法顺序不能交换。", "可逆与行列式非零、满秩要对应检查。"],
+            "title": "线性代数复盘卡",
+            "core_idea": "线性代数题要明确矩阵运算对象和结构，关注乘法顺序、秩、行列式、可逆性、特征值和线性变换含义。",
+            "formula_focus": "整理矩阵运算、特征值映射、行列式、秩或逆矩阵关系。",
+            "default_transformations": ["先确认矩阵维度和运算顺序。", "根据题意选择秩、行列式、逆矩阵或特征值工具。", "把结果和可逆、线性无关或特征方向联系起来。"],
+            "solution_path": [
+                {"action": "检查维度和顺序", "reason": "矩阵乘法通常不能交换，维度错会导致整题失效。"},
+                {"action": "锁定结构性质", "reason": "秩、行列式、可逆性和特征值各自服务不同问题。"},
+                {"action": "使用对应定理", "reason": "例如 $A^k$ 的特征值来自特征值的 k 次方。"},
+            ],
+            "mistake_traps": ["矩阵乘法顺序写反。", "把特征值和特征向量的变化规律混淆。", "可逆、满秩、行列式非零没有对应检查。"],
+            "review_checklist": ["矩阵维度和乘法顺序是否核对。", "使用的定理是否满足前提。", "特征值、行列式、秩的结论是否对应题目问法。"],
+            "visual_hint": "如果题目涉及线性变换，可用矩阵作用前后关系或特征方向示意帮助理解；纯计算题可不画图。",
         },
         "algebra": {
-            "title": "代数关系拆解图",
-            "fallback_focus": "方程、不等式或代数变形链",
-            "coordinate_system": "symbolic_flow",
-            "core_layer_type": "formula_flow",
-            "drawing_hint": "把条件、变形、目标结论拆成流程节点，并标出等价变形和非等价推理。",
-            "observation_hint": "先确认每一步变形是否等价，再关注定义域、符号和取值范围。",
-            "parameter_hint": "可把未知量、参数范围或临界点作为控件。",
-            "default_step": "先整理条件和目标，再逐步做等价变形或分类讨论。",
-            "student_tasks": ["把条件、目标和关键变形写成节点。", "遇到不等式时单独标出符号变化和范围限制。"],
-            "render_hints": ["等价变形用实线箭头，分类讨论用分支节点。", "定义域和限制条件放在固定提示区。"],
-            "annotations": ["定义域", "等价变形", "分类讨论", "临界点"],
-            "misconception_checks": ["开方、平方、约分可能引入或丢失解。", "不等式乘除负数要变号。"],
+            "title": "代数题复盘卡",
+            "core_idea": "代数题的重点是保证每一步变形合法，先整理条件和目标，再处理定义域、符号、临界点和分类讨论。",
+            "formula_focus": "把方程、不等式、参数范围或代数变形链整理清楚。",
+            "default_transformations": ["先写清条件、目标和定义域。", "逐步做等价变形，并标记非等价操作。", "遇到参数、不等式或绝对值时分类讨论。"],
+            "solution_path": [
+                {"action": "先写限制", "reason": "定义域、分母不为零和根号条件会影响解集。"},
+                {"action": "做等价变形", "reason": "变形是否等价决定有没有增根或漏解。"},
+                {"action": "分类并回代", "reason": "参数题和不等式题必须检查每类条件。"},
+            ],
+            "mistake_traps": ["平方、开方、约分导致增根或漏解。", "不等式乘除负数忘记变号。", "分类讨论没有覆盖所有临界点。"],
+            "review_checklist": ["定义域和限制条件是否先写。", "非等价变形后是否回代检验。", "分类讨论是否不重不漏。"],
+            "visual_hint": "",
         },
     }
     return profiles.get(scene, profiles["algebra"])
+
+
+def _math_formula_transformations(
+    scene: str,
+    *,
+    profile: dict,
+    expressions: List[str],
+    solution_steps: List[str],
+    cleaned_question: str,
+) -> List[dict]:
+    transformations: List[dict] = []
+    if expressions:
+        for index, expression in enumerate(expressions[:3], start=1):
+            transformations.append(
+                {
+                    "label": f"关键式 {index}",
+                    "detail": expression,
+                }
+            )
+
+    lowered = cleaned_question.lower()
+    if scene == "calculus":
+        if any(token in lowered for token in ["对称", "-\\frac", "-π", "-pi", "奇", "偶"]):
+            transformations.append(
+                {
+                    "label": "对称区间",
+                    "detail": "先判断被积函数奇偶性：奇函数在对称区间上积分为 0，偶函数可转化为两倍半区间积分。",
+                }
+            )
+        if any(token in lowered for token in ["sin", "cos", "tan", "三角"]):
+            transformations.append(
+                {
+                    "label": "三角恒等变形",
+                    "detail": "优先检查半角、平方降幂、诱导公式和和差关系，把被积函数化成更容易积分的形式。",
+                }
+            )
+        if any(token in lowered for token in ["分部", "e^", "e^x"]):
+            transformations.append(
+                {
+                    "label": "分部积分",
+                    "detail": "乘积型积分先选择能简化的 $u$ 和容易积分的 $dv$，别忘记边界项。",
+                }
+            )
+
+    for step in solution_steps[:2]:
+        if step and all(step != item["detail"] for item in transformations):
+            transformations.append({"label": "解题步骤提示", "detail": step})
+
+    if not transformations:
+        transformations = [
+            {"label": "关键整理", "detail": profile["formula_focus"]},
+            *({"label": f"推荐变形 {i}", "detail": item} for i, item in enumerate(profile["default_transformations"][:2], start=1)),
+        ]
+    return transformations[:5]
+
+
+def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
+    if solution_steps:
+        profile_path = profile["solution_path"]
+        path = [
+            {
+                "action": step,
+                "reason": profile_path[index - 1]["reason"]
+                if index - 1 < len(profile_path)
+                else "这一步用于把题目条件继续转化为可计算、可验证的数学关系。",
+            }
+            for index, step in enumerate(solution_steps[:4], start=1)
+            if step.strip()
+        ]
+        if path:
+            return path
+    return profile["solution_path"][:4]
 
 
 def _math_extract_expressions(text: str) -> List[str]:
@@ -380,19 +416,6 @@ def _math_extract_expressions(text: str) -> List[str]:
             if 2 <= len(value) <= 140 and value not in candidates:
                 candidates.append(value)
     return candidates
-
-
-def _math_detect_parameters(text: str) -> List[str]:
-    reserved = {"x", "y", "n", "m"}
-    params: List[str] = []
-    for match in re.finditer(r"(?<![a-zA-Z])([a-zA-Z])(?=\s*(?:为|是|∈|>|<|=|,|，|、|[+\-*/^]))", text):
-        name = match.group(1)
-        if name.lower() not in reserved and name not in params:
-            params.append(name)
-    for name in ["a", "b", "c", "k", "p", "q", "t"]:
-        if re.search(rf"(?<![a-zA-Z]){name}(?![a-zA-Z])", text, re.IGNORECASE) and name not in params:
-            params.append(name)
-    return params
 
 
 def _build_physics_html(
@@ -2438,9 +2461,20 @@ def _is_chart_spec_valid(parsed: dict) -> bool:
     if renderer and renderer != "generic_chart_spec":
         return False
 
+    if str(parsed.get("core_idea") or "").strip():
+        return True
     has_content = any(
         isinstance(parsed.get(key), list) and len(parsed.get(key) or []) > 0
-        for key in ["plot_suggestions", "student_tasks", "step_mapping", "render_hints"]
+        for key in [
+            "formula_transformations",
+            "solution_path",
+            "mistake_traps",
+            "review_checklist",
+            "plot_suggestions",
+            "student_tasks",
+            "step_mapping",
+            "render_hints",
+        ]
     )
     visual_model = parsed.get("visual_model")
     if isinstance(visual_model, dict) and visual_model:

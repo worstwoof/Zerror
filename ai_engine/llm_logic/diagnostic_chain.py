@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "可以额外返回一个 rich_artifacts 项，优先用 chart_spec 表达函数图像、几何构型、圆锥曲线、概率统计、数列、向量或线性代数结构；内容必须是可解析 JSON，不要只写文字摘要。",
+    "数学": "可以额外返回一个 rich_artifacts 项，artifact_type 用 chart_spec；content 必须是可解析 JSON，定位为学生错题复盘卡，不要返回渲染器配置或可交互参数。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
@@ -785,12 +785,15 @@ class DiagnosticService:
         if subject_name == "数学":
             return (
                 "如果返回 chart_spec，请严格满足以下要求："
-                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、scene、title、knowledge_points、plot_suggestions、student_tasks 和 step_mapping；"
-                "2. scene 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
-                "3. plot_suggestions 每项使用 {label, value}，value 直接写给学生看的短句，不要嵌套复杂对象；"
-                "4. 能提取公式时，把关键公式放入 expressions 数组，优先用 LaTeX；"
-                "5. visual_model 可描述坐标系、图层、标注、可交互参数，但不要依赖外部图片或 CDN；"
-                "6. 内容要围绕本题具体对象，比如函数零点、几何辅助线、圆锥曲线焦点、事件树、数列递推、向量投影或矩阵变换。"
+                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、version、scene、topic_type、title、knowledge_points、expressions、core_idea、formula_transformations、solution_path、mistake_traps、review_checklist、visual_hint；"
+                "2. scene/topic_type 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
+                "3. core_idea 用 1 到 2 句话讲清本题最关键的数学思想；"
+                "4. formula_transformations 使用 [{label, detail}]，写关键公式、恒等变形、代换、对称性、分部积分等；"
+                "5. solution_path 使用 [{action, reason}]，最多 4 步，每步说明要做什么以及为什么这样做；"
+                "6. mistake_traps 和 review_checklist 必须和本题强相关，避免泛泛而谈；"
+                "7. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
+                "8. 禁止生成 visual_model、controls、可交互参数、plot_suggestions 这类偏渲染实现的字段；"
+                "9. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
             )
         if subject_name == "化学":
             return (

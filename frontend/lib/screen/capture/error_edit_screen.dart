@@ -1330,11 +1330,158 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildChartSpecArtifact(Map<String, dynamic> data) {
     final scene = (data['scene'] ?? '').toString();
+    final topicType = (data['topic_type'] ?? scene).toString();
+    final coreIdea = (data['core_idea'] ?? '').toString().trim();
+    final expressions = _artifactStringList(data['expressions']);
+    final formulaTransformations =
+        _artifactMapList(data['formula_transformations']);
+    final solutionPath = _artifactMapList(data['solution_path']);
+    final mistakeTraps = _artifactStringList(data['mistake_traps']);
+    final reviewChecklist = _artifactStringList(data['review_checklist']);
+    final visualHint = (data['visual_hint'] ?? '').toString().trim();
     final knowledgePoints =
         (data['knowledge_points'] as List<dynamic>? ?? const [])
             .map((item) => item.toString())
             .where((item) => item.trim().isNotEmpty)
             .toList();
+    final hasReviewCard = coreIdea.isNotEmpty ||
+        formulaTransformations.isNotEmpty ||
+        solutionPath.isNotEmpty ||
+        mistakeTraps.isNotEmpty ||
+        reviewChecklist.isNotEmpty ||
+        visualHint.isNotEmpty;
+
+    if (hasReviewCard) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (topicType.isNotEmpty)
+            _buildArtifactMetaChip('题型', _chartSceneLabel(topicType)),
+          if (knowledgePoints.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: knowledgePoints
+                  .map((item) => _buildArtifactMetaPill(item))
+                  .toList(),
+            ),
+          ],
+          if (coreIdea.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactInfoTile(
+              label: '核心思路',
+              child: AppLatexText(
+                coreIdea,
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+          if (expressions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactSectionTitle('关键公式'),
+            const SizedBox(height: 8),
+            ...expressions.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactBullet(item),
+              ),
+            ),
+          ],
+          if (formulaTransformations.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactSectionTitle('关键变形'),
+            const SizedBox(height: 8),
+            ...formulaTransformations.map((item) {
+              final label = (item['label'] ?? '变形提示').toString();
+              final detail = (item['detail'] ?? '').toString().trim();
+              if (detail.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactInfoTile(
+                  label: label,
+                  child: AppLatexText(
+                    detail,
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+          if (solutionPath.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactSectionTitle('解题路线'),
+            const SizedBox(height: 8),
+            ...solutionPath.asMap().entries.map((entry) {
+              final item = entry.value;
+              final action =
+                  (item['action'] ?? '步骤 ${entry.key + 1}').toString();
+              final reason = (item['reason'] ?? '').toString().trim();
+              if (reason.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactInfoTile(
+                  label: action,
+                  child: AppLatexText(
+                    reason,
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+          if (mistakeTraps.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactSectionTitle('易错提醒'),
+            const SizedBox(height: 8),
+            ...mistakeTraps.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactBullet(item),
+              ),
+            ),
+          ],
+          if (reviewChecklist.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactSectionTitle('复盘清单'),
+            const SizedBox(height: 8),
+            ...reviewChecklist.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildArtifactBullet(item),
+              ),
+            ),
+          ],
+          if (visualHint.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildArtifactInfoTile(
+              label: '可视化提示',
+              child: AppLatexText(
+                visualHint,
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
     final suggestions = (data['plot_suggestions'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .toList();
@@ -1420,6 +1567,25 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         ],
       ],
     );
+  }
+
+  List<String> _artifactStringList(dynamic value) {
+    if (value is! List<dynamic>) {
+      return const [];
+    }
+    return value
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _artifactMapList(dynamic value) {
+    if (value is! List<dynamic>) {
+      return const [];
+    }
+    return value
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   Widget _buildStudyCardArtifact(Map<String, dynamic> data) {
