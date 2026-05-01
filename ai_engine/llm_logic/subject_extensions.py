@@ -28,6 +28,8 @@ def filter_subject_extension_artifacts(
             cleaned_question=cleaned_question,
         ):
             continue
+        if artifact.artifact_type == "chart_spec":
+            artifact = _with_chart_spec_legacy_display_fields(artifact)
         filtered.append(artifact)
     return filtered
 
@@ -111,6 +113,13 @@ def _build_math_chart_spec(
     expressions = _math_extract_expressions(cleaned_question)
     title = profile["title"]
     solution_path = _math_solution_path(profile, solution_steps)
+    formula_transformations = _math_formula_transformations(
+        scene,
+        profile=profile,
+        expressions=expressions,
+        solution_steps=solution_steps,
+        cleaned_question=cleaned_question,
+    )
 
     content = {
         "renderer": "generic_chart_spec",
@@ -122,17 +131,23 @@ def _build_math_chart_spec(
         "knowledge_points": knowledge_points[:4],
         "expressions": expressions[:4],
         "core_idea": profile["core_idea"],
-        "formula_transformations": _math_formula_transformations(
-            scene,
-            profile=profile,
-            expressions=expressions,
-            solution_steps=solution_steps,
-            cleaned_question=cleaned_question,
-        ),
+        "formula_transformations": formula_transformations,
         "solution_path": solution_path,
         "mistake_traps": profile["mistake_traps"],
         "review_checklist": profile["review_checklist"],
         "visual_hint": profile["visual_hint"],
+        # Compatibility for older mobile clients that only render these fields.
+        "plot_suggestions": _math_legacy_display_sections(
+            profile=profile,
+            formula_transformations=formula_transformations,
+            solution_path=solution_path,
+        ),
+        "student_tasks": profile["review_checklist"],
+        "step_mapping": [
+            f"{item['action']}：{item['reason']}"
+            for item in solution_path[:4]
+            if item.get("action") and item.get("reason")
+        ],
     }
     return RichArtifact(
         artifact_type="chart_spec",
@@ -397,6 +412,50 @@ def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
         if path:
             return path
     return profile["solution_path"][:4]
+
+
+def _math_legacy_display_sections(
+    *,
+    profile: dict,
+    formula_transformations: List[dict],
+    solution_path: List[dict],
+) -> List[dict]:
+    sections = [
+        {
+            "label": "核心思路",
+            "value": profile["core_idea"],
+        }
+    ]
+    if formula_transformations:
+        sections.append(
+            {
+                "label": "关键变形",
+                "value": "；".join(
+                    f"{item['label']}：{item['detail']}"
+                    for item in formula_transformations[:3]
+                    if item.get("label") and item.get("detail")
+                ),
+            }
+        )
+    if solution_path:
+        sections.append(
+            {
+                "label": "解题路线",
+                "value": "；".join(
+                    f"{item['action']}：{item['reason']}"
+                    for item in solution_path[:3]
+                    if item.get("action") and item.get("reason")
+                ),
+            }
+        )
+    if profile["mistake_traps"]:
+        sections.append(
+            {
+                "label": "易错提醒",
+                "value": "；".join(profile["mistake_traps"][:3]),
+            }
+        )
+    return [section for section in sections if section.get("value")]
 
 
 def _math_extract_expressions(text: str) -> List[str]:
@@ -2480,6 +2539,70 @@ def _is_chart_spec_valid(parsed: dict) -> bool:
     if isinstance(visual_model, dict) and visual_model:
         has_content = True
     return has_content
+
+
+def _with_chart_spec_legacy_display_fields(artifact: RichArtifact) -> RichArtifact:
+    if artifact.mime_type != "application/json":
+        return artifact
+    try:
+        parsed = json.loads(artifact.content)
+    except json.JSONDecodeError:
+        return artifact
+    if not isinstance(parsed, dict):
+        return artifact
+    if parsed.get("plot_suggestions"):
+        return artifact
+
+    core_idea = str(parsed.get("core_idea") or "").strip()
+    transformations = parsed.get("formula_transformations")
+    solution_path = parsed.get("solution_path")
+    mistake_traps = parsed.get("mistake_traps")
+    review_checklist = parsed.get("review_checklist")
+
+    legacy_sections: List[dict] = []
+    if core_idea:
+        legacy_sections.append({"label": "核心思路", "value": core_idea})
+    if isinstance(transformations, list):
+        value = "；".join(
+            f"{item.get('label', '关键变形')}：{item.get('detail', '')}"
+            for item in transformations[:3]
+            if isinstance(item, dict) and str(item.get("detail") or "").strip()
+        )
+        if value:
+            legacy_sections.append({"label": "关键变形", "value": value})
+    if isinstance(solution_path, list):
+        value = "；".join(
+            f"{item.get('action', '解题步骤')}：{item.get('reason', '')}"
+            for item in solution_path[:3]
+            if isinstance(item, dict) and str(item.get("reason") or "").strip()
+        )
+        if value:
+            legacy_sections.append({"label": "解题路线", "value": value})
+            parsed["step_mapping"] = [
+                f"{item.get('action', '解题步骤')}：{item.get('reason', '')}"
+                for item in solution_path[:4]
+                if isinstance(item, dict) and str(item.get("reason") or "").strip()
+            ]
+    if isinstance(mistake_traps, list) and mistake_traps:
+        legacy_sections.append(
+            {
+                "label": "易错提醒",
+                "value": "；".join(str(item) for item in mistake_traps[:3] if str(item).strip()),
+            }
+        )
+    if isinstance(review_checklist, list) and review_checklist:
+        parsed["student_tasks"] = [str(item) for item in review_checklist if str(item).strip()]
+
+    if not legacy_sections:
+        return artifact
+    parsed["plot_suggestions"] = legacy_sections
+    return RichArtifact(
+        artifact_type=artifact.artifact_type,
+        title=artifact.title,
+        description=artifact.description,
+        mime_type=artifact.mime_type,
+        content=json.dumps(parsed, ensure_ascii=False, indent=2),
+    )
 
 
 def _looks_like_physics_question(cleaned_question: str) -> bool:
