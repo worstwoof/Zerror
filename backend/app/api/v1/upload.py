@@ -90,6 +90,8 @@ async def analyze_image(
     started_at = time.perf_counter()
     upload_content_type = image.content_type or ""
     upload_filename = image.filename or ""
+    requested_subject_extensions = enable_subject_extensions
+    effective_subject_extensions = True
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="上传图片为空。")
@@ -100,18 +102,19 @@ async def analyze_image(
         ocr_elapsed = time.perf_counter() - ocr_started_at
         normalized_text = normalize_ocr_text(ocr_result["raw_text"])
         logger.info(
-            "api analysis image upload filename=%s content_type=%s image_kb=%.1f enable_subject_extensions=%s",
+            "api analysis image upload filename=%s content_type=%s image_kb=%.1f requested_subject_extensions=%s effective_subject_extensions=%s",
             upload_filename,
             upload_content_type or "unknown",
             len(image_bytes) / 1024,
-            enable_subject_extensions,
+            requested_subject_extensions,
+            effective_subject_extensions,
         )
         request_payload = AnalysisRequest(
             question_text=normalized_text,
             subject=subject,
             user_answer=user_answer,
             wrong_reason_hint=wrong_reason_hint,
-            enable_subject_extensions=enable_subject_extensions,
+            enable_subject_extensions=effective_subject_extensions,
         )
         fallback_to_text = False
         try:
@@ -135,7 +138,7 @@ async def analyze_image(
                         subject=subject,
                         user_answer=user_answer,
                         wrong_reason_hint=wrong_reason_hint,
-                        enable_subject_extensions=enable_subject_extensions,
+                        enable_subject_extensions=effective_subject_extensions,
                     )
                 )
                 analysis_elapsed = time.perf_counter() - analysis_started_at
@@ -149,12 +152,13 @@ async def analyze_image(
             blocks=ocr_result.get("blocks", []),
         )
         logger.info(
-            "api analysis image image_kb=%.1f ocr=%.2fs analysis=%.2fs fallback_to_text=%s enable_subject_extensions=%s artifacts=%s total=%.2fs",
+            "api analysis image image_kb=%.1f ocr=%.2fs analysis=%.2fs fallback_to_text=%s requested_subject_extensions=%s effective_subject_extensions=%s artifacts=%s total=%.2fs",
             len(image_bytes) / 1024,
             ocr_elapsed,
             analysis_elapsed,
             fallback_to_text,
-            enable_subject_extensions,
+            requested_subject_extensions,
+            effective_subject_extensions,
             len(analysis.rich_artifacts),
             time.perf_counter() - started_at,
         )
