@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -206,9 +207,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   Future<void> _generatePhysicsAnimation() async {
     final questionText = _questionController.text.trim();
     if (questionText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先确认题目内容，再生成动画演示。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容，再生成动画演示。')));
       return;
     }
 
@@ -236,15 +237,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           _upsertInteractiveHtmlArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
-          _physicsAnimationError =
-              result.reason.trim().isEmpty ? '当前题目暂时无法生成动画演示。' : result.reason;
+          _physicsAnimationError = result.reason.trim().isEmpty
+              ? '当前题目暂时无法生成动画演示。'
+              : result.reason;
         }
       });
 
       if (result.generated && result.artifact != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('动画演示已生成，可在下方学科扩展中打开。')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('动画演示已生成，可在下方学科扩展中打开。')));
       }
     } on AiApiException catch (error) {
       if (!mounted) return;
@@ -264,9 +266,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   Future<void> _saveToArchive() async {
     final question = _questionController.text.trim();
     if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先确认题目内容')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容')));
       return;
     }
 
@@ -274,9 +276,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       final draft = _buildDraft(question);
       final created = AppStateScope.of(context).addErrorRecord(draft);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('错题已加入档案，并进入后续复习链路')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('错题已加入档案，并进入后续复习链路')));
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -284,9 +286,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         ),
       );
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败：$error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败：$error')));
     }
   }
 
@@ -294,9 +296,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final question = _questionController.text.trim();
     if (_isSaving) return;
     if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先确认题目内容')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容')));
       return;
     }
 
@@ -325,9 +327,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _isSaving = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('错题已加入档案')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('错题已加入档案')));
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -339,9 +341,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       setState(() {
         _isSaving = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败: $error')));
     }
   }
 
@@ -365,8 +367,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   NewErrorDraft _buildDraft(String question) {
     final subject = _subject == '通用' ? _inferSubject(question) : _subject;
     final topic = _inferTopic(question, subject);
-    final reason =
-        _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
+    final reason = _selectedErrorReason.isNotEmpty
+        ? _selectedErrorReason
+        : '概念模糊';
     final reflection = _reflectionController.text.trim();
 
     final summaryParts = <String>[
@@ -492,8 +495,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         actions: [
           IconButton(
             onPressed: _isAiThinking ? null : _generateAiAnalysis,
-            icon: const Icon(Icons.refresh_rounded,
-                color: AppPalette.textPrimary),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: AppPalette.textPrimary,
+            ),
             tooltip: '重新生成解析',
           ),
         ],
@@ -544,7 +549,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                   ? '正在生成归因、知识点和后续训练建议'
                   : '正在结合“$_selectedErrorReason”重新分析',
               style: const TextStyle(
-                  color: AppPalette.textSecondary, fontSize: 13),
+                color: AppPalette.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -553,8 +560,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildAnalysisDashboard() {
-    final subject =
-        _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
+    final subject = _subject == '通用'
+        ? _inferSubject(_questionController.text)
+        : _subject;
     final topic = _inferTopic(_questionController.text, subject);
 
     return SingleChildScrollView(
@@ -723,10 +731,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             alignment: Alignment.center,
             child: const Text(
               '预留：后续可接入动态板书 / HTML 扩展内容',
-              style: TextStyle(
-                color: AppPalette.textSecondary,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
             ),
           ),
           if (_supportsPhysicsAnimation()) ...[
@@ -885,7 +890,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             final question = entry.value;
             return Padding(
               padding: EdgeInsets.only(
-                  bottom: index == _similarQuestions.length - 1 ? 0 : 12),
+                bottom: index == _similarQuestions.length - 1 ? 0 : 12,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -960,10 +966,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           TextField(
             controller: _reflectionController,
             maxLines: 3,
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: AppPalette.textPrimary, fontSize: 14),
             decoration: InputDecoration(
               hintText: '写下你自己的避坑笔记...',
               hintStyle: const TextStyle(color: AppPalette.textSecondary),
@@ -980,8 +983,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _isAiThinking ? null : _generateAiAnalysis,
-              icon: const Icon(Icons.auto_awesome,
-                  color: AppPalette.matchaMist, size: 18),
+              icon: const Icon(
+                Icons.auto_awesome,
+                color: AppPalette.matchaMist,
+                size: 18,
+              ),
               label: const Text(
                 '结合当前题目重新分析',
                 style: TextStyle(color: AppPalette.matchaMist),
@@ -1072,8 +1078,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                     _isGeneratingPhysicsAnimation
                         ? '生成中...'
                         : hasArtifact
-                            ? '重新生成'
-                            : '生成动画',
+                        ? '重新生成'
+                        : '生成动画',
                     style: const TextStyle(color: AppPalette.almondCream),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -1133,8 +1139,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final content = (artifact['content'] ?? '').toString().trim();
 
     final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
-    final displayDescription =
-        description.isEmpty ? _fallbackArtifactDescription(type) : description;
+    final displayDescription = description.isEmpty
+        ? _fallbackArtifactDescription(type)
+        : description;
     final previewText = _artifactPreviewText(type, mimeType, content);
 
     return Container(
@@ -1290,10 +1297,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         }
         break;
       case 'interactive_html':
-        return _buildInteractiveHtmlArtifact(
-          title: title,
-          content: content,
-        );
+        return _buildInteractiveHtmlArtifact(title: title, content: content);
     }
 
     if (previewText.isEmpty) {
@@ -1333,23 +1337,29 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final topicType = (data['topic_type'] ?? scene).toString();
     final coreIdea = (data['core_idea'] ?? '').toString().trim();
     final expressions = _artifactStringList(data['expressions']);
-    final formulaTransformations =
-        _artifactMapList(data['formula_transformations']);
+    final formulaTransformations = _artifactMapList(
+      data['formula_transformations'],
+    );
     final solutionPath = _artifactMapList(data['solution_path']);
     final mistakeTraps = _artifactStringList(data['mistake_traps']);
     final reviewChecklist = _artifactStringList(data['review_checklist']);
     final visualHint = (data['visual_hint'] ?? '').toString().trim();
+    final coordinateGraph = data['coordinate_graph'] is Map<String, dynamic>
+        ? data['coordinate_graph'] as Map<String, dynamic>
+        : null;
     final knowledgePoints =
         (data['knowledge_points'] as List<dynamic>? ?? const [])
             .map((item) => item.toString())
             .where((item) => item.trim().isNotEmpty)
             .toList();
-    final hasReviewCard = coreIdea.isNotEmpty ||
+    final hasReviewCard =
+        coreIdea.isNotEmpty ||
         formulaTransformations.isNotEmpty ||
         solutionPath.isNotEmpty ||
         mistakeTraps.isNotEmpty ||
         reviewChecklist.isNotEmpty ||
-        visualHint.isNotEmpty;
+        visualHint.isNotEmpty ||
+        coordinateGraph != null;
 
     if (hasReviewCard) {
       return Column(
@@ -1392,6 +1402,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ],
+          if (coordinateGraph != null) ...[
+            const SizedBox(height: 12),
+            _buildCoordinateGraphArtifact(coordinateGraph),
+          ],
           if (formulaTransformations.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildArtifactSectionTitle('关键变形'),
@@ -1422,8 +1436,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             const SizedBox(height: 8),
             ...solutionPath.asMap().entries.map((entry) {
               final item = entry.value;
-              final action =
-                  (item['action'] ?? '步骤 ${entry.key + 1}').toString();
+              final action = (item['action'] ?? '步骤 ${entry.key + 1}')
+                  .toString();
               final reason = (item['reason'] ?? '').toString().trim();
               if (reason.isEmpty) return const SizedBox.shrink();
               return Padding(
@@ -1489,11 +1503,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         .map((item) => item.toString())
         .where((item) => item.trim().isNotEmpty)
         .toList();
-    final stepMapping = (data['step_mapping'] as List<dynamic>? ?? const [])
-        .map((item) => item.toString())
-        .where((item) => item.trim().isNotEmpty)
-        .toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1544,29 +1553,53 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
         ],
-        if (stepMapping.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _buildArtifactSectionTitle('和解题步骤的对应关系'),
-          const SizedBox(height: 8),
-          ...stepMapping.asMap().entries.map(
-                (entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _buildArtifactInfoTile(
-                    label: '步骤 ${entry.key + 1}',
-                    child: AppLatexText(
-                      entry.value,
-                      style: const TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 13,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-        ],
       ],
     );
+  }
+
+  Widget _buildCoordinateGraphArtifact(Map<String, dynamic> graph) {
+    final title = (graph['title'] ?? '二维坐标辅助图').toString();
+    final notes = _coordinateGraphNotes(graph);
+    return _buildArtifactInfoTile(
+      label: title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1.45,
+            child: CustomPaint(
+              painter: _MathCoordinateGraphPainter(graph),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...notes.map(
+              (note) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _buildArtifactBullet(note),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<String> _coordinateGraphNotes(Map<String, dynamic> graph) {
+    final raw = graph['student_focus'] ?? graph['annotations'];
+    if (raw is! List<dynamic>) {
+      return const [];
+    }
+    return raw
+        .map((item) {
+          if (item is Map<String, dynamic>) {
+            return (item['text'] ?? item['label'] ?? '').toString();
+          }
+          return item.toString();
+        })
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
   }
 
   List<String> _artifactStringList(dynamic value) {
@@ -1583,9 +1616,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (value is! List<dynamic>) {
       return const [];
     }
-    return value
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    return value.whereType<Map<String, dynamic>>().toList();
   }
 
   Widget _buildStudyCardArtifact(Map<String, dynamic> data) {
@@ -1675,7 +1706,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               color: AppPalette.night.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              ),
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1695,19 +1727,23 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           const SizedBox(height: 12),
           _buildArtifactSectionTitle('执行思路'),
           const SizedBox(height: 8),
-          ...traceSteps.map((step) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildArtifactBullet(step),
-              )),
+          ...traceSteps.map(
+            (step) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildArtifactBullet(step),
+            ),
+          ),
         ],
         if (debugChecklist.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildArtifactSectionTitle('调试清单'),
           const SizedBox(height: 8),
-          ...debugChecklist.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildArtifactBullet(item),
-              )),
+          ...debugChecklist.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildArtifactBullet(item),
+            ),
+          ),
         ],
       ],
     );
@@ -1955,10 +1991,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppPalette.textPrimary,
-          fontSize: 12,
-        ),
+        style: const TextStyle(color: AppPalette.textPrimary, fontSize: 12),
       ),
     );
   }
@@ -1988,5 +2021,234 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       default:
         return scene;
     }
+  }
+}
+
+class _MathCoordinateGraphPainter extends CustomPainter {
+  const _MathCoordinateGraphPainter(this.graph);
+
+  final Map<String, dynamic> graph;
+
+  static const _curveColor = AppPalette.almondCream;
+  static const _axisColor = Color(0x99FFFFFF);
+  static const _gridColor = Color(0x1AFFFFFF);
+  static const _helperColor = Color(0x99A8F08F);
+  static const _pointColor = Color(0xFFFFD59A);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final plot = Rect.fromLTWH(30, 14, size.width - 42, size.height - 34);
+    if (plot.width <= 0 || plot.height <= 0) return;
+
+    final xRange = _range(graph['x_range'], -4, 4);
+    final yRange = _range(graph['y_range'], -3, 3);
+    final xMin = xRange[0];
+    final xMax = xRange[1] == xMin ? xRange[0] + 1 : xRange[1];
+    final yMin = yRange[0];
+    final yMax = yRange[1] == yMin ? yRange[0] + 1 : yRange[1];
+
+    Offset project(num x, num y) {
+      final dx = (x.toDouble() - xMin) / (xMax - xMin);
+      final dy = (y.toDouble() - yMin) / (yMax - yMin);
+      final px = dx.clamp(0.0, 1.0).toDouble();
+      final py = dy.clamp(0.0, 1.0).toDouble();
+      return Offset(
+        plot.left + px * plot.width,
+        plot.bottom - py * plot.height,
+      );
+    }
+
+    _drawGrid(canvas, plot);
+    _drawAxes(canvas, plot, project, xMin, xMax, yMin, yMax);
+    _drawLines(canvas, project);
+    _drawCurves(canvas, project);
+    _drawPoints(canvas, project);
+  }
+
+  void _drawGrid(Canvas canvas, Rect plot) {
+    final gridPaint = Paint()
+      ..color = _gridColor
+      ..strokeWidth = 1;
+    for (var i = 0; i <= 4; i++) {
+      final x = plot.left + plot.width * i / 4;
+      final y = plot.top + plot.height * i / 4;
+      canvas.drawLine(Offset(x, plot.top), Offset(x, plot.bottom), gridPaint);
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), gridPaint);
+    }
+  }
+
+  void _drawAxes(
+    Canvas canvas,
+    Rect plot,
+    Offset Function(num x, num y) project,
+    double xMin,
+    double xMax,
+    double yMin,
+    double yMax,
+  ) {
+    final axisPaint = Paint()
+      ..color = _axisColor
+      ..strokeWidth = 1.2;
+    final xAxisY = yMin <= 0 && yMax >= 0 ? project(0, 0).dy : plot.bottom;
+    final yAxisX = xMin <= 0 && xMax >= 0 ? project(0, 0).dx : plot.left;
+    canvas.drawLine(
+      Offset(plot.left, xAxisY),
+      Offset(plot.right, xAxisY),
+      axisPaint,
+    );
+    canvas.drawLine(
+      Offset(yAxisX, plot.top),
+      Offset(yAxisX, plot.bottom),
+      axisPaint,
+    );
+    _drawLabel(canvas, 'x', Offset(plot.right - 8, xAxisY + 4), _axisColor);
+    _drawLabel(canvas, 'y', Offset(yAxisX + 5, plot.top), _axisColor);
+  }
+
+  void _drawCurves(Canvas canvas, Offset Function(num x, num y) project) {
+    final curves = _mapList(graph['curves']);
+    for (final curve in curves) {
+      final points = _pointList(curve['points']);
+      if (points.length < 2) continue;
+      final path = Path()
+        ..moveTo(
+          project(points.first.dx, points.first.dy).dx,
+          project(points.first.dx, points.first.dy).dy,
+        );
+      for (final point in points.skip(1)) {
+        final projected = project(point.dx, point.dy);
+        path.lineTo(projected.dx, projected.dy);
+      }
+      final paint = Paint()
+        ..color = _curveColor
+        ..strokeWidth = 2.2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  void _drawLines(Canvas canvas, Offset Function(num x, num y) project) {
+    final lines = _mapList(graph['lines']);
+    for (final line in lines) {
+      final from = _offsetFromPair(line['from']);
+      final to = _offsetFromPair(line['to']);
+      if (from == null || to == null) continue;
+      final style = (line['style'] ?? '').toString();
+      final paint = Paint()
+        ..color = style == 'axis' ? _axisColor : _helperColor
+        ..strokeWidth = style == 'axis' ? 1.4 : 1.5;
+      final start = project(from.dx, from.dy);
+      final end = project(to.dx, to.dy);
+      if (style == 'dashed') {
+        _drawDashedLine(canvas, start, end, paint);
+      } else {
+        canvas.drawLine(start, end, paint);
+      }
+      final label = (line['label'] ?? '').toString();
+      if (label.isNotEmpty) {
+        _drawLabel(
+          canvas,
+          label,
+          Offset((start.dx + end.dx) / 2 + 4, (start.dy + end.dy) / 2 - 12),
+          _helperColor,
+        );
+      }
+    }
+  }
+
+  void _drawPoints(Canvas canvas, Offset Function(num x, num y) project) {
+    final points = _mapList(graph['points']);
+    final pointPaint = Paint()..color = _pointColor;
+    for (final point in points) {
+      final x = _toDouble(point['x']);
+      final y = _toDouble(point['y']);
+      if (x == null || y == null) continue;
+      final offset = project(x, y);
+      canvas.drawCircle(offset, 3.5, pointPaint);
+      final label = (point['label'] ?? '').toString();
+      if (label.isNotEmpty) {
+        _drawLabel(canvas, label, offset + const Offset(5, -15), _pointColor);
+      }
+    }
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    final vector = end - start;
+    final distance = vector.distance;
+    if (distance <= 0) return;
+    final direction = vector / distance;
+    var drawn = 0.0;
+    while (drawn < distance) {
+      final next = math.min(drawn + 7, distance);
+      canvas.drawLine(
+        start + direction * drawn,
+        start + direction * next,
+        paint,
+      );
+      drawn += 12;
+    }
+  }
+
+  void _drawLabel(Canvas canvas, String text, Offset offset, Color color) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      maxLines: 1,
+      ellipsis: '…',
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 92);
+    painter.paint(canvas, offset);
+  }
+
+  static List<double> _range(
+    dynamic value,
+    double fallbackMin,
+    double fallbackMax,
+  ) {
+    if (value is List<dynamic> && value.length >= 2) {
+      final minValue = _toDouble(value[0]);
+      final maxValue = _toDouble(value[1]);
+      if (minValue != null && maxValue != null) {
+        return [math.min(minValue, maxValue), math.max(minValue, maxValue)];
+      }
+    }
+    return [fallbackMin, fallbackMax];
+  }
+
+  static List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List<dynamic>) return const [];
+    return value.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static List<Offset> _pointList(dynamic value) {
+    if (value is! List<dynamic>) return const [];
+    return value.map(_offsetFromPair).whereType<Offset>().toList();
+  }
+
+  static Offset? _offsetFromPair(dynamic value) {
+    if (value is! List<dynamic> || value.length < 2) return null;
+    final x = _toDouble(value[0]);
+    final y = _toDouble(value[1]);
+    if (x == null || y == null) return null;
+    return Offset(x, y);
+  }
+
+  static double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  @override
+  bool shouldRepaint(covariant _MathCoordinateGraphPainter oldDelegate) {
+    return oldDelegate.graph != graph;
   }
 }

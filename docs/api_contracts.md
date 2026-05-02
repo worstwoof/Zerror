@@ -134,7 +134,7 @@
 当前建议支持的扩展方向：
 
 - `interactive_html`: 物理受力分析、运动过程、光路、电路变化
-- `chart_spec`: 数学错题复盘卡，包含题型定位、核心思路、关键变形、解题路线、易错提醒和复盘清单
+- `chart_spec`: 数学错题复盘卡，包含题型定位、核心思路、关键变形、解题路线、二维坐标辅助图、易错提醒和复盘清单
 - `code_snippet`: 编程题执行轨迹、关键代码模板、输入输出样例
 - `timeline`: 生物过程流转、历史事件推演、实验步骤动画
 - `study_card`: 化学反应条件卡片、语文修辞辨析卡片、英语语法对照卡
@@ -143,7 +143,7 @@
 
 为了便于 MVP 演示，当前后端已经支持一组“按学科兜底生成”的扩展内容：
 
-- 数学：默认补充 `chart_spec`，返回面向学生复盘的结构化卡片。当前会按题型细分为 `function`、`geometry`、`conic`、`calculus`、`statistics`、`probability`、`sequence`、`vector`、`linear_algebra`、`algebra` 等场景，并补充核心思路、关键公式/变形、解题路线、易错提醒和复盘清单；不再生成可交互参数等渲染器配置。
+- 数学：默认补充 `chart_spec`，返回面向学生复盘的结构化卡片。当前会按题型细分为 `function`、`geometry`、`conic`、`calculus`、`statistics`、`probability`、`sequence`、`vector`、`linear_algebra`、`algebra` 等场景，并补充核心思路、关键公式/变形、解题路线、易错提醒和复盘清单；函数、导数和圆锥曲线类题可额外返回 `coordinate_graph`，用于展示曲线、辅助线、关键点和坐标标注；不再生成可交互参数等渲染器配置。
 - 物理：默认补充 `interactive_html`，返回可嵌入 WebView 的小型 HTML 演示页，当前覆盖受力运动、电路、光路三类模板。
 - 化学：默认补充 `study_card`，返回 JSON 卡片集合，适合做翻卡式复习界面。
 - 编程：默认补充 `code_snippet`，返回 JSON 结构的代码骨架、调试清单与执行步骤。
@@ -164,7 +164,7 @@
   "title": "导数积分复盘卡",
   "description": "把数学错题整理成可直接复盘的关键思路、变形路径和自查清单。",
   "mime_type": "application/json",
-  "content": "{ \"renderer\": \"generic_chart_spec\", \"version\": 3, \"scene\": \"calculus\", \"topic_type\": \"calculus\", \"core_idea\": \"...\", \"formula_transformations\": [...], \"solution_path\": [...], \"mistake_traps\": [...], \"review_checklist\": [...], \"visual_hint\": \"...\" }"
+  "content": "{ \"renderer\": \"generic_chart_spec\", \"version\": 3, \"scene\": \"function\", \"topic_type\": \"function\", \"core_idea\": \"...\", \"formula_transformations\": [...], \"solution_path\": [...], \"coordinate_graph\": { \"title\": \"二维坐标辅助图\", \"x_range\": [-4, 4], \"y_range\": [-3, 3], \"curves\": [{ \"label\": \"函数图像 y=f(x)\", \"points\": [[-2, 1], [0, 0], [2, 1]] }], \"lines\": [{ \"label\": \"对称轴\", \"from\": [0, -3], \"to\": [0, 3], \"style\": \"dashed\" }], \"points\": [{ \"label\": \"A(0,0)\", \"x\": 0, \"y\": 0 }], \"student_focus\": [\"把交点、端点和单调区间放到图上核对。\"] }, \"mistake_traps\": [...], \"review_checklist\": [...], \"visual_hint\": \"...\" }"
 }
 ```
 

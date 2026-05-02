@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import math
 import re
 from typing import Iterable, List, Optional
 
@@ -29,7 +30,10 @@ def filter_subject_extension_artifacts(
         ):
             continue
         if artifact.artifact_type == "chart_spec":
-            artifact = _with_chart_spec_legacy_display_fields(artifact)
+            artifact = _with_chart_spec_legacy_display_fields(
+                artifact,
+                cleaned_question=cleaned_question,
+            )
         filtered.append(artifact)
     return filtered
 
@@ -120,6 +124,12 @@ def _build_math_chart_spec(
         solution_steps=solution_steps,
         cleaned_question=cleaned_question,
     )
+    coordinate_graph = _math_coordinate_graph_spec(
+        scene,
+        cleaned_question=cleaned_question,
+        knowledge_points=knowledge_points,
+        solution_steps=solution_steps,
+    )
 
     content = {
         "renderer": "generic_chart_spec",
@@ -149,6 +159,8 @@ def _build_math_chart_spec(
             if item.get("action") and item.get("reason")
         ],
     }
+    if coordinate_graph:
+        content["coordinate_graph"] = coordinate_graph
     return RichArtifact(
         artifact_type="chart_spec",
         title=title,
@@ -160,6 +172,12 @@ def _build_math_chart_spec(
 
 def _math_scene_type(cleaned_question: str, knowledge_points: List[str]) -> str:
     text = f"{cleaned_question} {' '.join(knowledge_points)}".lower()
+    if any(keyword in text for keyword in ["解析几何", "抛物线", "椭圆", "双曲线", "焦点", "准线", "离心率", "圆锥曲线"]):
+        return "conic"
+    if any(keyword in text for keyword in ["导数", "求导", "切线", "积分", "定积分", "极限", "分部", "换元", "\\int"]):
+        return "calculus"
+    if any(keyword in text for keyword in ["函数", "二次函数", "一次函数", "指数", "对数", "三角函数", "图像", "零点", "最小值", "最大值"]):
+        return "function"
     scene_keywords = [
         ("linear_algebra", ["线性代数", "矩阵", "行列式", "特征值", "特征向量", "秩", "向量空间", "线性变换"]),
         ("statistics", ["统计", "样本", "频率", "均值", "方差", "标准差", "直方图", "箱线图"]),
@@ -394,6 +412,224 @@ def _math_formula_transformations(
             *({"label": f"推荐变形 {i}", "detail": item} for i, item in enumerate(profile["default_transformations"][:2], start=1)),
         ]
     return transformations[:5]
+
+
+def _math_coordinate_graph_spec(
+    scene: str,
+    *,
+    cleaned_question: str,
+    knowledge_points: List[str],
+    solution_steps: List[str],
+) -> Optional[dict]:
+    text = f"{cleaned_question} {' '.join(knowledge_points)} {' '.join(solution_steps)}".lower()
+    if scene == "function":
+        graph = _math_function_coordinate_graph(text)
+    elif scene == "calculus" and _math_is_derivative_graph_question(text):
+        graph = _math_derivative_coordinate_graph()
+    elif scene == "conic":
+        graph = _math_conic_coordinate_graph(text)
+    else:
+        return None
+
+    detected_points = _math_extract_coordinate_points(cleaned_question)
+    if detected_points:
+        labels = {str(point.get("label") or "") for point in graph.get("points", [])}
+        for point in detected_points[:5]:
+            if point["label"] not in labels:
+                graph.setdefault("points", []).append(point)
+    return graph
+
+
+def _math_is_derivative_graph_question(text: str) -> bool:
+    derivative_markers = [
+        "导数",
+        "单调",
+        "极值",
+        "最值",
+        "切线",
+        "斜率",
+        "凹凸",
+        "拐点",
+        "f'",
+        "y'",
+        "\\prime",
+    ]
+    integral_markers = ["积分", "\\int", "定积分", "原函数"]
+    return any(marker in text for marker in derivative_markers) and not (
+        any(marker in text for marker in integral_markers)
+        and not any(marker in text for marker in ["导数", "切线", "单调", "极值"])
+    )
+
+
+def _math_function_coordinate_graph(text: str) -> dict:
+    is_quadratic = any(marker in text for marker in ["二次", "抛物线", "x^2", "x²"])
+    if is_quadratic:
+        curves = [
+            {
+                "label": "函数图像 y=f(x)",
+                "points": _math_plot_points(lambda x: 0.3 * (x - 1) * (x - 1) - 1.2, [-3, -2, -1, 0, 1, 2, 3, 4, 5]),
+            }
+        ]
+        points = [
+            {"label": "顶点 V(1,-1.2)", "x": 1, "y": -1.2},
+            {"label": "零点附近 A(-1,0)", "x": -1, "y": 0},
+            {"label": "零点附近 B(3,0)", "x": 3, "y": 0},
+        ]
+        lines = [
+            {"label": "对称轴 x=1", "from": [1, -2.5], "to": [1, 3.2], "style": "dashed"},
+            {"label": "x 轴", "from": [-3.5, 0], "to": [5.2, 0], "style": "axis"},
+        ]
+        focus = ["先看定义域、零点、顶点和单调区间，再回到题目条件判断交点或最值。"]
+    else:
+        curves = [
+            {
+                "label": "函数图像 y=f(x)",
+                "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, [-3, -2.4, -1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8, 2.4, 3]),
+            }
+        ]
+        points = [
+            {"label": "零点/交点候选", "x": 0.22, "y": 0},
+            {"label": "极值点候选", "x": -1.29, "y": 0.97},
+            {"label": "极值点候选", "x": 1.29, "y": -0.57},
+        ]
+        lines = [
+            {"label": "y=0 辅助线", "from": [-3.2, 0], "to": [3.2, 0], "style": "dashed"},
+            {"label": "x=0 参考线", "from": [0, -2.2], "to": [0, 2.2], "style": "axis"},
+        ]
+        focus = ["把方程解、交点、端点和单调变化放到同一张图上核对，避免只靠代数变形漏情况。"]
+
+    return {
+        "title": "二维坐标辅助图",
+        "is_schematic": True,
+        "x_range": [-3.5, 5.5] if is_quadratic else [-3.4, 3.4],
+        "y_range": [-2.5, 4.0] if is_quadratic else [-2.2, 2.2],
+        "curves": curves,
+        "lines": lines,
+        "points": points,
+        "student_focus": focus,
+    }
+
+
+def _math_derivative_coordinate_graph() -> dict:
+    return {
+        "title": "导数与切线辅助图",
+        "is_schematic": True,
+        "x_range": [-3.4, 3.4],
+        "y_range": [-2.4, 2.4],
+        "curves": [
+            {
+                "label": "原函数 y=f(x)",
+                "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, [-3, -2.4, -1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8, 2.4, 3]),
+            }
+        ],
+        "lines": [
+            {"label": "切线示意", "from": [-1.2, 0.05], "to": [3.0, -1.38], "style": "solid"},
+            {"label": "x=x0", "from": [1.0, -2.0], "to": [1.0, 2.0], "style": "dashed"},
+        ],
+        "points": [
+            {"label": "切点 P(x0,f(x0))", "x": 1.0, "y": -0.52},
+            {"label": "f'(x)=0", "x": -1.29, "y": 0.97},
+            {"label": "f'(x)=0", "x": 1.29, "y": -0.57},
+        ],
+        "student_focus": [
+            "导数题优先把切点、切线斜率、极值点和单调区间标在图上，检查代数结论是否符合图像趋势。"
+        ],
+    }
+
+
+def _math_conic_coordinate_graph(text: str) -> dict:
+    if any(marker in text for marker in ["抛物线", "准线"]):
+        return {
+            "title": "抛物线辅助图",
+            "is_schematic": True,
+            "x_range": [-2.0, 5.0],
+            "y_range": [-4.0, 4.0],
+            "curves": [
+                {
+                    "label": "抛物线 $y^2=4px$ 示意",
+                    "points": [[x * x, 2 * x] for x in [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]],
+                }
+            ],
+            "lines": [
+                {"label": "准线 x=-p", "from": [-1, -3.6], "to": [-1, 3.6], "style": "dashed"},
+                {"label": "对称轴", "from": [-1.6, 0], "to": [4.5, 0], "style": "axis"},
+            ],
+            "points": [
+                {"label": "焦点 F(p,0)", "x": 1, "y": 0},
+                {"label": "顶点 O(0,0)", "x": 0, "y": 0},
+            ],
+            "student_focus": ["把焦点、准线、对称轴和动点位置画出来，再把距离关系翻译成方程。"],
+        }
+    if "双曲线" in text:
+        return {
+            "title": "双曲线辅助图",
+            "is_schematic": True,
+            "x_range": [-5.0, 5.0],
+            "y_range": [-4.0, 4.0],
+            "curves": [
+                {"label": "右支", "points": _math_plot_points(lambda x: math.sqrt(max(0.0, x * x / 4 - 1)), [2, 2.4, 2.8, 3.2, 3.8, 4.5])},
+                {"label": "右支", "points": _math_plot_points(lambda x: -math.sqrt(max(0.0, x * x / 4 - 1)), [2, 2.4, 2.8, 3.2, 3.8, 4.5])},
+                {"label": "左支", "points": _math_plot_points(lambda x: math.sqrt(max(0.0, x * x / 4 - 1)), [-4.5, -3.8, -3.2, -2.8, -2.4, -2])},
+                {"label": "左支", "points": _math_plot_points(lambda x: -math.sqrt(max(0.0, x * x / 4 - 1)), [-4.5, -3.8, -3.2, -2.8, -2.4, -2])},
+            ],
+            "lines": [
+                {"label": "渐近线", "from": [-5, -2.5], "to": [5, 2.5], "style": "dashed"},
+                {"label": "渐近线", "from": [-5, 2.5], "to": [5, -2.5], "style": "dashed"},
+            ],
+            "points": [
+                {"label": "焦点 F1", "x": -2.8, "y": 0},
+                {"label": "焦点 F2", "x": 2.8, "y": 0},
+                {"label": "顶点", "x": -2, "y": 0},
+                {"label": "顶点", "x": 2, "y": 0},
+            ],
+            "student_focus": ["先确认实轴方向、焦点和渐近线，再处理直线联立、弦长或切线条件。"],
+        }
+    return {
+        "title": "椭圆辅助图",
+        "is_schematic": True,
+        "x_range": [-4.0, 4.0],
+        "y_range": [-3.0, 3.0],
+        "curves": [
+            {
+                "label": "椭圆示意",
+                "points": [
+                    [round(3 * math.cos(t), 2), round(2 * math.sin(t), 2)]
+                    for t in [i * math.pi / 14 for i in range(29)]
+                ],
+            }
+        ],
+        "lines": [
+            {"label": "长轴", "from": [-3.4, 0], "to": [3.4, 0], "style": "axis"},
+            {"label": "短轴", "from": [0, -2.4], "to": [0, 2.4], "style": "axis"},
+            {"label": "辅助直线/弦", "from": [-2.6, -1.2], "to": [2.5, 1.5], "style": "dashed"},
+        ],
+        "points": [
+            {"label": "焦点 F1", "x": -2.24, "y": 0},
+            {"label": "焦点 F2", "x": 2.24, "y": 0},
+            {"label": "端点", "x": -3, "y": 0},
+            {"label": "端点", "x": 3, "y": 0},
+        ],
+        "student_focus": ["把标准方程、焦点、长短轴和题目中的直线/动点放到同一坐标图中，检查 $a,b,c,e$ 的对应关系。"],
+    }
+
+
+def _math_plot_points(fn, xs: List[float]) -> List[List[float]]:
+    return [[round(float(x), 2), round(float(fn(float(x))), 2)] for x in xs]
+
+
+def _math_extract_coordinate_points(text: str) -> List[dict]:
+    points: List[dict] = []
+    pattern = re.compile(r"([A-ZＡ-Ｚ]?)\s*[（(]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[）)]")
+    for index, match in enumerate(pattern.finditer(text), start=1):
+        label = match.group(1) or f"P{index}"
+        points.append(
+            {
+                "label": f"{label}({match.group(2)},{match.group(3)})",
+                "x": float(match.group(2)),
+                "y": float(match.group(3)),
+            }
+        )
+    return points
 
 
 def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
@@ -2579,15 +2815,23 @@ def _is_chart_spec_valid(parsed: dict) -> bool:
             "student_tasks",
             "step_mapping",
             "render_hints",
+            "coordinate_graph",
         ]
     )
     visual_model = parsed.get("visual_model")
     if isinstance(visual_model, dict) and visual_model:
         has_content = True
+    coordinate_graph = parsed.get("coordinate_graph")
+    if isinstance(coordinate_graph, dict) and coordinate_graph:
+        has_content = True
     return has_content
 
 
-def _with_chart_spec_legacy_display_fields(artifact: RichArtifact) -> RichArtifact:
+def _with_chart_spec_legacy_display_fields(
+    artifact: RichArtifact,
+    *,
+    cleaned_question: str = "",
+) -> RichArtifact:
     if artifact.mime_type != "application/json":
         return artifact
     try:
@@ -2596,8 +2840,38 @@ def _with_chart_spec_legacy_display_fields(artifact: RichArtifact) -> RichArtifa
         return artifact
     if not isinstance(parsed, dict):
         return artifact
+    scene = str(parsed.get("scene") or parsed.get("topic_type") or "").strip()
+    if not isinstance(parsed.get("coordinate_graph"), dict):
+        knowledge_values = parsed.get("knowledge_points")
+        if not isinstance(knowledge_values, list):
+            knowledge_values = []
+        solution_values = parsed.get("solution_path")
+        solution_texts: List[str] = []
+        if isinstance(solution_values, list):
+            for item in solution_values:
+                if isinstance(item, dict):
+                    action = str(item.get("action") or "").strip()
+                    if action:
+                        solution_texts.append(action)
+                elif str(item).strip():
+                    solution_texts.append(str(item))
+        graph = _math_coordinate_graph_spec(
+            scene,
+            cleaned_question=cleaned_question,
+            knowledge_points=[str(item) for item in knowledge_values],
+            solution_steps=solution_texts,
+        )
+        if graph:
+            parsed["coordinate_graph"] = graph
+
     if parsed.get("plot_suggestions"):
-        return artifact
+        return RichArtifact(
+            artifact_type=artifact.artifact_type,
+            title=artifact.title,
+            description=artifact.description,
+            mime_type=artifact.mime_type,
+            content=json.dumps(parsed, ensure_ascii=False, indent=2),
+        )
 
     core_idea = str(parsed.get("core_idea") or "").strip()
     transformations = parsed.get("formula_transformations")

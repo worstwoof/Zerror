@@ -791,9 +791,10 @@ class DiagnosticService:
                 "4. formula_transformations 使用 [{label, detail}]，写关键公式、恒等变形、代换、对称性、分部积分等；"
                 "5. solution_path 使用 [{action, reason}]，最多 4 步，每步说明要做什么以及为什么这样做；"
                 "6. mistake_traps 和 review_checklist 必须和本题强相关，避免泛泛而谈；"
-                "7. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
-                "8. 禁止生成 visual_model、controls、可交互参数、plot_suggestions 这类偏渲染实现的字段；"
-                "9. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
+                "7. 函数题、导数题、圆锥曲线题如果图像能帮助理解，请额外返回 coordinate_graph，包含 title、x_range、y_range、curves[{label,points}]、lines[{label,from,to,style}]、points[{label,x,y}]、student_focus；曲线和辅助线要服务解题步骤，可标出切线、对称轴、焦点、准线、交点、端点或题中给出的坐标；"
+                "8. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
+                "9. 禁止生成 visual_model、controls、可交互参数、plot_suggestions 这类偏渲染实现的字段；"
+                "10. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
             )
         if subject_name == "化学":
             return (
