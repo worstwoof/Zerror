@@ -567,7 +567,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildOriginalQuestionCard(subject, topic),
+          _buildOriginalQuestionCard(),
           const SizedBox(height: 18),
           _buildAiSolutionCard(subject, topic),
           const SizedBox(height: 18),
@@ -580,7 +580,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     );
   }
 
-  Widget _buildOriginalQuestionCard(String subject, String topic) {
+  Widget _buildOriginalQuestionCard() {
     return AppPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,34 +591,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             icon: Icons.document_scanner_rounded,
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              if (widget.imagePath.isNotEmpty) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(widget.imagePath),
-                    width: 62,
-                    height: 62,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildTagChip(subject),
-                    _buildTagChip(topic),
-                    ..._knowledgePoints.take(2).map(_buildTagChip),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+          if (widget.imagePath.isNotEmpty) ...[
+            _buildOriginalImagePreview(),
+            const SizedBox(height: 14),
+          ],
           TextField(
             controller: _questionController,
             maxLines: null,
@@ -683,6 +659,32 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOriginalImagePreview() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppPalette.night.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 280),
+          child: Image.file(
+            File(widget.imagePath),
+            width: double.infinity,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+          ),
+        ),
       ),
     );
   }
