@@ -20,6 +20,7 @@ class AppLatexText extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final fallbackText = _fallbackPlainText(normalized);
     final plainText = Text(
       normalized,
       textAlign: textAlign,
@@ -35,7 +36,7 @@ class AppLatexText extends StatelessWidget {
             fontSize: style.fontSize == null ? null : style.fontSize! + 1,
           ),
           onErrorFallback: (_) => Text(
-            normalized,
+            fallbackText,
             textAlign: textAlign,
             style: style,
           ),
@@ -64,5 +65,24 @@ class AppLatexText extends StatelessWidget {
         .replaceAll(r'\]', r'$$')
         .replaceAll(r'\(', r'$')
         .replaceAll(r'\)', r'$');
+  }
+
+  String _fallbackPlainText(String value) {
+    return value
+        .replaceAll(RegExp(r'\${1,2}'), '')
+        .replaceAll(r'\infty', '∞')
+        .replaceAll(r'\geq', '≥')
+        .replaceAll(r'\leq', '≤')
+        .replaceAll(r'\ln', 'ln')
+        .replaceAll(r'\sin', 'sin')
+        .replaceAll(r'\cos', 'cos')
+        .replaceAll(r'\tan', 'tan')
+        .replaceAll(r'\pi', 'π')
+        .replaceAllMapped(
+          RegExp(r'\\frac\{([^{}]+)\}\{([^{}]+)\}'),
+          (match) => '(${match.group(1)})/(${match.group(2)})',
+        )
+        .replaceAll('{', '')
+        .replaceAll('}', '');
   }
 }

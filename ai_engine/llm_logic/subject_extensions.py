@@ -116,7 +116,7 @@ def _build_math_chart_spec(
     profile = _math_scene_profile(scene)
     expressions = _math_extract_expressions(cleaned_question)
     title = profile["title"]
-    solution_path = _math_solution_path(profile, solution_steps)
+    solution_path = _math_clean_solution_path(_math_solution_path(profile, solution_steps))
     formula_transformations = _math_formula_transformations(
         scene,
         profile=profile,
@@ -139,7 +139,7 @@ def _build_math_chart_spec(
         "title": title,
         "question_excerpt": _math_latexize_display_text(cleaned_question[:220]),
         "knowledge_points": knowledge_points[:4],
-        "expressions": [_math_inline_formula(expression) for expression in expressions[:4]],
+        "expressions": [_math_readable_math_text(expression) for expression in expressions[:4]],
         "core_idea": profile["core_idea"],
         "formula_transformations": formula_transformations,
         "solution_path": solution_path,
@@ -156,6 +156,10 @@ def _build_math_chart_spec(
     }
     if coordinate_graph:
         content["coordinate_graph"] = coordinate_graph
+    content = _math_sanitize_chart_spec_content(
+        content,
+        cleaned_question=cleaned_question,
+    )
     return RichArtifact(
         artifact_type="chart_spec",
         title=title,
@@ -364,17 +368,23 @@ def _math_formula_transformations(
     cleaned_question: str,
 ) -> List[dict]:
     transformations: List[dict] = []
-    if expressions:
-        for index, expression in enumerate(expressions[:3], start=1):
-            transformations.append(
-                {
-                    "label": f"关键式 {index}",
-                    "detail": _math_inline_formula(expression),
-                }
-            )
 
     lowered = cleaned_question.lower()
     if scene == "calculus":
+        if any(token in lowered for token in ["定义域", "ln", "log", "对数", "根号", "分母"]):
+            transformations.append(
+                {
+                    "label": "定义域限制",
+                    "detail": "先把对数真数、根号内式和分母限制写清楚；后续求导、单调性和最值判断都必须在定义域内进行。",
+                }
+            )
+        if any(token in lowered for token in ["导数", "求导", "f'", "单调", "极值", "最值", "切线"]):
+            transformations.append(
+                {
+                    "label": "导数符号分析",
+                    "detail": "求出导函数后，重点判断导函数在定义域内的正负；单调性、极值和切线斜率都由这个符号变化决定。",
+                }
+            )
         if any(token in lowered for token in ["对称", "-\\frac", "-π", "-pi", "奇", "偶"]):
             transformations.append(
                 {
@@ -397,16 +407,41 @@ def _math_formula_transformations(
                 }
             )
 
-    for step in solution_steps[:2]:
-        if step and all(step != item["detail"] for item in transformations):
-            transformations.append({"label": "解题步骤提示", "detail": step})
+    if scene == "function":
+        if any(token in lowered for token in ["log", "ln", "对数"]):
+            transformations.append(
+                {
+                    "label": "对数真数大于 0",
+                    "detail": "对数函数题先把真数大于 0 转成不等式，再结合零点或图像分段判断定义域。",
+                }
+            )
+        transformations.append(
+            {
+                "label": "图像与代数互相校验",
+                "detail": "把定义域、零点、端点和单调区间放在同一条逻辑线上检查，避免只看图像或只算代数导致漏区间。",
+            }
+        )
+
+    if scene == "conic":
+        transformations.extend(
+            [
+                {
+                    "label": "先化标准方程",
+                    "detail": "圆锥曲线题先确认标准方程、焦点方向和参数 a、b、c 的关系，再处理直线、弦或动点条件。",
+                },
+                {
+                    "label": "几何量代数化",
+                    "detail": "焦点、准线、长短轴、离心率和弦长都要落到坐标或方程关系中，避免只凭图形直觉判断。",
+                },
+            ]
+        )
 
     if not transformations:
         transformations = [
             {"label": "关键整理", "detail": profile["formula_focus"]},
             *({"label": f"推荐变形 {i}", "detail": item} for i, item in enumerate(profile["default_transformations"][:2], start=1)),
         ]
-    return transformations[:5]
+    return _math_clean_transformation_items(transformations[:5])
 
 
 def _math_coordinate_graph_spec(
@@ -1031,6 +1066,169 @@ def _math_graph_legend(curves: List[dict], lines: List[dict], points: List[dict]
     return deduped[:8]
 
 
+def _math_clean_transformation_items(items: List[dict]) -> List[dict]:
+    cleaned: List[dict] = []
+    blocked_labels = ("关键式", "解题步骤提示", "步骤提示")
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = _math_readable_math_text(str(item.get("label") or "")).strip()
+        detail = _math_readable_math_text(str(item.get("detail") or "")).strip()
+        if not label or not detail:
+            continue
+        if any(token in label for token in blocked_labels):
+            continue
+        if _math_is_noise_expression(detail):
+            continue
+        cleaned.append({"label": label, "detail": detail})
+    return cleaned
+
+
+def _math_clean_solution_path(items: List[dict]) -> List[dict]:
+    cleaned: List[dict] = []
+    for index, item in enumerate(items[:4], start=1):
+        if not isinstance(item, dict):
+            continue
+        action = _math_readable_math_text(str(item.get("action") or f"步骤 {index}")).strip()
+        reason = _math_readable_math_text(str(item.get("reason") or "")).strip()
+        if action and reason:
+            cleaned.append({"action": action, "reason": reason})
+    return cleaned
+
+
+def _math_sanitize_chart_spec_content(content: dict, *, cleaned_question: str = "") -> dict:
+    scene = str(content.get("scene") or content.get("topic_type") or "").strip()
+    profile = _math_scene_profile(scene) if scene else _math_scene_profile("algebra")
+    sanitized = dict(content)
+    sanitized.pop("step_mapping", None)
+
+    expressions = [
+        _math_readable_math_text(str(item)).strip()
+        for item in sanitized.get("expressions", [])
+        if _math_is_meaningful_expression(str(item))
+    ]
+    sanitized["expressions"] = _math_unique_strings(expressions)[:3]
+
+    transformations = sanitized.get("formula_transformations")
+    if isinstance(transformations, list):
+        sanitized["formula_transformations"] = _math_clean_transformation_items(transformations)
+    else:
+        sanitized["formula_transformations"] = []
+    if not sanitized["formula_transformations"]:
+        sanitized["formula_transformations"] = _math_clean_transformation_items(
+            _math_formula_transformations(
+                scene or "algebra",
+                profile=profile,
+                expressions=[],
+                solution_steps=[],
+                cleaned_question=cleaned_question,
+            )
+        )
+
+    solution_path = sanitized.get("solution_path")
+    if isinstance(solution_path, list):
+        sanitized["solution_path"] = _math_clean_solution_path(solution_path)
+
+    for key in ["core_idea", "visual_hint", "question_excerpt", "title"]:
+        if isinstance(sanitized.get(key), str):
+            sanitized[key] = _math_readable_math_text(sanitized[key]).strip()
+    for key in ["mistake_traps", "review_checklist", "student_tasks", "knowledge_points"]:
+        if isinstance(sanitized.get(key), list):
+            sanitized[key] = [
+                _math_readable_math_text(str(item)).strip()
+                for item in sanitized[key]
+                if str(item).strip()
+            ]
+    plot_suggestions = sanitized.get("plot_suggestions")
+    if isinstance(plot_suggestions, list):
+        cleaned_sections: List[dict] = []
+        for item in plot_suggestions:
+            if not isinstance(item, dict):
+                continue
+            label = _math_readable_math_text(str(item.get("label") or "")).strip()
+            value = _math_readable_math_text(str(item.get("value") or "")).strip()
+            if label and value:
+                cleaned_sections.append({"label": label, "value": value})
+        sanitized["plot_suggestions"] = cleaned_sections
+    graph = sanitized.get("coordinate_graph")
+    if isinstance(graph, dict):
+        sanitized["coordinate_graph"] = _math_sanitize_coordinate_graph(graph)
+    return sanitized
+
+
+def _math_sanitize_coordinate_graph(graph: dict) -> dict:
+    sanitized = dict(graph)
+    for key in ["title"]:
+        if isinstance(sanitized.get(key), str):
+            sanitized[key] = _math_readable_math_text(sanitized[key]).strip()
+    for key in ["legend", "student_focus", "annotations"]:
+        if isinstance(sanitized.get(key), list):
+            sanitized[key] = _math_unique_strings(
+                [_math_readable_math_text(str(item)).strip() for item in sanitized[key] if str(item).strip()]
+            )
+    for key in ["curves", "lines", "points"]:
+        if isinstance(sanitized.get(key), list):
+            cleaned_items = []
+            for item in sanitized[key]:
+                if isinstance(item, dict):
+                    copied = dict(item)
+                    if isinstance(copied.get("label"), str):
+                        copied["label"] = _math_readable_math_text(copied["label"]).strip()
+                    cleaned_items.append(copied)
+            sanitized[key] = cleaned_items
+    return sanitized
+
+
+def _math_unique_strings(items: List[str]) -> List[str]:
+    unique: List[str] = []
+    for item in items:
+        if item and item not in unique:
+            unique.append(item)
+    return unique
+
+
+def _math_readable_math_text(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    text = text.replace(r"\(", "").replace(r"\)", "")
+    text = text.replace(r"\[", "").replace(r"\]", "")
+    text = re.sub(r"\${1,2}\s*([^$]+?)\s*\${1,2}", lambda match: match.group(1), text)
+    replacements = {
+        r"\infty": "∞",
+        r"\geq": "≥",
+        r"\leq": "≤",
+        r"\gt": ">",
+        r"\lt": "<",
+        r"\ln": "ln",
+        r"\sin": "sin",
+        r"\cos": "cos",
+        r"\tan": "tan",
+        r"\pi": "π",
+        r"\cdot": "·",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    text = re.sub(r"\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}", r"(\1)/(\2)", text)
+    text = re.sub(r"\\sqrt\s*\{([^{}]+)\}", r"√(\1)", text)
+    text = text.replace("^2", "²").replace("^3", "³")
+    text = text.replace("{", "").replace("}", "")
+    text = text.replace("$", "")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _math_is_noise_expression(value: str) -> bool:
+    cleaned = _math_readable_math_text(value)
+    if re.fullmatch(r"\(?\d+\)?", cleaned):
+        return True
+    if re.fullmatch(r"[fgh]\s*\(\s*x\s*\)", cleaned, re.IGNORECASE):
+        return True
+    if len(cleaned) <= 3 and not re.search(r"[\u4e00-\u9fff]", cleaned):
+        return True
+    return False
+
+
 def _math_format_number(value: float) -> str:
     rounded = round(float(value), 2)
     if abs(rounded - round(rounded)) < 1e-9:
@@ -1074,13 +1272,10 @@ def _math_coordinate_graph_has_renderable_content(value: object) -> bool:
 
 def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
     if solution_steps:
-        profile_path = profile["solution_path"]
         path = [
             {
                 "action": step,
-                "reason": profile_path[index - 1]["reason"]
-                if index - 1 < len(profile_path)
-                else "这一步用于把题目条件继续转化为可计算、可验证的数学关系。",
+                "reason": _math_reason_for_solution_step(step),
             }
             for index, step in enumerate(solution_steps[:4], start=1)
             if step.strip()
@@ -1088,6 +1283,19 @@ def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
         if path:
             return path
     return profile["solution_path"][:4]
+
+
+def _math_reason_for_solution_step(step: str) -> str:
+    text = step.lower()
+    if any(token in text for token in ["定义域", "ln", "log", "根号", "分母"]):
+        return "先确定限制条件，后面的求导、变形、单调性和最值判断才不会超出有效范围。"
+    if any(token in text for token in ["导数", "f'", "求导", "单调", "极值", "最值"]):
+        return "导函数的符号决定函数增减和极值，是导数题复盘时最需要核对的主线。"
+    if any(token in text for token in ["对称", "奇", "偶", "积分"]):
+        return "利用结构特征先简化计算，可以减少展开硬算带来的符号错误。"
+    if any(token in text for token in ["焦点", "椭圆", "双曲线", "抛物线", "圆锥"]):
+        return "把几何条件落到标准方程和坐标关系中，才能稳定连接图形与计算。"
+    return "这一步把题目条件转化为可计算、可验证的数学关系。"
 
 
 def _math_legacy_display_sections(
@@ -1193,10 +1401,29 @@ def _math_extract_expressions(text: str) -> List[str]:
     ]
     for pattern in patterns:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            value = match.group(1).strip()
-            if 2 <= len(value) <= 140 and value not in candidates:
+            value = _math_clean_extracted_expression(match.group(1))
+            if _math_is_meaningful_expression(value) and value not in candidates:
                 candidates.append(value)
     return candidates
+
+
+def _math_clean_extracted_expression(value: str) -> str:
+    cleaned = _math_readable_math_text(value)
+    cleaned = re.split(r"(?:的定义域|定义域|求|其中|，|。|；|;|故|所以)", cleaned)[0].strip()
+    return cleaned.strip("：:，,。；; ")
+
+
+def _math_is_meaningful_expression(value: str) -> bool:
+    cleaned = _math_readable_math_text(value)
+    if not (2 <= len(cleaned) <= 140):
+        return False
+    if re.fullmatch(r"\(?\d+\)?", cleaned):
+        return False
+    if re.fullmatch(r"[fgh]\s*\(\s*x\s*\)", cleaned, re.IGNORECASE):
+        return False
+    if cleaned in {"x", "y", "f", "f(x)", "函数", "导数"}:
+        return False
+    return bool(re.search(r"[=<>≥≤+\-*/²³√]|ln|log|sin|cos|tan", cleaned, re.IGNORECASE))
 
 
 def _build_physics_html(
@@ -3303,6 +3530,10 @@ def _with_chart_spec_legacy_display_fields(
         )
         if graph:
             parsed["coordinate_graph"] = graph
+    parsed = _math_sanitize_chart_spec_content(
+        parsed,
+        cleaned_question=cleaned_question,
+    )
 
     if parsed.get("plot_suggestions"):
         return RichArtifact(
@@ -3324,7 +3555,7 @@ def _with_chart_spec_legacy_display_fields(
         legacy_sections.append({"label": "核心思路", "value": core_idea})
     if isinstance(transformations, list):
         value = "；".join(
-            f"{item.get('label', '关键变形')}：{_math_latexize_display_text(str(item.get('detail', '')))}"
+            f"{_math_readable_math_text(str(item.get('label', '关键变形')))}：{_math_readable_math_text(str(item.get('detail', '')))}"
             for item in transformations[:5]
             if isinstance(item, dict)
             and str(item.get("detail") or "").strip()
@@ -3334,7 +3565,7 @@ def _with_chart_spec_legacy_display_fields(
             legacy_sections.append({"label": "关键变形", "value": value})
     if isinstance(solution_path, list):
         value = "；".join(
-            f"{_math_latexize_display_text(str(item.get('action', '解题步骤')))}：{_math_latexize_display_text(str(item.get('reason', '')))}"
+            f"{_math_readable_math_text(str(item.get('action', '解题步骤')))}：{_math_readable_math_text(str(item.get('reason', '')))}"
             for item in solution_path[:3]
             if isinstance(item, dict) and str(item.get("reason") or "").strip()
         )
@@ -3351,7 +3582,13 @@ def _with_chart_spec_legacy_display_fields(
         parsed["student_tasks"] = [str(item) for item in review_checklist if str(item).strip()]
 
     if not legacy_sections:
-        return artifact
+        return RichArtifact(
+            artifact_type=artifact.artifact_type,
+            title=artifact.title,
+            description=artifact.description,
+            mime_type=artifact.mime_type,
+            content=json.dumps(parsed, ensure_ascii=False, indent=2),
+        )
     parsed["plot_suggestions"] = legacy_sections
     return RichArtifact(
         artifact_type=artifact.artifact_type,
