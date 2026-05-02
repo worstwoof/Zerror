@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import math
 import re
 from typing import Iterable, List, Optional
 
 from backend.app.schemas.card_schema import RichArtifact
+
+
+logger = logging.getLogger(__name__)
 
 
 def filter_subject_extension_artifacts(
@@ -18,6 +22,15 @@ def filter_subject_extension_artifacts(
     profile = _resolve_subject_profile(subject, cleaned_question)
     if profile is None:
         return list(artifacts)
+
+    if profile.builder is _build_math_chart_spec:
+        math_artifacts = list(artifacts)
+        if math_artifacts:
+            logger.info(
+                "math subject extension discarding model artifacts count=%s source=model",
+                len(math_artifacts),
+            )
+        return []
 
     filtered: List[RichArtifact] = []
     for artifact in artifacts:
@@ -51,7 +64,7 @@ def build_subject_extension_artifacts(
         return []
 
     existing_types = {artifact.artifact_type for artifact in existing_artifacts}
-    if profile.default_artifact_type in existing_types:
+    if profile.builder is not _build_math_chart_spec and profile.default_artifact_type in existing_types:
         return []
 
     artifact = profile.builder(
@@ -59,6 +72,11 @@ def build_subject_extension_artifacts(
         knowledge_points=list(knowledge_points),
         solution_steps=list(solution_steps),
     )
+    if profile.builder is _build_math_chart_spec:
+        logger.info(
+            "math subject extension generated artifact title=%s source=backend",
+            artifact.title,
+        )
     return [artifact]
 
 
