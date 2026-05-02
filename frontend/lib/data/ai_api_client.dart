@@ -227,7 +227,7 @@ class AiApiClient {
     required String imagePath,
     String subject = '未分类',
     String wrongReasonHint = '',
-    bool enableSubjectExtensions = false,
+    bool enableSubjectExtensions = true,
   }) async {
     final request = http.MultipartRequest(
       'POST',

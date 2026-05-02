@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "可以额外返回一个 rich_artifacts 项，用 chart_spec 或 interactive_html 展示函数图像、几何构型或步骤可视化。",
+    "数学": "可以额外返回一个 rich_artifacts 项，artifact_type 用 chart_spec；content 必须是可解析 JSON，定位为学生错题复盘卡，不要返回渲染器配置或可交互参数。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
@@ -784,7 +784,17 @@ class DiagnosticService:
             )
         if subject_name == "数学":
             return (
-                "如果返回 chart_spec 或 interactive_html，请优先围绕函数图像、几何构型、统计图或步骤可视化来设计，不要只返回文字摘要。"
+                "如果返回 chart_spec，请严格满足以下要求："
+                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、version、scene、topic_type、title、knowledge_points、expressions、core_idea、formula_transformations、solution_path、mistake_traps、review_checklist、visual_hint；"
+                "2. scene/topic_type 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
+                "3. core_idea 用 1 到 2 句话讲清本题最关键的数学思想；"
+                "4. formula_transformations 使用 [{label, detail}]，写关键公式、恒等变形、代换、对称性、分部积分等；"
+                "5. solution_path 使用 [{action, reason}]，最多 4 步，每步说明要做什么以及为什么这样做；"
+                "6. mistake_traps 和 review_checklist 必须和本题强相关，避免泛泛而谈；"
+                "7. 函数题、导数题、圆锥曲线题如果图像能帮助理解，请额外返回 coordinate_graph，包含 title、x_range、y_range、curves[{label,points}]、lines[{label,from,to,style}]、points[{label,x,y}]、student_focus；曲线和辅助线要服务解题步骤，可标出切线、对称轴、焦点、准线、交点、端点或题中给出的坐标；"
+                "8. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
+                "9. 禁止生成 visual_model、controls、可交互参数、plot_suggestions、step_mapping 这类偏渲染实现或重复展示的字段；"
+                "10. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
             )
         if subject_name == "化学":
             return (
