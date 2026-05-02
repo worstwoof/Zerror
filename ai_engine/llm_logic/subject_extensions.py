@@ -127,9 +127,9 @@ def _build_math_chart_spec(
         "scene": scene,
         "topic_type": scene,
         "title": title,
-        "question_excerpt": cleaned_question[:220],
+        "question_excerpt": _math_latexize_display_text(cleaned_question[:220]),
         "knowledge_points": knowledge_points[:4],
-        "expressions": expressions[:4],
+        "expressions": [_math_inline_formula(expression) for expression in expressions[:4]],
         "core_idea": profile["core_idea"],
         "formula_transformations": formula_transformations,
         "solution_path": solution_path,
@@ -144,7 +144,7 @@ def _build_math_chart_spec(
         ),
         "student_tasks": profile["review_checklist"],
         "step_mapping": [
-            f"{item['action']}：{item['reason']}"
+            f"{_math_latexize_display_text(str(item['action']))}：{_math_latexize_display_text(str(item['reason']))}"
             for item in solution_path[:4]
             if item.get("action") and item.get("reason")
         ],
@@ -356,7 +356,7 @@ def _math_formula_transformations(
             transformations.append(
                 {
                     "label": f"关键式 {index}",
-                    "detail": expression,
+                    "detail": _math_inline_formula(expression),
                 }
             )
 
@@ -431,9 +431,11 @@ def _math_legacy_display_sections(
             {
                 "label": "关键变形",
                 "value": "；".join(
-                    f"{item['label']}：{item['detail']}"
-                    for item in formula_transformations[:3]
-                    if item.get("label") and item.get("detail")
+                    f"{item['label']}：{_math_latexize_display_text(str(item['detail']))}"
+                    for item in formula_transformations[:5]
+                    if item.get("label")
+                    and item.get("detail")
+                    and not _math_is_formula_only(str(item["detail"]))
                 ),
             }
         )
@@ -442,7 +444,7 @@ def _math_legacy_display_sections(
             {
                 "label": "解题路线",
                 "value": "；".join(
-                    f"{item['action']}：{item['reason']}"
+                    f"{_math_latexize_display_text(str(item['action']))}：{_math_latexize_display_text(str(item['reason']))}"
                     for item in solution_path[:3]
                     if item.get("action") and item.get("reason")
                 ),
@@ -456,6 +458,50 @@ def _math_legacy_display_sections(
             }
         )
     return [section for section in sections if section.get("value")]
+
+
+def _math_inline_formula(expression: str) -> str:
+    cleaned = _math_clean_latex_fragment(expression)
+    if not cleaned:
+        return ""
+    return f"${cleaned}$"
+
+
+def _math_clean_latex_fragment(value: str) -> str:
+    cleaned = value.strip().strip("；;，,。")
+    cleaned = cleaned.strip("$").strip()
+    return cleaned.strip().strip("；;，,。")
+
+
+def _math_latexize_display_text(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    text = text.replace(r"\(", "$").replace(r"\)", "$")
+    text = text.replace(r"\[", "$").replace(r"\]", "$")
+    text = re.sub(
+        r"\$\$\s*([^$]+?)\s*\$\$",
+        lambda match: _math_inline_formula(match.group(1)),
+        text,
+    )
+    text = re.sub(
+        r"\$\s*([^$]+?)\s*\${2,}",
+        lambda match: _math_inline_formula(match.group(1)),
+        text,
+    )
+    parts = text.split("$")
+    for index in range(0, len(parts), 2):
+        parts[index] = re.sub(
+            r"((?:\\int|\\frac|\\sqrt|\\sum|\\lim|\\sin|\\cos|\\tan)[^；;。]*?)(?=；|;|。|，|,|$)",
+            lambda match: _math_inline_formula(match.group(1)),
+            parts[index],
+        )
+    return "$".join(parts)
+
+
+def _math_is_formula_only(value: str) -> bool:
+    cleaned = value.strip()
+    return cleaned.startswith("$") and cleaned.endswith("$") and cleaned.count("$") == 2
 
 
 def _math_extract_expressions(text: str) -> List[str]:
@@ -2564,22 +2610,24 @@ def _with_chart_spec_legacy_display_fields(artifact: RichArtifact) -> RichArtifa
         legacy_sections.append({"label": "核心思路", "value": core_idea})
     if isinstance(transformations, list):
         value = "；".join(
-            f"{item.get('label', '关键变形')}：{item.get('detail', '')}"
-            for item in transformations[:3]
-            if isinstance(item, dict) and str(item.get("detail") or "").strip()
+            f"{item.get('label', '关键变形')}：{_math_latexize_display_text(str(item.get('detail', '')))}"
+            for item in transformations[:5]
+            if isinstance(item, dict)
+            and str(item.get("detail") or "").strip()
+            and not _math_is_formula_only(str(item.get("detail") or ""))
         )
         if value:
             legacy_sections.append({"label": "关键变形", "value": value})
     if isinstance(solution_path, list):
         value = "；".join(
-            f"{item.get('action', '解题步骤')}：{item.get('reason', '')}"
+            f"{_math_latexize_display_text(str(item.get('action', '解题步骤')))}：{_math_latexize_display_text(str(item.get('reason', '')))}"
             for item in solution_path[:3]
             if isinstance(item, dict) and str(item.get("reason") or "").strip()
         )
         if value:
             legacy_sections.append({"label": "解题路线", "value": value})
             parsed["step_mapping"] = [
-                f"{item.get('action', '解题步骤')}：{item.get('reason', '')}"
+                f"{_math_latexize_display_text(str(item.get('action', '解题步骤')))}：{_math_latexize_display_text(str(item.get('reason', '')))}"
                 for item in solution_path[:4]
                 if isinstance(item, dict) and str(item.get("reason") or "").strip()
             ]
