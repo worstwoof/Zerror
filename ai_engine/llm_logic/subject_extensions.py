@@ -426,7 +426,7 @@ def _math_coordinate_graph_spec(
     if scene == "function":
         graph = _math_function_coordinate_graph(text)
     elif scene == "calculus" and _math_is_derivative_graph_question(text):
-        graph = _math_derivative_coordinate_graph()
+        graph = _math_derivative_coordinate_graph(text)
     elif scene == "conic":
         graph = _math_conic_coordinate_graph(text)
     else:
@@ -463,82 +463,24 @@ def _math_is_derivative_graph_question(text: str) -> bool:
 
 
 def _math_function_coordinate_graph(text: str) -> dict:
-    is_quadratic = any(marker in text for marker in ["二次", "抛物线", "x^2", "x²"])
-    if is_quadratic:
-        curves = [
-            {
-                "label": "函数图像 y=f(x)",
-                "points": _math_plot_points(lambda x: 0.3 * (x - 1) * (x - 1) - 1.2, [-3, -2, -1, 0, 1, 2, 3, 4, 5]),
-            }
-        ]
-        points = [
-            {"label": "顶点 V(1,-1.2)", "x": 1, "y": -1.2},
-            {"label": "零点附近 A(-1,0)", "x": -1, "y": 0},
-            {"label": "零点附近 B(3,0)", "x": 3, "y": 0},
-        ]
-        lines = [
-            {"label": "对称轴 x=1", "from": [1, -2.5], "to": [1, 3.2], "style": "dashed"},
-            {"label": "x 轴", "from": [-3.5, 0], "to": [5.2, 0], "style": "axis"},
-        ]
-        focus = ["先看定义域、零点、顶点和单调区间，再回到题目条件判断交点或最值。"]
-    else:
-        curves = [
-            {
-                "label": "函数图像 y=f(x)",
-                "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, [-3, -2.4, -1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8, 2.4, 3]),
-            }
-        ]
-        points = [
-            {"label": "零点/交点候选", "x": 0.22, "y": 0},
-            {"label": "极值点候选", "x": -1.29, "y": 0.97},
-            {"label": "极值点候选", "x": 1.29, "y": -0.57},
-        ]
-        lines = [
-            {"label": "y=0 辅助线", "from": [-3.2, 0], "to": [3.2, 0], "style": "dashed"},
-            {"label": "x=0 参考线", "from": [0, -2.2], "to": [0, 2.2], "style": "axis"},
-        ]
-        focus = ["把方程解、交点、端点和单调变化放到同一张图上核对，避免只靠代数变形漏情况。"]
-
-    return {
-        "title": "二维坐标辅助图",
-        "is_schematic": True,
-        "x_range": [-3.5, 5.5] if is_quadratic else [-3.4, 3.4],
-        "y_range": [-2.5, 4.0] if is_quadratic else [-2.2, 2.2],
-        "curves": curves,
-        "lines": lines,
-        "points": points,
-        "student_focus": focus,
-    }
+    sampled = _math_sample_function_graph(text)
+    if sampled:
+        return sampled
+    return _math_template_function_coordinate_graph(text)
 
 
-def _math_derivative_coordinate_graph() -> dict:
-    return {
-        "title": "导数与切线辅助图",
-        "is_schematic": True,
-        "x_range": [-3.4, 3.4],
-        "y_range": [-2.4, 2.4],
-        "curves": [
-            {
-                "label": "原函数 y=f(x)",
-                "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, [-3, -2.4, -1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8, 2.4, 3]),
-            }
-        ],
-        "lines": [
-            {"label": "切线示意", "from": [-1.2, 0.05], "to": [3.0, -1.38], "style": "solid"},
-            {"label": "x=x0", "from": [1.0, -2.0], "to": [1.0, 2.0], "style": "dashed"},
-        ],
-        "points": [
-            {"label": "切点 P(x0,f(x0))", "x": 1.0, "y": -0.52},
-            {"label": "f'(x)=0", "x": -1.29, "y": 0.97},
-            {"label": "f'(x)=0", "x": 1.29, "y": -0.57},
-        ],
-        "student_focus": [
-            "导数题优先把切点、切线斜率、极值点和单调区间标在图上，检查代数结论是否符合图像趋势。"
-        ],
-    }
+def _math_derivative_coordinate_graph(text: str) -> dict:
+    sampled = _math_sample_function_graph(text, derivative_view=True)
+    if sampled:
+        return sampled
+    return _math_template_derivative_coordinate_graph()
 
 
 def _math_conic_coordinate_graph(text: str) -> dict:
+    parsed_ellipse = _math_parse_ellipse_equation(text)
+    if parsed_ellipse:
+        a, b = parsed_ellipse
+        return _math_ellipse_graph(a, b)
     if any(marker in text for marker in ["抛物线", "准线"]):
         return {
             "title": "抛物线辅助图",
@@ -585,33 +527,515 @@ def _math_conic_coordinate_graph(text: str) -> dict:
             ],
             "student_focus": ["先确认实轴方向、焦点和渐近线，再处理直线联立、弦长或切线条件。"],
         }
+    return _math_ellipse_graph(3.0, 2.0)
+
+
+def _math_ellipse_graph(a: float, b: float) -> dict:
+    a = max(abs(a), 0.5)
+    b = max(abs(b), 0.5)
+    c = math.sqrt(abs(a * a - b * b))
+    horizontal = a >= b
+    focus_points = [
+        {"label": "F1", "x": -c if horizontal else 0, "y": 0 if horizontal else -c},
+        {"label": "F2", "x": c if horizontal else 0, "y": 0 if horizontal else c},
+    ]
+    vertices = [
+        {"label": "长轴端点", "x": -a if horizontal else 0, "y": 0 if horizontal else -a},
+        {"label": "长轴端点", "x": a if horizontal else 0, "y": 0 if horizontal else a},
+    ]
+    x_pad = max(0.8, a * 0.35)
+    y_pad = max(0.8, b * 0.35)
     return {
         "title": "椭圆辅助图",
-        "is_schematic": True,
-        "x_range": [-4.0, 4.0],
-        "y_range": [-3.0, 3.0],
+        "is_schematic": False,
+        "x_range": [round(-a - x_pad, 2), round(a + x_pad, 2)],
+        "y_range": [round(-b - y_pad, 2), round(b + y_pad, 2)],
         "curves": [
             {
-                "label": "椭圆示意",
+                "label": f"椭圆 a={_math_format_number(a)}, b={_math_format_number(b)}",
                 "points": [
-                    [round(3 * math.cos(t), 2), round(2 * math.sin(t), 2)]
-                    for t in [i * math.pi / 14 for i in range(29)]
+                    [round(a * math.cos(t), 3), round(b * math.sin(t), 3)]
+                    for t in [i * math.pi / 60 for i in range(121)]
                 ],
             }
         ],
         "lines": [
-            {"label": "长轴", "from": [-3.4, 0], "to": [3.4, 0], "style": "axis"},
-            {"label": "短轴", "from": [0, -2.4], "to": [0, 2.4], "style": "axis"},
-            {"label": "辅助直线/弦", "from": [-2.6, -1.2], "to": [2.5, 1.5], "style": "dashed"},
+            {"label": "长轴", "from": [-a, 0] if horizontal else [0, -a], "to": [a, 0] if horizontal else [0, a], "style": "axis"},
+            {"label": "短轴", "from": [0, -b] if horizontal else [-b, 0], "to": [0, b] if horizontal else [b, 0], "style": "axis"},
         ],
-        "points": [
-            {"label": "焦点 F1", "x": -2.24, "y": 0},
-            {"label": "焦点 F2", "x": 2.24, "y": 0},
-            {"label": "端点", "x": -3, "y": 0},
-            {"label": "端点", "x": 3, "y": 0},
-        ],
+        "points": [*focus_points, *vertices],
+        "legend": _math_graph_legend([], [], [*focus_points, *vertices]),
         "student_focus": ["把标准方程、焦点、长短轴和题目中的直线/动点放到同一坐标图中，检查 $a,b,c,e$ 的对应关系。"],
     }
+
+
+def _math_sample_function_graph(text: str, *, derivative_view: bool = False) -> Optional[dict]:
+    formula = _math_extract_function_formula(text)
+    evaluator = _math_compile_single_variable_expression(formula) if formula else None
+    if evaluator is None:
+        return None
+
+    segments = _math_sample_valid_segments(evaluator, -6.0, 6.0, count=361)
+    if not segments:
+        return None
+    y_values = [point[1] for segment in segments for point in segment]
+    x_values = [point[0] for segment in segments for point in segment]
+    x_range = _math_padded_range(x_values, fallback=[-4.0, 4.0])
+    y_range = _math_padded_range(_math_trim_extremes(y_values), fallback=[-3.0, 3.0])
+    domain_boundaries = _math_formula_domain_boundaries(formula) or _math_detect_domain_boundaries(segments)
+    lines: List[dict] = [
+        {"label": "", "from": [x_range[0], 0], "to": [x_range[1], 0], "style": "axis"},
+        {"label": "", "from": [0, y_range[0]], "to": [0, y_range[1]], "style": "axis"},
+    ]
+    points = _math_function_feature_points(evaluator, segments)
+    for boundary in domain_boundaries:
+        if x_range[0] < boundary < x_range[1]:
+            lines.append({"label": f"x={_math_format_number(boundary)}", "from": [boundary, y_range[0]], "to": [boundary, y_range[1]], "style": "dashed"})
+
+    if derivative_view:
+        tangent = _math_tangent_hint(evaluator, segments, x_range)
+        if tangent:
+            lines.append(tangent["line"])
+            points.insert(0, tangent["point"])
+
+    curves = [
+        {"label": f"y={formula}", "points": segment}
+        for segment in segments
+        if len(segment) >= 2
+    ]
+    return {
+        "title": "导数与切线辅助图" if derivative_view else "二维坐标辅助图",
+        "is_schematic": False,
+        "x_range": x_range,
+        "y_range": y_range,
+        "curves": curves,
+        "lines": lines,
+        "points": points[:6],
+        "legend": _math_graph_legend(curves, lines, points),
+        "student_focus": [
+            "这张图按题目中的函数表达式采样绘制；先看定义域断点、零点和关键点，再核对代数结论。"
+            if not derivative_view
+            else "这张图按题目中的函数表达式采样绘制；重点核对切点、切线趋势、极值点和单调区间。"
+        ],
+    }
+
+
+def _math_template_function_coordinate_graph(text: str) -> dict:
+    is_quadratic = any(marker in text for marker in ["二次", "抛物线", "x^2", "x²"])
+    if is_quadratic:
+        xs = _math_linspace(-3, 5, 81)
+        curves = [{"label": "函数图像 y=f(x)", "points": _math_plot_points(lambda x: 0.3 * (x - 1) * (x - 1) - 1.2, xs)}]
+        points = [
+            {"label": "V(1,-1.2)", "x": 1, "y": -1.2},
+            {"label": "A(-1,0)", "x": -1, "y": 0},
+            {"label": "B(3,0)", "x": 3, "y": 0},
+        ]
+        lines = [
+            {"label": "x=1", "from": [1, -2.5], "to": [1, 3.2], "style": "dashed"},
+            {"label": "", "from": [-3.5, 0], "to": [5.2, 0], "style": "axis"},
+        ]
+        focus = ["先看定义域、零点、顶点和单调区间，再回到题目条件判断交点或最值。"]
+    else:
+        xs = _math_linspace(-3, 3, 101)
+        curves = [{"label": "函数图像 y=f(x)", "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, xs)}]
+        points = [{"label": "零点", "x": 0.22, "y": 0}, {"label": "极值点", "x": -1.29, "y": 0.97}, {"label": "极值点", "x": 1.29, "y": -0.57}]
+        lines = [{"label": "", "from": [-3.2, 0], "to": [3.2, 0], "style": "axis"}]
+        focus = ["把方程解、交点、端点和单调变化放到同一张图上核对，避免只靠代数变形漏情况。"]
+    return {
+        "title": "二维坐标辅助图",
+        "is_schematic": True,
+        "x_range": [-3.5, 5.5] if is_quadratic else [-3.4, 3.4],
+        "y_range": [-2.5, 4.0] if is_quadratic else [-2.2, 2.2],
+        "curves": curves,
+        "lines": lines,
+        "points": points,
+        "legend": _math_graph_legend(curves, lines, points),
+        "student_focus": focus,
+    }
+
+
+def _math_template_derivative_coordinate_graph() -> dict:
+    xs = _math_linspace(-3, 3, 101)
+    curves = [{"label": "原函数 y=f(x)", "points": _math_plot_points(lambda x: 0.18 * x * x * x - 0.9 * x + 0.2, xs)}]
+    lines = [
+        {"label": "切线", "from": [-1.2, 0.05], "to": [3.0, -1.38], "style": "solid"},
+        {"label": "x=x0", "from": [1.0, -2.0], "to": [1.0, 2.0], "style": "dashed"},
+    ]
+    points = [
+        {"label": "切点", "x": 1.0, "y": -0.52},
+        {"label": "f'(x)=0", "x": -1.29, "y": 0.97},
+        {"label": "f'(x)=0", "x": 1.29, "y": -0.57},
+    ]
+    return {
+        "title": "导数与切线辅助图",
+        "is_schematic": True,
+        "x_range": [-3.4, 3.4],
+        "y_range": [-2.4, 2.4],
+        "curves": curves,
+        "lines": lines,
+        "points": points,
+        "legend": _math_graph_legend(curves, lines, points),
+        "student_focus": ["导数题优先把切点、切线斜率、极值点和单调区间标在图上，检查代数结论是否符合图像趋势。"],
+    }
+
+
+def _math_extract_function_formula(text: str) -> str:
+    normalized = _math_normalize_formula_text(text)
+    patterns = [
+        r"f\s*\(\s*x\s*\)\s*=\s*([^，。；;\n]+)",
+        r"y\s*=\s*([^，。；;\n]+)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, normalized, re.IGNORECASE)
+        if match:
+            formula = match.group(1).strip()
+            formula = re.split(r"(?:的定义域|定义域|求|其中|，|。|；|;)", formula)[0].strip()
+            if formula:
+                return formula
+    return ""
+
+
+def _math_normalize_formula_text(text: str) -> str:
+    normalized = text.replace("（", "(").replace("）", ")")
+    normalized = normalized.replace("＋", "+").replace("－", "-").replace("−", "-")
+    normalized = normalized.replace("×", "*").replace("÷", "/")
+    normalized = normalized.replace("²", "^2").replace("³", "^3")
+    normalized = normalized.replace("\\left", "").replace("\\right", "")
+    normalized = normalized.replace("\\ln", "ln").replace("\\sin", "sin").replace("\\cos", "cos").replace("\\tan", "tan")
+    normalized = normalized.replace("\\sqrt", "sqrt").replace("\\pi", "pi")
+    normalized = normalized.replace("log₂", "log_2").replace("log2", "log_2")
+    normalized = re.sub(r"\\log_\{?2\}?", "log_2", normalized)
+    normalized = re.sub(r"\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}", r"(\1)/(\2)", normalized)
+    return normalized
+
+
+def _math_compile_single_variable_expression(formula: str):
+    expression = _math_to_python_expression(formula)
+    if not expression:
+        return None
+    allowed_names = {
+        "abs": abs,
+        "sqrt": math.sqrt,
+        "sin": math.sin,
+        "cos": math.cos,
+        "tan": math.tan,
+        "ln": math.log,
+        "log": math.log,
+        "log2": math.log2,
+        "exp": math.exp,
+        "pi": math.pi,
+        "e": math.e,
+    }
+    try:
+        code = compile(expression, "<math-expression>", "eval")
+    except SyntaxError:
+        return None
+    if any(name not in allowed_names and name != "x" for name in code.co_names):
+        return None
+
+    def evaluate(x: float) -> Optional[float]:
+        try:
+            y = eval(code, {"__builtins__": {}}, {**allowed_names, "x": x})
+        except (ValueError, ZeroDivisionError, OverflowError, TypeError):
+            return None
+        if not isinstance(y, (int, float)) or not math.isfinite(float(y)):
+            return None
+        return float(y)
+
+    return evaluate
+
+
+def _math_to_python_expression(formula: str) -> str:
+    expression = _math_normalize_formula_text(formula).strip().strip("$")
+    expression = expression.replace(" ", "")
+    expression = expression.replace("^", "**")
+    expression = re.sub(r"log_?2\s*\(", "log2(", expression)
+    expression = expression.replace("lnx", "ln(x)")
+    expression = expression.replace("sinx", "sin(x)")
+    expression = expression.replace("cosx", "cos(x)")
+    expression = expression.replace("tanx", "tan(x)")
+    expression = re.sub(r"(?<=\d)(?=x|ln|log2|sin|cos|tan|sqrt|\()", "*", expression)
+    expression = re.sub(r"(?<=x)(?=\d|x|ln|log2|sin|cos|tan|sqrt|\()", "*", expression)
+    expression = re.sub(r"(?<=\))(?=x|\d|ln|log2|sin|cos|tan|sqrt|\()", "*", expression)
+    expression = re.sub(r"(log2|ln|sin|cos|tan|sqrt)\*\(", r"\1(", expression)
+    if not re.fullmatch(r"[0-9xepi+\-*/().,_a-zA-Z*]+", expression):
+        return ""
+    return expression
+
+
+def _math_sample_valid_segments(fn, x_min: float, x_max: float, *, count: int) -> List[List[List[float]]]:
+    raw_points: List[Optional[List[float]]] = []
+    for x in _math_linspace(x_min, x_max, count):
+        y = fn(x)
+        raw_points.append([round(x, 4), round(y, 4)] if y is not None and abs(y) < 1e4 else None)
+
+    segments: List[List[List[float]]] = []
+    current: List[List[float]] = []
+    previous_x: Optional[float] = None
+    for point in raw_points:
+        if point is None:
+            if len(current) >= 2:
+                segments.append(current)
+            current = []
+            previous_x = None
+            continue
+        if previous_x is not None and abs(point[0] - previous_x) > (x_max - x_min) / count * 2.5:
+            if len(current) >= 2:
+                segments.append(current)
+            current = []
+        current.append(point)
+        previous_x = point[0]
+    if len(current) >= 2:
+        segments.append(current)
+    return [segment for segment in segments if len(segment) >= 2]
+
+
+def _math_function_feature_points(fn, segments: List[List[List[float]]]) -> List[dict]:
+    points: List[dict] = []
+    for segment in segments:
+        zeros = _math_detect_zero_crossings(segment)
+        for zero in zeros[:3]:
+            points.append({"label": f"零点 x≈{_math_format_number(zero)}", "x": zero, "y": 0})
+        extrema = _math_detect_local_extrema(segment)
+        for x, y, kind in extrema[:3]:
+            points.append({"label": f"{kind}≈({_math_format_number(x)},{_math_format_number(y)})", "x": x, "y": y})
+    if not points:
+        for segment in segments[:2]:
+            mid = segment[len(segment) // 2]
+            points.append({"label": f"取样点({_math_format_number(mid[0])},{_math_format_number(mid[1])})", "x": mid[0], "y": mid[1]})
+    return points
+
+
+def _math_detect_zero_crossings(segment: List[List[float]]) -> List[float]:
+    zeros: List[float] = []
+    for left, right in zip(segment, segment[1:]):
+        x1, y1 = left
+        x2, y2 = right
+        if y1 == 0:
+            zeros.append(x1)
+        elif y1 * y2 < 0:
+            ratio = abs(y1) / (abs(y1) + abs(y2))
+            zeros.append(round(x1 + (x2 - x1) * ratio, 3))
+    return _math_unique_nearby(zeros)
+
+
+def _math_detect_local_extrema(segment: List[List[float]]) -> List[tuple[float, float, str]]:
+    extrema: List[tuple[float, float, str]] = []
+    if len(segment) < 5:
+        return extrema
+    stride = max(1, len(segment) // 80)
+    sampled = segment[::stride]
+    for i in range(1, len(sampled) - 1):
+        prev_y = sampled[i - 1][1]
+        x, y = sampled[i]
+        next_y = sampled[i + 1][1]
+        if y <= prev_y and y <= next_y:
+            extrema.append((x, y, "极小值"))
+        elif y >= prev_y and y >= next_y:
+            extrema.append((x, y, "极大值"))
+    return extrema[:4]
+
+
+def _math_detect_domain_boundaries(segments: List[List[List[float]]]) -> List[float]:
+    boundaries: List[float] = []
+    if len(segments) <= 1:
+        return boundaries
+    for left, right in zip(segments, segments[1:]):
+        boundaries.append(round(left[-1][0], 3))
+        boundaries.append(round(right[0][0], 3))
+    return boundaries[:4]
+
+
+def _math_formula_domain_boundaries(formula: str) -> List[float]:
+    expression = _math_to_python_expression(formula)
+    if not expression:
+        return []
+    boundaries: List[float] = []
+    for argument in _math_extract_function_arguments(expression, ["log2", "ln", "log", "sqrt"]):
+        roots = _math_quadratic_roots(argument)
+        if roots:
+            boundaries.extend(roots)
+        elif argument == "x":
+            boundaries.append(0.0)
+    return _math_unique_nearby([round(value, 4) for value in boundaries], tolerance=0.02)[:4]
+
+
+def _math_extract_function_arguments(expression: str, function_names: List[str]) -> List[str]:
+    arguments: List[str] = []
+    for name in function_names:
+        search_from = 0
+        prefix = f"{name}("
+        while True:
+            start = expression.find(prefix, search_from)
+            if start < 0:
+                break
+            index = start + len(prefix)
+            depth = 1
+            while index < len(expression) and depth:
+                if expression[index] == "(":
+                    depth += 1
+                elif expression[index] == ")":
+                    depth -= 1
+                index += 1
+            if depth == 0:
+                arguments.append(expression[start + len(prefix) : index - 1])
+            search_from = max(index, start + 1)
+    return arguments
+
+
+def _math_quadratic_roots(expression: str) -> List[float]:
+    coefficients = _math_quadratic_coefficients(expression)
+    if coefficients is None:
+        return []
+    a, b, c = coefficients
+    if abs(a) < 1e-12:
+        if abs(b) < 1e-12:
+            return []
+        return [-c / b]
+    discriminant = b * b - 4 * a * c
+    if discriminant < 0:
+        return []
+    sqrt_d = math.sqrt(discriminant)
+    return sorted([(-b - sqrt_d) / (2 * a), (-b + sqrt_d) / (2 * a)])
+
+
+def _math_quadratic_coefficients(expression: str) -> Optional[tuple[float, float, float]]:
+    compact = expression.replace(" ", "")
+    if not compact:
+        return None
+    compact = compact.replace("-", "+-")
+    if compact.startswith("+-"):
+        compact = compact[1:]
+    a = b = c = 0.0
+    saw_term = False
+    for term in compact.split("+"):
+        if not term:
+            continue
+        saw_term = True
+        if "x**2" in term:
+            coeff = term.replace("*x**2", "").replace("x**2", "")
+            a += _math_parse_coefficient(coeff)
+        elif "x" in term:
+            coeff = term.replace("*x", "").replace("x", "")
+            b += _math_parse_coefficient(coeff)
+        else:
+            try:
+                c += float(term)
+            except ValueError:
+                return None
+    return (a, b, c) if saw_term else None
+
+
+def _math_parse_coefficient(value: str) -> float:
+    if value in {"", "+"}:
+        return 1.0
+    if value == "-":
+        return -1.0
+    return float(value)
+
+
+def _math_tangent_hint(fn, segments: List[List[List[float]]], x_range: List[float]) -> Optional[dict]:
+    longest = max(segments, key=len)
+    point = longest[len(longest) // 2]
+    x0, y0 = point
+    h = max(1e-3, (x_range[1] - x_range[0]) / 1000)
+    y_left = fn(x0 - h)
+    y_right = fn(x0 + h)
+    if y_left is None or y_right is None:
+        return None
+    slope = (y_right - y_left) / (2 * h)
+    span = (x_range[1] - x_range[0]) * 0.28
+    x1 = x0 - span
+    x2 = x0 + span
+    return {
+        "line": {
+            "label": "切线",
+            "from": [round(x1, 3), round(y0 + slope * (x1 - x0), 3)],
+            "to": [round(x2, 3), round(y0 + slope * (x2 - x0), 3)],
+            "style": "solid",
+        },
+        "point": {"label": f"切点({_math_format_number(x0)},{_math_format_number(y0)})", "x": x0, "y": y0},
+    }
+
+
+def _math_parse_ellipse_equation(text: str) -> Optional[tuple[float, float]]:
+    normalized = _math_normalize_formula_text(text).replace(" ", "")
+    normalized = normalized.replace("{", "(").replace("}", ")").replace("^", "**")
+    match = re.search(
+        r"\(?x\*\*2\)?/\(?(\d+(?:\.\d+)?)\)?.*?\(?y\*\*2\)?/\(?(\d+(?:\.\d+)?)\)?.*?=1",
+        normalized,
+    )
+    if not match:
+        return None
+    x_den = float(match.group(1))
+    y_den = float(match.group(2))
+    if x_den <= 0 or y_den <= 0:
+        return None
+    return math.sqrt(x_den), math.sqrt(y_den)
+
+
+def _math_trim_extremes(values: List[float]) -> List[float]:
+    if len(values) < 8:
+        return values
+    ordered = sorted(values)
+    trim = max(1, len(ordered) // 20)
+    return ordered[trim:-trim] or values
+
+
+def _math_padded_range(values: List[float], *, fallback: List[float]) -> List[float]:
+    finite = [value for value in values if math.isfinite(value)]
+    if not finite:
+        return fallback
+    lower = min(finite)
+    upper = max(finite)
+    if lower == upper:
+        lower -= 1
+        upper += 1
+    padding = max((upper - lower) * 0.12, 0.6)
+    return [round(lower - padding, 3), round(upper + padding, 3)]
+
+
+def _math_linspace(start: float, stop: float, count: int) -> List[float]:
+    if count <= 1:
+        return [start]
+    step = (stop - start) / (count - 1)
+    return [start + step * i for i in range(count)]
+
+
+def _math_unique_nearby(values: List[float], tolerance: float = 0.12) -> List[float]:
+    result: List[float] = []
+    for value in values:
+        if all(abs(value - existing) > tolerance for existing in result):
+            result.append(value)
+    return result
+
+
+def _math_graph_legend(curves: List[dict], lines: List[dict], points: List[dict]) -> List[str]:
+    items: List[str] = []
+    for curve in curves[:2]:
+        label = str(curve.get("label") or "").strip()
+        if label:
+            items.append(label)
+    for line in lines:
+        label = str(line.get("label") or "").strip()
+        if label:
+            items.append(label)
+    for point in points[:6]:
+        label = str(point.get("label") or "").strip()
+        if label:
+            items.append(label)
+    deduped: List[str] = []
+    for item in items:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped[:8]
+
+
+def _math_format_number(value: float) -> str:
+    rounded = round(float(value), 2)
+    if abs(rounded - round(rounded)) < 1e-9:
+        return str(int(round(rounded)))
+    return f"{rounded:.2f}".rstrip("0").rstrip(".")
 
 
 def _math_plot_points(fn, xs: List[float]) -> List[List[float]]:

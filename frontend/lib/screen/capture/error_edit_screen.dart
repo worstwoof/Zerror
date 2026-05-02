@@ -237,9 +237,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           _upsertInteractiveHtmlArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
-          _physicsAnimationError = result.reason.trim().isEmpty
-              ? '当前题目暂时无法生成动画演示。'
-              : result.reason;
+          _physicsAnimationError =
+              result.reason.trim().isEmpty ? '当前题目暂时无法生成动画演示。' : result.reason;
         }
       });
 
@@ -367,9 +366,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   NewErrorDraft _buildDraft(String question) {
     final subject = _subject == '通用' ? _inferSubject(question) : _subject;
     final topic = _inferTopic(question, subject);
-    final reason = _selectedErrorReason.isNotEmpty
-        ? _selectedErrorReason
-        : '概念模糊';
+    final reason =
+        _selectedErrorReason.isNotEmpty ? _selectedErrorReason : '概念模糊';
     final reflection = _reflectionController.text.trim();
 
     final summaryParts = <String>[
@@ -560,9 +558,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildAnalysisDashboard() {
-    final subject = _subject == '通用'
-        ? _inferSubject(_questionController.text)
-        : _subject;
+    final subject =
+        _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
     final topic = _inferTopic(_questionController.text, subject);
 
     return SingleChildScrollView(
@@ -1078,8 +1075,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                     _isGeneratingPhysicsAnimation
                         ? '生成中...'
                         : hasArtifact
-                        ? '重新生成'
-                        : '生成动画',
+                            ? '重新生成'
+                            : '生成动画',
                     style: const TextStyle(color: AppPalette.almondCream),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -1139,9 +1136,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final content = (artifact['content'] ?? '').toString().trim();
 
     final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
-    final displayDescription = description.isEmpty
-        ? _fallbackArtifactDescription(type)
-        : description;
+    final displayDescription =
+        description.isEmpty ? _fallbackArtifactDescription(type) : description;
     final previewText = _artifactPreviewText(type, mimeType, content);
 
     return Container(
@@ -1352,8 +1348,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             .map((item) => item.toString())
             .where((item) => item.trim().isNotEmpty)
             .toList();
-    final hasReviewCard =
-        coreIdea.isNotEmpty ||
+    final hasReviewCard = coreIdea.isNotEmpty ||
         formulaTransformations.isNotEmpty ||
         solutionPath.isNotEmpty ||
         mistakeTraps.isNotEmpty ||
@@ -1436,8 +1431,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             const SizedBox(height: 8),
             ...solutionPath.asMap().entries.map((entry) {
               final item = entry.value;
-              final action = (item['action'] ?? '步骤 ${entry.key + 1}')
-                  .toString();
+              final action =
+                  (item['action'] ?? '步骤 ${entry.key + 1}').toString();
               final reason = (item['reason'] ?? '').toString().trim();
               if (reason.isEmpty) return const SizedBox.shrink();
               return Padding(
@@ -1587,11 +1582,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   List<String> _coordinateGraphNotes(Map<String, dynamic> graph) {
-    final raw = graph['student_focus'] ?? graph['annotations'];
-    if (raw is! List<dynamic>) {
-      return const [];
-    }
-    return raw
+    final rawItems = [
+      ..._graphTextList(graph['legend']),
+      ..._graphTextList(graph['student_focus']),
+      ..._graphTextList(graph['annotations']),
+    ];
+    return rawItems
         .map((item) {
           if (item is Map<String, dynamic>) {
             return (item['text'] ?? item['label'] ?? '').toString();
@@ -1599,7 +1595,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           return item.toString();
         })
         .where((item) => item.trim().isNotEmpty)
+        .toSet()
         .toList();
+  }
+
+  List<dynamic> _graphTextList(dynamic raw) {
+    if (raw is! List<dynamic>) {
+      return const [];
+    }
+    return raw;
   }
 
   List<String> _artifactStringList(dynamic value) {
@@ -2147,7 +2151,7 @@ class _MathCoordinateGraphPainter extends CustomPainter {
         canvas.drawLine(start, end, paint);
       }
       final label = (line['label'] ?? '').toString();
-      if (label.isNotEmpty) {
+      if (label.isNotEmpty && label.length <= 8) {
         _drawLabel(
           canvas,
           label,
@@ -2167,7 +2171,7 @@ class _MathCoordinateGraphPainter extends CustomPainter {
       if (x == null || y == null) continue;
       final offset = project(x, y);
       canvas.drawCircle(offset, 3.5, pointPaint);
-      final label = (point['label'] ?? '').toString();
+      final label = _compactPointLabel((point['label'] ?? '').toString());
       if (label.isNotEmpty) {
         _drawLabel(canvas, label, offset + const Offset(5, -15), _pointColor);
       }
@@ -2206,6 +2210,14 @@ class _MathCoordinateGraphPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: 92);
     painter.paint(canvas, offset);
+  }
+
+  String _compactPointLabel(String label) {
+    if (label.isEmpty) return '';
+    final compact = label.split(RegExp(r'[\s（(≈]')).first.trim();
+    if (compact.isEmpty) return '';
+    if (compact.length <= 5) return compact;
+    return '';
   }
 
   static List<double> _range(
