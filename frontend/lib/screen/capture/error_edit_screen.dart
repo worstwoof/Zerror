@@ -475,10 +475,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppPalette.night,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppPalette.night,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
@@ -502,7 +501,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         ],
       ),
       body: AppSurface(
-        padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
+        topSafe: false,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         child: _isAiThinking ? _buildLoadingState() : _buildAnalysisDashboard(),
       ),
       bottomNavigationBar: _isAiThinking
