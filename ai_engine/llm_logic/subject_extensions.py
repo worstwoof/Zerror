@@ -153,11 +153,6 @@ def _build_math_chart_spec(
             solution_path=solution_path,
         ),
         "student_tasks": profile["review_checklist"],
-        "step_mapping": [
-            f"{_math_latexize_display_text(str(item['action']))}：{_math_latexize_display_text(str(item['reason']))}"
-            for item in solution_path[:4]
-            if item.get("action") and item.get("reason")
-        ],
     }
     if coordinate_graph:
         content["coordinate_graph"] = coordinate_graph
@@ -422,6 +417,12 @@ def _math_coordinate_graph_spec(
     solution_steps: List[str],
 ) -> Optional[dict]:
     text = f"{cleaned_question} {' '.join(knowledge_points)} {' '.join(solution_steps)}".lower()
+    inferred_scene = _math_scene_type(cleaned_question, knowledge_points)
+    if inferred_scene in {"function", "calculus", "conic"}:
+        scene = inferred_scene
+    elif scene not in {"function", "calculus", "conic"}:
+        scene = inferred_scene
+
     if scene == "function":
         graph = _math_function_coordinate_graph(text)
     elif scene == "calculus" and _math_is_derivative_graph_question(text):
@@ -630,6 +631,21 @@ def _math_extract_coordinate_points(text: str) -> List[dict]:
             }
         )
     return points
+
+
+def _math_coordinate_graph_has_renderable_content(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    curves = value.get("curves")
+    if not isinstance(curves, list):
+        return False
+    for curve in curves:
+        if not isinstance(curve, dict):
+            continue
+        points = curve.get("points")
+        if isinstance(points, list) and len(points) >= 2:
+            return True
+    return False
 
 
 def _math_solution_path(profile: dict, solution_steps: List[str]) -> List[dict]:
@@ -2813,7 +2829,6 @@ def _is_chart_spec_valid(parsed: dict) -> bool:
             "review_checklist",
             "plot_suggestions",
             "student_tasks",
-            "step_mapping",
             "render_hints",
             "coordinate_graph",
         ]
@@ -2840,8 +2855,9 @@ def _with_chart_spec_legacy_display_fields(
         return artifact
     if not isinstance(parsed, dict):
         return artifact
+    parsed.pop("step_mapping", None)
     scene = str(parsed.get("scene") or parsed.get("topic_type") or "").strip()
-    if not isinstance(parsed.get("coordinate_graph"), dict):
+    if not _math_coordinate_graph_has_renderable_content(parsed.get("coordinate_graph")):
         knowledge_values = parsed.get("knowledge_points")
         if not isinstance(knowledge_values, list):
             knowledge_values = []
@@ -2900,11 +2916,6 @@ def _with_chart_spec_legacy_display_fields(
         )
         if value:
             legacy_sections.append({"label": "解题路线", "value": value})
-            parsed["step_mapping"] = [
-                f"{_math_latexize_display_text(str(item.get('action', '解题步骤')))}：{_math_latexize_display_text(str(item.get('reason', '')))}"
-                for item in solution_path[:4]
-                if isinstance(item, dict) and str(item.get("reason") or "").strip()
-            ]
     if isinstance(mistake_traps, list) and mistake_traps:
         legacy_sections.append(
             {
