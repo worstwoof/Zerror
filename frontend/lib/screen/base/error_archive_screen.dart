@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import 'error_detail_screen.dart';
 
@@ -240,16 +241,22 @@ class _ErrorArchiveScreenState extends State<ErrorArchiveScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    item.question,
-                    style: const TextStyle(
-                      color: AppPalette.textPrimary,
-                      fontSize: 15,
-                      height: 1.5,
-                      fontWeight: FontWeight.w500,
+                  SizedBox(
+                    height: 68,
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: AppLatexText(
+                          item.question,
+                          style: const TextStyle(
+                            color: AppPalette.textPrimary,
+                            fontSize: 15,
+                            height: 1.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
                   Row(

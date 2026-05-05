@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'app_repository.dart';
 import 'auth_session.dart';
 import 'auth_session_store.dart';
+import '../data/ai_api_client.dart';
 import '../data/auth_api_client.dart';
 
 class ErrorRecord {
@@ -162,6 +163,54 @@ enum CalendarState { done, review, today, upcoming, rest }
 
 enum ReviewFeedback { forgot, fuzzy, mastered }
 
+enum AnalysisTaskStatus { queued, analyzing, completed, failed }
+
+class BackgroundAnalysisTask {
+  const BackgroundAnalysisTask({
+    required this.id,
+    required this.imagePath,
+    required this.createdAt,
+    required this.status,
+    this.extractedText = '',
+    this.analysis,
+    this.errorMessage,
+  });
+
+  final String id;
+  final String imagePath;
+  final DateTime createdAt;
+  final AnalysisTaskStatus status;
+  final String extractedText;
+  final AnalysisResult? analysis;
+  final String? errorMessage;
+
+  bool get isActive =>
+      status == AnalysisTaskStatus.queued ||
+      status == AnalysisTaskStatus.analyzing;
+  bool get isCompleted => status == AnalysisTaskStatus.completed;
+  bool get isFailed => status == AnalysisTaskStatus.failed;
+
+  BackgroundAnalysisTask copyWith({
+    AnalysisTaskStatus? status,
+    String? extractedText,
+    AnalysisResult? analysis,
+    String? errorMessage,
+    bool clearErrorMessage = false,
+  }) {
+    return BackgroundAnalysisTask(
+      id: id,
+      imagePath: imagePath,
+      createdAt: createdAt,
+      status: status ?? this.status,
+      extractedText: extractedText ?? this.extractedText,
+      analysis: analysis ?? this.analysis,
+      errorMessage: clearErrorMessage
+          ? null
+          : errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
 class AppStore extends ChangeNotifier {
   AppStore.seeded({
     AppRepository? repository,
@@ -191,12 +240,15 @@ class AppStore extends ChangeNotifier {
   final AppRepository? _repository;
   final AuthSessionStore? _sessionStore;
   final AuthApiClient? _authApiClient;
+  final AiApiClient _aiApiClient = const AiApiClient();
   final List<ErrorRecord> _errors;
+  final List<BackgroundAnalysisTask> _analysisTasks = <BackgroundAnalysisTask>[];
   AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
   DateTime _passwordUpdatedAt;
   List<DeviceSession> _devices;
+  bool _isAnalysisQueueRunning = false;
 
   static Future<AppStore> bootstrap(
     AppRepository repository, {
@@ -327,6 +379,8 @@ class AppStore extends ChangeNotifier {
   UnmodifiableListView<ErrorRecord> get errors => UnmodifiableListView(_errors);
   UnmodifiableListView<DeviceSession> get devices =>
       UnmodifiableListView(_devices);
+  UnmodifiableListView<BackgroundAnalysisTask> get analysisTasks =>
+      UnmodifiableListView(_analysisTasks);
 
   DeviceSession get currentDevice =>
       _devices.firstWhere(
@@ -363,6 +417,13 @@ class AppStore extends ChangeNotifier {
   int get favoriteCount => favorites.length;
   int get pendingReviewCount => pendingReviewErrors.length;
   int get masteredCount => masteredErrors.length;
+  int get activeAnalysisTaskCount =>
+      _analysisTasks.where((item) => item.isActive).length;
+  int get completedAnalysisTaskCount =>
+      _analysisTasks.where((item) => item.isCompleted).length;
+  int get failedAnalysisTaskCount =>
+      _analysisTasks.where((item) => item.isFailed).length;
+  bool get hasAnalysisTasks => _analysisTasks.isNotEmpty;
   int get knowledgePointCount => _errors.map((item) => item.topic).toSet().length;
   int get subjectCount => _errors.map((item) => item.subject).toSet().length;
   bool get hasLearningHistory => totalErrors > 0;
@@ -522,6 +583,39 @@ class AppStore extends ChangeNotifier {
     return record;
   }
 
+  BackgroundAnalysisTask enqueueImageAnalysisTask({
+    required String imagePath,
+  }) {
+    final task = BackgroundAnalysisTask(
+      id: 'analysis-${DateTime.now().microsecondsSinceEpoch}-${_analysisTasks.length}',
+      imagePath: imagePath,
+      createdAt: DateTime.now(),
+      status: AnalysisTaskStatus.queued,
+    );
+    _analysisTasks.insert(0, task);
+    notifyListeners();
+    unawaited(_pumpAnalysisQueue());
+    return task;
+  }
+
+  void retryAnalysisTask(String id) {
+    final index = _analysisTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _analysisTasks[index] = _analysisTasks[index].copyWith(
+      status: AnalysisTaskStatus.queued,
+      clearErrorMessage: true,
+    );
+    notifyListeners();
+    unawaited(_pumpAnalysisQueue());
+  }
+
+  void dismissAnalysisTask(String id) {
+    final index = _analysisTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _analysisTasks.removeAt(index);
+    notifyListeners();
+  }
+
   List<ErrorRecord> addErrorRecords(Iterable<NewErrorDraft> drafts) {
     final created = drafts.map(addErrorRecord).toList(growable: false);
     return created;
@@ -664,6 +758,7 @@ class AppStore extends ChangeNotifier {
     await sessionStore?.disableAutoLogin();
     _session = null;
     _applySnapshotState(null);
+    _analysisTasks.clear();
     notifyListeners();
     unawaited(_persist());
   }
@@ -702,6 +797,76 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  Future<void> _pumpAnalysisQueue() async {
+    if (_isAnalysisQueueRunning) return;
+
+    _isAnalysisQueueRunning = true;
+    try {
+      while (true) {
+        final nextIndex = _analysisTasks.lastIndexWhere(
+          (item) => item.status == AnalysisTaskStatus.queued,
+        );
+        if (nextIndex == -1) {
+          return;
+        }
+
+        final task = _analysisTasks[nextIndex];
+        _analysisTasks[nextIndex] = task.copyWith(
+          status: AnalysisTaskStatus.analyzing,
+          clearErrorMessage: true,
+        );
+        notifyListeners();
+
+        try {
+          final payload = await _aiApiClient.analyzeImage(
+            imagePath: task.imagePath,
+            enableSubjectExtensions: true,
+          );
+          _replaceAnalysisTask(
+            task.id,
+            (current) => current.copyWith(
+              status: AnalysisTaskStatus.completed,
+              extractedText: payload.extractedText,
+              analysis: payload.analysis,
+              clearErrorMessage: true,
+            ),
+          );
+        } on AiApiException catch (error) {
+          _replaceAnalysisTask(
+            task.id,
+            (current) => current.copyWith(
+              status: AnalysisTaskStatus.failed,
+              errorMessage: error.message,
+            ),
+          );
+        } catch (error) {
+          _replaceAnalysisTask(
+            task.id,
+            (current) => current.copyWith(
+              status: AnalysisTaskStatus.failed,
+              errorMessage: 'AI analysis failed: $error',
+            ),
+          );
+        }
+      }
+    } finally {
+      _isAnalysisQueueRunning = false;
+      if (_analysisTasks.any((item) => item.status == AnalysisTaskStatus.queued)) {
+        unawaited(_pumpAnalysisQueue());
+      }
+    }
+  }
+
+  void _replaceAnalysisTask(
+    String id,
+    BackgroundAnalysisTask Function(BackgroundAnalysisTask task) update,
+  ) {
+    final index = _analysisTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _analysisTasks[index] = update(_analysisTasks[index]);
+    notifyListeners();
+  }
+
   Future<void> _reloadForCurrentSession() async {
     AppPersistenceSnapshot? loadedSnapshot;
     final repository = _repository;
@@ -726,6 +891,7 @@ class AppStore extends ChangeNotifier {
     _errors
       ..clear()
       ..addAll(_restoreErrors(snapshot));
+    _analysisTasks.clear();
     _profile = snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;
     _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now();

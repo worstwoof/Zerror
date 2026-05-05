@@ -20,11 +20,13 @@ class ErrorEditScreen extends StatefulWidget {
     required this.imagePath,
     required this.initialText,
     this.initialAnalysis,
+    this.onArchived,
   });
 
   final String imagePath;
   final String initialText;
   final AnalysisResult? initialAnalysis;
+  final VoidCallback? onArchived;
 
   @override
   State<ErrorEditScreen> createState() => _ErrorEditScreenState();
@@ -274,6 +276,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     try {
       final draft = _buildDraft(question);
       final created = AppStateScope.of(context).addErrorRecord(draft);
+      widget.onArchived?.call();
 
       ScaffoldMessenger.of(
         context,
@@ -320,6 +323,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
       final draft = _buildDraftWithImage(question, imageUrl: imageUrl);
       final created = AppStateScope.of(context).addErrorRecord(draft);
+      widget.onArchived?.call();
 
       if (!mounted) return;
       setState(() {

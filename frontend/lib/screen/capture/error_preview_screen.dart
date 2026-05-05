@@ -1,12 +1,11 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
+import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
-import '../../data/ai_api_client.dart';
-import 'error_edit_screen.dart';
 
 class ErrorPreviewScreen extends StatefulWidget {
   const ErrorPreviewScreen({
@@ -25,13 +24,16 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
   static const double _minSelectionEdge = 24;
   static const double _handleTouchRadius = 22;
 
-  final AiApiClient _apiClient = const AiApiClient();
   bool _isRecognizing = false;
+  bool _isMinimizing = false;
+  String? _queuedImagePath;
   Size? _sourceImageSize;
   Rect _selection = _defaultSelection;
   _SelectionDragMode _dragMode = _SelectionDragMode.none;
   Offset? _dragStartPoint;
   Rect? _dragStartRect;
+
+  bool get _isBusy => _isRecognizing || _isMinimizing;
 
   @override
   void initState() {
@@ -80,42 +82,23 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
 
     try {
       final croppedImagePath = await _cropSelectionToTempFile();
-      final payload = await _apiClient.analyzeImage(
+      if (!mounted) {
+        return;
+      }
+
+      AppStateScope.of(context).enqueueImageAnalysisTask(
         imagePath: croppedImagePath,
-        enableSubjectExtensions: true,
       );
-      if (!mounted) {
-        return;
-      }
 
       setState(() {
         _isRecognizing = false;
+        _queuedImagePath = croppedImagePath;
+        _isMinimizing = true;
       });
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => ErrorEditScreen(
-            imagePath: croppedImagePath,
-            initialText: payload.extractedText,
-            initialAnalysis: payload.analysis,
-          ),
-        ),
-      );
-    } on AiApiException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isRecognizing = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Image analysis failed: ${error.message}'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      await Future<void>.delayed(const Duration(milliseconds: 560));
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (_) {
       if (!mounted) {
         return;
@@ -123,6 +106,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
 
       setState(() {
         _isRecognizing = false;
+        _isMinimizing = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -403,7 +387,10 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
       backgroundColor: AppPalette.night,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -432,7 +419,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                 ),
               ),
               child: const Text(
-                '在图片上拖动框选题目区域。分析时只会上传框内的小图，不会把整张原图发到云端。',
+                '在图片上拖动框选题目区域。分析时只会上传框内小图，不会把整张原图发到云端。',
                 style: TextStyle(
                   color: AppPalette.textSecondary,
                   fontSize: 13,
@@ -505,7 +492,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _isRecognizing ? null : _resetSelection,
+                        onPressed: _isBusy ? null : _resetSelection,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppPalette.textPrimary,
                           side: BorderSide(
@@ -523,7 +510,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isRecognizing ? null : () => Navigator.pop(context),
+                        onPressed: _isBusy ? null : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppPalette.textPrimary,
                           side: BorderSide(
@@ -544,7 +531,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed:
-                        _isRecognizing || _sourceImageSize == null ? null : _startOCR,
+                        _isBusy || _sourceImageSize == null ? null : _startOCR,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppPalette.almondCream,
                       foregroundColor: AppPalette.night,
@@ -554,16 +541,15 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                       ),
                     ),
                     child: _isRecognizing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: AppPalette.night,
-                              strokeWidth: 2,
+                        ? const Text(
+                            '正在收进后台整理',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           )
                         : const Text(
-                            '分析框选内容',
+                            '加入后台整理',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -575,6 +561,166 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
             ),
           ),
         ],
+      ),
+        ),
+        if (_isRecognizing) _buildRecognizingOverlay(),
+        if (_isMinimizing) _buildMinimizingOverlay(),
+      ],
+    );
+  }
+
+  Widget _buildMinimizingOverlay() {
+    final imagePath = _queuedImagePath;
+    if (imagePath == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Material(
+          color: Colors.transparent,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final topPadding = MediaQuery.of(context).padding.top;
+              return TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 540),
+                curve: Curves.easeInOutCubic,
+                builder: (context, value, child) {
+                  final startSize = (constraints.maxWidth - 72).clamp(180.0, 260.0);
+                  final size = ui.lerpDouble(startSize, 58, value)!;
+                  final top = ui.lerpDouble(
+                    constraints.maxHeight * 0.34,
+                    topPadding + 16,
+                    value,
+                  )!;
+                  final right = ui.lerpDouble(
+                    (constraints.maxWidth - startSize) / 2,
+                    18,
+                    value,
+                  )!;
+                  final overlayOpacity = ui.lerpDouble(0.52, 0.0, value)!;
+
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withValues(alpha: overlayOpacity),
+                        ),
+                      ),
+                      Positioned(
+                        top: top,
+                        right: right,
+                        child: Container(
+                          width: size,
+                          height: size,
+                          decoration: BoxDecoration(
+                            color: AppPalette.kombuGreen,
+                            borderRadius: BorderRadius.circular(
+                              ui.lerpDouble(28, 18, value)!,
+                            ),
+                            border: Border.all(
+                              color: AppPalette.almondCream.withValues(
+                                alpha: ui.lerpDouble(0.50, 0.18, value)!,
+                              ),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.26),
+                                blurRadius: ui.lerpDouble(28, 12, value)!,
+                                offset: Offset(0, ui.lerpDouble(14, 6, value)!),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.file(
+                                File(imagePath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const ColoredBox(
+                                    color: AppPalette.pineGreen,
+                                    child: Icon(
+                                      Icons.image_rounded,
+                                      color: AppPalette.textPrimary,
+                                    ),
+                                  );
+                                },
+                              ),
+                              Container(
+                                color: AppPalette.night.withValues(
+                                  alpha: ui.lerpDouble(0.04, 0.26, value)!,
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  margin: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: AppPalette.almondCream,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.cloud_sync_rounded,
+                                    color: AppPalette.night,
+                                    size: 15,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecognizingOverlay() {
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.58),
+            alignment: Alignment.center,
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RoseThreeLoader(size: 124),
+                SizedBox(height: 22),
+                Text(
+                  '正在收进后台整理',
+                  style: TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '回到首页后，AI 会在右上角继续整理',
+                  style: TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 13,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

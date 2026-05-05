@@ -6,8 +6,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
 import '../../core/theme.dart';
+import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
 import 'data_dashboard_screen.dart';
 import 'error_archive_screen.dart';
@@ -103,7 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildAnimatedBottomNav(context),
+      floatingActionButton: _buildCenterAddButton(context),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: _buildBottomAppBar(),
     );
   }
 
@@ -115,22 +119,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final featuredReview = store.smartReviewQueue.isNotEmpty
         ? store.smartReviewQueue.first
         : store.errors.first;
+    final topPadding = MediaQuery.of(context).padding.top + 38;
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
-          24, MediaQuery.of(context).padding.top + 38, 24, 120),
+          24, topPadding, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '\u6b22\u8fce\u56de\u6765\uff0c${store.userName}',
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 38,
-              fontWeight: FontWeight.w700,
-              height: 1.12,
-            ),
-          ),
+          _buildHomeHeader(context, store),
           const SizedBox(height: 10),
           Text(
             '\u4eca\u5929\u8fd8\u6709 ${store.pendingReviewCount} \u9053\u9519\u9898\u5f85\u590d\u4e60\uff0c\u4f18\u5148\u8865\u5f3a\u300c${store.weakestSubject}\u300d\u3002',
@@ -223,21 +220,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyHomeTab(BuildContext context, AppStore store) {
+    final topPadding = MediaQuery.of(context).padding.top + 38;
+
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
-          24, MediaQuery.of(context).padding.top + 38, 24, 120),
+          24, topPadding, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '欢迎回来，${store.userName}',
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 38,
-              fontWeight: FontWeight.w700,
-              height: 1.12,
-            ),
-          ),
+          _buildHomeHeader(context, store),
           const SizedBox(height: 10),
           const Text(
             '你的错题档案还是空的。先录入第一道题，后面的复习、学科拓展和数据统计才会慢慢长出来。',
@@ -322,6 +313,31 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHomeHeader(BuildContext context, AppStore store) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            store.userName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 46,
+              fontWeight: FontWeight.w800,
+              height: 1.04,
+            ),
+          ),
+        ),
+        if (store.hasAnalysisTasks) ...[
+          const SizedBox(width: 14),
+          _buildAnalysisQueueLauncher(context, store),
+        ],
+      ],
     );
   }
 
@@ -567,161 +583,106 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAnimatedBottomNav(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return Container(
-      height: 44 + bottomPadding,
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      decoration: BoxDecoration(
-        color: AppPalette.night.withValues(alpha: 0.92),
-        border: Border(
-          top: BorderSide(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.24),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
+  Widget _buildBottomAppBar() {
+    return BottomAppBar(
+      height: 48,
+      color: const Color(0xFF1E211F),
+      elevation: 18,
+      shadowColor: Colors.black.withValues(alpha: 0.36),
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 6,
+      padding: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Row(
         children: [
-          Positioned.fill(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildNavItem(
-                    index: 0,
-                    icon: Icons.home_rounded,
-                  ),
-                ),
-                Expanded(child: _buildCaptureNavAction(context)),
-                Expanded(
-                  child: _buildNavItem(
-                    index: 1,
-                    icon: Icons.person_rounded,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 18),
+          Expanded(
+            child: _buildBottomTab(
+              index: 0,
+              icon: Icons.home_outlined,
+              label: '主页',
             ),
           ),
+          const SizedBox(width: 66),
+          Expanded(
+            child: _buildBottomTab(
+              index: 1,
+              icon: Icons.person_outline_rounded,
+              label: '个人中心',
+            ),
+          ),
+          const SizedBox(width: 18),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem({
+  Widget _buildBottomTab({
     required int index,
     required IconData icon,
+    required String label,
   }) {
     final isSelected = _currentIndex == index;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _onNavTapped(index),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: 0, end: isSelected ? 1 : 0),
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutBack,
-        builder: (context, value, child) {
-          final iconSize = 34 + 14 * value;
-          final iconTop = 5 - 24 * value;
-          final scale = 1 + 0.06 * value;
-          return SizedBox.expand(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  top: iconTop,
-                  left: 0,
-                  right: 0,
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Center(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                        width: iconSize,
-                        height: iconSize,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppPalette.pineGreen
-                              : Colors.transparent,
-                          shape: BoxShape.circle,
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: AppPalette.pineGreen
-                                        .withValues(alpha: 0.26),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 9),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                          child: Icon(
-                            icon,
-                            size: isSelected ? 25 : 24,
-                            color: isSelected
-                                ? AppPalette.almondCream
-                                : AppPalette.textSecondary
-                                    .withValues(alpha: 0.72),
-                          ),
-                        ),
-                    ),
+    const selectedColor = Colors.white;
+    const unselectedColor = Color(0xFF757575);
+    final contentColor = isSelected ? selectedColor : unselectedColor;
+
+    return Material(
+      color: Colors.transparent,
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        child: InkWell(
+          onTap: () => _onNavTapped(index),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              const SizedBox(height: 1),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: Icon(
+                  icon,
+                  key: ValueKey<bool>(isSelected),
+                  color: contentColor,
+                  size: 30,
+                ),
+              ),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                opacity: isSelected ? 1 : 0,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: const BoxDecoration(
+                    color: selectedColor,
+                    shape: BoxShape.circle,
                   ),
                 ),
-              ],
-            ),
-          );
-        },
+              ),
+              const SizedBox(height: 1),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildCaptureNavAction(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _showAddActionSheet(context),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: -24,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppPalette.honeyOrange, AppPalette.almondCream],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppPalette.honeyOrange.withValues(alpha: 0.30),
-                      blurRadius: 18,
-                      offset: const Offset(0, 9),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: AppPalette.night,
-                  size: 32,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+  Widget _buildCenterAddButton(BuildContext context) {
+    return FloatingActionButton(
+      onPressed: () => _showAddActionSheet(context),
+      elevation: 10,
+      highlightElevation: 12,
+      backgroundColor: const Color(0xFFFCD9A8),
+      foregroundColor: const Color(0xFF121212),
+      shape: const CircleBorder(),
+      child: const Icon(Icons.add_rounded, size: 32),
     );
   }
 
@@ -878,6 +839,488 @@ class _HomeScreenState extends State<HomeScreen> {
       curve: Curves.easeOutCubic,
     );
     setState(() => _currentIndex = index);
+  }
+
+  Widget _buildAnalysisQueueLauncher(BuildContext context, AppStore store) {
+    final completedCount = store.completedAnalysisTaskCount;
+    final failedCount = store.failedAnalysisTaskCount;
+    final totalCount = store.analysisTasks.length;
+    final hasFailure = failedCount > 0;
+    final hasCompleted = completedCount > 0;
+    final tint = hasFailure
+        ? Colors.redAccent
+        : hasCompleted
+            ? AppPalette.matchaMist
+            : AppPalette.almondCream;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showAnalysisQueueSheet(context),
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppPalette.night.withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: tint.withValues(alpha: 0.32)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.24),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasFailure
+                    ? Icons.error_outline_rounded
+                    : Icons.file_download_rounded,
+                color: tint,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$totalCount',
+                style: TextStyle(
+                  color: tint,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAnalysisQueueSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => _buildAnalysisQueueSheet(sheetContext),
+    );
+  }
+
+  Widget _buildAnalysisQueueSheet(BuildContext sheetContext) {
+    return Builder(
+      builder: (context) {
+        final store = AppStateScope.of(context);
+        final tasks = store.analysisTasks;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.76,
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          decoration: const BoxDecoration(
+            color: AppPalette.night,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppPalette.textSecondary.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppPalette.almondCream.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.file_download_rounded,
+                        color: AppPalette.almondCream,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '\u540e\u53f0\u9519\u9898\u6574\u7406',
+                            style: TextStyle(
+                              color: AppPalette.textPrimary,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _queueSummary(store),
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: tasks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            '\u6682\u65e0\u540e\u53f0\u6574\u7406\u4efb\u52a1',
+                            style: TextStyle(color: AppPalette.textSecondary),
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: tasks.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            return _buildAnalysisTaskTile(
+                              sheetContext,
+                              store,
+                              tasks[index],
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _queueSummary(AppStore store) {
+    final active = store.activeAnalysisTaskCount;
+    final completed = store.completedAnalysisTaskCount;
+    final failed = store.failedAnalysisTaskCount;
+    if (active > 0) {
+      return '\u6b63\u5728\u6574\u7406 $active \u9053\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+    }
+    if (failed > 0) {
+      return '$failed \u9053\u9700\u8981\u91cd\u8bd5\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+    }
+    if (completed > 0) {
+      return '$completed \u9053\u5df2\u6574\u7406\u597d\uff0c\u7b49\u4f60\u786e\u8ba4\u5165\u6863';
+    }
+    return '\u62cd\u5b8c\u9898\u540e\u4f1a\u81ea\u52a8\u5728\u8fd9\u91cc\u6392\u961f';
+  }
+
+  Widget _buildAnalysisTaskTile(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundAnalysisTask task,
+  ) {
+    final status = _analysisTaskStatus(task);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _analysisTaskTap(sheetContext, task),
+        borderRadius: BorderRadius.circular(24),
+        child: AppPanel(
+          padding: const EdgeInsets.all(12),
+          color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 62,
+                  height: 62,
+                  child: Image.file(
+                    File(task.imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: AppPalette.pineGreen,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.image_rounded,
+                          color: AppPalette.textPrimary,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(status.icon, color: status.color, size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            color: status.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _formatTaskTime(task.createdAt),
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildTaskPreviewText(task, status.note),
+                    const SizedBox(height: 10),
+                    _buildAnalysisTaskActions(sheetContext, store, task),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  VoidCallback? _analysisTaskTap(
+    BuildContext sheetContext,
+    BackgroundAnalysisTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openCompletedAnalysisTask(task);
+      };
+    }
+    if (task.status == AnalysisTaskStatus.failed) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openFailedAnalysisTask(task);
+      };
+    }
+    return null;
+  }
+
+  Widget _buildTaskPreviewText(BackgroundAnalysisTask task, String fallback) {
+    final content = task.isCompleted && task.extractedText.trim().isNotEmpty
+        ? task.extractedText.trim()
+        : task.errorMessage ?? fallback;
+
+    if (!task.isCompleted) {
+      return Text(
+        content,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppPalette.textPrimary,
+          fontSize: 13,
+          height: 1.45,
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 42,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: AppLatexText(
+            content,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalysisTaskActions(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundAnalysisTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openCompletedAnalysisTask(task);
+            },
+            icon: const Icon(Icons.fact_check_rounded, size: 17),
+            label: const Text('\u786e\u8ba4\u5165\u6863'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.almondCream,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissAnalysisTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('\u79fb\u9664'),
+          ),
+        ],
+      );
+    }
+
+    if (task.status == AnalysisTaskStatus.failed) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => store.retryAnalysisTask(task.id),
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('\u91cd\u8bd5'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.almondCream,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openFailedAnalysisTask(task);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textPrimary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('\u624b\u52a8\u6574\u7406'),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissAnalysisTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('\u79fb\u9664'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: AppPalette.almondCream.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.file_download_rounded,
+            color: AppPalette.almondCream,
+            size: 13,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          '\u4f60\u53ef\u4ee5\u7ee7\u7eed\u62cd\u4e0b\u4e00\u9898',
+          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  ({IconData icon, Color color, String label, String note}) _analysisTaskStatus(
+    BackgroundAnalysisTask task,
+  ) {
+    switch (task.status) {
+      case AnalysisTaskStatus.queued:
+        return (
+          icon: Icons.schedule_rounded,
+          color: AppPalette.textSecondary,
+          label: '\u7b49\u5f85\u6574\u7406',
+          note: '\u5df2\u6536\u5230\u540e\u53f0\u961f\u5217',
+        );
+      case AnalysisTaskStatus.analyzing:
+        return (
+          icon: Icons.file_download_rounded,
+          color: AppPalette.almondCream,
+          label: '\u6b63\u5728\u6574\u7406',
+          note: '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
+        );
+      case AnalysisTaskStatus.completed:
+        return (
+          icon: Icons.check_circle_rounded,
+          color: AppPalette.matchaMist,
+          label: '\u5df2\u5b8c\u6210',
+          note: '\u70b9\u51fb\u786e\u8ba4\u540e\u5c31\u80fd\u5165\u6863',
+        );
+      case AnalysisTaskStatus.failed:
+        return (
+          icon: Icons.error_outline_rounded,
+          color: Colors.redAccent,
+          label: '\u9700\u8981\u91cd\u8bd5',
+          note: '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
+        );
+    }
+  }
+
+  String _formatTaskTime(DateTime time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  void _openCompletedAnalysisTask(BackgroundAnalysisTask task) {
+    final analysis = task.analysis;
+    if (analysis == null) return;
+    final store = AppStateScope.of(context);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ErrorEditScreen(
+          imagePath: task.imagePath,
+          initialText: task.extractedText,
+          initialAnalysis: analysis,
+          onArchived: () => store.dismissAnalysisTask(task.id),
+        ),
+      ),
+    );
+  }
+
+  void _openFailedAnalysisTask(BackgroundAnalysisTask task) {
+    final store = AppStateScope.of(context);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ErrorEditScreen(
+          imagePath: task.imagePath,
+          initialText: task.extractedText,
+          onArchived: () => store.dismissAnalysisTask(task.id),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -1059,21 +1502,6 @@ class _HomeScreenState extends State<HomeScreen> {
       alignment: Alignment.center,
       child: Icon(Icons.person_rounded,
           color: AppPalette.textPrimary, size: iconSize),
-    );
-  }
-
-  Widget _ambientBlob(double size, Color color) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color, blurRadius: 120, spreadRadius: 12)
-          ],
-        ),
-      ),
     );
   }
 }
