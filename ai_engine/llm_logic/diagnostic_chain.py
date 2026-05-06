@@ -32,19 +32,19 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "可以额外返回一个 rich_artifacts 项，artifact_type 用 chart_spec；content 必须是可解析 JSON，定位为学生错题复盘卡，不要返回渲染器配置或可交互参数。",
+    "数学": "本题无需返回 rich_artifacts，数学题的主答案必须全部放在 solution_summary 和 solution_steps 中，rich_artifacts 必须返回空数组。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
 
 ANALYSIS_FIELD_GUIDANCE = """
-前端展示顺序固定为：破题关键与最终结论 → 错因诊断 → 复习建议 → 详细推导步骤 → 学科拓展 → 举一反三。
+前端展示顺序固定为：破题关键与最终结论 → 详细推导步骤 → 学科拓展（仅物理动画或真正高质量可视化）→ 举一反三。
 
 必须严格分工，禁止同一内容在多个字段重复出现：
 - solution_summary：只写“破题关键 + 最终结论”。控制在 60-100 字。必须包含最终答案、轨迹方程、结论或核心判断。不要写详细推导过程，不要分点，不要写“首先/然后/接着”。
-- mistake_diagnosis：只写学生可能错在哪里。控制在 40-80 字。聚焦 1-2 个具体误区，例如切线关系、参数设定、公式适用条件、方向判断、符号运算。不要重复正确解法，不要再次推导。
-- review_plan.focus：只写一句复习重点。控制在 20-40 字。必须是可执行动作，例如“复盘切线斜率与距离公式的联立过程”。不要写长段建议。
-- solution_steps：只写详细推导步骤，最多 4 步。每一步控制在 35-70 字。每一步只完成一个推理动作。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
+- mistake_diagnosis：字段仅为兼容旧 schema 保留，前端不展示。除非用户明确提供了错误答案或自述错因，否则返回空字符串；不要生成独立错因板块。
+- review_plan.focus：字段仅为兼容旧 schema 保留，前端不展示。默认返回空字符串；不要生成独立复习建议板块。
+- solution_steps：只写详细推导步骤，建议 5-7 步。每一步控制在 70-140 字。每一步都要写清“为什么这样做”和关键等式/代换/条件来源。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
 - similar_questions：最多返回 1 个变式题。prompt 控制在 60 字以内，answer_outline 控制在 80 字以内。不要返回多道相似题。
 - rich_artifacts：默认返回空数组。只有当能提供真正可视化内容时才返回，例如函数图像、几何图、物理动画、化学流程图。不要返回 study_card 类型的纯文字知识卡片。不要把“学科拓展说明”“知识点总结”“关键联系”塞进 rich_artifacts。如果没有高质量图表或交互内容，必须返回 []。
 如果题目要求“说明它表示什么曲线/物理含义/化学意义”，这个解释属于 solution_summary 的结尾，不属于 rich_artifacts。
@@ -190,7 +190,10 @@ class DiagnosticService:
             ]
         physics_html_elapsed = 0.0
         if request.enable_subject_extensions:
-            if "物理" not in subject:
+            should_auto_build_extension = not any(
+                subject_name in subject for subject_name in ["物理", "数学"]
+            )
+            if should_auto_build_extension:
                 rich_artifacts.extend(
                     build_subject_extension_artifacts(
                         subject=subject,
@@ -461,11 +464,11 @@ class DiagnosticService:
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
   "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["推导步骤1，35-70字", "推导步骤2，35-70字", "推导步骤3，35-70字"],
-  "mistake_diagnosis": "具体错因，40-80字，不重复解法",
+  "solution_steps": ["推导步骤1，70-140字", "推导步骤2，70-140字", "推导步骤3，70-140字", "推导步骤4，70-140字", "推导步骤5，70-140字"],
+  "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "一句复习动作，20-40字",
+    "focus": "",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
@@ -481,8 +484,8 @@ class DiagnosticService:
 1. 所有字段必须返回，没有内容时返回空数组或空字符串。
 2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
 3. solution_summary 只写关键突破口和最终结论，60-100字。
-4. mistake_diagnosis 只写错因，40-80字。
-5. solution_steps 最多 4 步，每步 35-70 字，只写推导。
+4. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+5. solution_steps 建议 5-7 步，每步 70-140 字，只写推导；必须写出关键等式、代换依据和条件来源。
 6. similar_questions 最多返回 1 个。
 7. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
 8. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
@@ -531,11 +534,11 @@ class DiagnosticService:
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
   "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["推导步骤1，35-70字", "推导步骤2，35-70字", "推导步骤3，35-70字"],
-  "mistake_diagnosis": "具体错因，40-80字，不重复解法",
+  "solution_steps": ["推导步骤1，70-140字", "推导步骤2，70-140字", "推导步骤3，70-140字", "推导步骤4，70-140字", "推导步骤5，70-140字"],
+  "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "一句复习动作，20-40字",
+    "focus": "",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
@@ -553,8 +556,8 @@ class DiagnosticService:
 3. 如果是数学、物理、化学题，优先纠正公式、符号、单位和结构。
 4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
 5. solution_summary 只写关键突破口和最终结论，60-100字。
-6. mistake_diagnosis 只写错因，40-80字。
-7. solution_steps 最多 4 步，每步 35-70 字，只写推导。
+6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+7. solution_steps 建议 5-7 步，每步 70-140 字，只写推导；必须写出关键等式、代换依据和条件来源。
 8. similar_questions 最多返回 1 个。
 9. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
 10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
@@ -788,17 +791,7 @@ class DiagnosticService:
             )
         if subject_name == "数学":
             return (
-                "如果返回 chart_spec，请严格满足以下要求："
-                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、version、scene、topic_type、title、knowledge_points、expressions、core_idea、formula_transformations、solution_path、mistake_traps、review_checklist、visual_hint；"
-                "2. scene/topic_type 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
-                "3. core_idea 用 1 到 2 句话讲清本题最关键的数学思想；"
-                "4. formula_transformations 使用 [{label, detail}]，写关键公式、恒等变形、代换、对称性、分部积分等；"
-                "5. solution_path 使用 [{action, reason}]，最多 4 步，每步说明要做什么以及为什么这样做；"
-                "6. mistake_traps 和 review_checklist 必须和本题强相关，避免泛泛而谈；"
-                "7. 函数题、导数题、圆锥曲线题如果图像能帮助理解，请额外返回 coordinate_graph，包含 title、x_range、y_range、curves[{label,points}]、lines[{label,from,to,style}]、points[{label,x,y}]、student_focus；曲线和辅助线要服务解题步骤，可标出切线、对称轴、焦点、准线、交点、端点或题中给出的坐标；"
-                "8. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
-                "9. 禁止生成 visual_model、controls、可交互参数、plot_suggestions、step_mapping 这类偏渲染实现或重复展示的字段；"
-                "10. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
+                "数学题不要返回 rich_artifacts，所有解析、公式变形、几何含义和最终结论都必须放入 solution_summary 或 solution_steps；rich_artifacts 必须返回空数组。"
             )
         if subject_name == "化学":
             return (
@@ -3709,3 +3702,4 @@ class DiagnosticService:
         normalized = re.sub(r"(?<!\\)\b([a-zA-Z])\s*\^\s*([-\d]+)", r"\1^\2", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
+

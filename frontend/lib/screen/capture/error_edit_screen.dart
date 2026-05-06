@@ -723,34 +723,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               fontSize: 14,
             ),
           ),
-          if (_mistakeDiagnosis.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildSectionLabel('⚠️ 错因诊断'),
-            const SizedBox(height: 6),
-            AppLatexText(
-              _mistakeDiagnosis,
-              style: const TextStyle(
-                color: AppPalette.textPrimary,
-                height: 1.5,
-                fontSize: 14,
-              ),
-            ),
-          ],
-          if (_reviewFocus.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildSectionLabel('📅 复习建议'),
-            const SizedBox(height: 6),
-            AppLatexText(
-              _reviewSchedule.isEmpty
-                  ? _reviewFocus
-                  : '$_reviewFocus\n推荐节奏：${_reviewSchedule.join(' / ')} 天',
-              style: const TextStyle(
-                color: AppPalette.textPrimary,
-                height: 1.5,
-                fontSize: 14,
-              ),
-            ),
-          ],
           const SizedBox(height: 12),
           Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -800,14 +772,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_supportsPhysicsAnimation() || _richArtifacts.isNotEmpty) ...[
+          if (_supportsPhysicsAnimation()) ...[
             const SizedBox(height: 12),
             _buildSectionLabel('学科拓展'),
             const SizedBox(height: 8),
-            if (_supportsPhysicsAnimation()) _buildPhysicsAnimationActionCard(),
-            if (_supportsPhysicsAnimation() && _richArtifacts.isNotEmpty)
+            _buildPhysicsAnimationActionCard(),
+            if (_richArtifacts.isNotEmpty) ...[
               const SizedBox(height: 12),
-            if (_richArtifacts.isNotEmpty) _buildRichArtifactsPreview(),
+              _buildRichArtifactsPreview(),
+            ],
           ],
           Text(
             '归档方向：$subject · $topic',
