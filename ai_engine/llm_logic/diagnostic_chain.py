@@ -37,6 +37,20 @@ SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
 
+ANALYSIS_FIELD_GUIDANCE = """
+前端展示顺序固定为：破题关键与最终结论 → 错因诊断 → 复习建议 → 详细推导步骤 → 学科拓展 → 举一反三。
+
+必须严格分工，禁止同一内容在多个字段重复出现：
+- solution_summary：只写“破题关键 + 最终结论”。控制在 60-100 字。必须包含最终答案、轨迹方程、结论或核心判断。不要写详细推导过程，不要分点，不要写“首先/然后/接着”。
+- mistake_diagnosis：只写学生可能错在哪里。控制在 40-80 字。聚焦 1-2 个具体误区，例如切线关系、参数设定、公式适用条件、方向判断、符号运算。不要重复正确解法，不要再次推导。
+- review_plan.focus：只写一句复习重点。控制在 20-40 字。必须是可执行动作，例如“复盘切线斜率与距离公式的联立过程”。不要写长段建议。
+- solution_steps：只写详细推导步骤，最多 4 步。每一步控制在 35-70 字。每一步只完成一个推理动作。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
+- similar_questions：最多返回 1 个变式题。prompt 控制在 60 字以内，answer_outline 控制在 80 字以内。不要返回多道相似题。
+- rich_artifacts：默认返回空数组。只有当能提供真正可视化内容时才返回，例如函数图像、几何图、物理动画、化学流程图。不要返回 study_card 类型的纯文字知识卡片。不要把“学科拓展说明”“知识点总结”“关键联系”塞进 rich_artifacts。如果没有高质量图表或交互内容，必须返回 []。
+如果题目要求“说明它表示什么曲线/物理含义/化学意义”，这个解释属于 solution_summary 的结尾，不属于 rich_artifacts。
+整体输出要克制，适合手机端阅读。宁可短而清楚，不要完整讲义式长答案。
+""".strip()
+
 
 class DiagnosticService:
     def __init__(self, client: VivoLMClient) -> None:
@@ -327,8 +341,8 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
-        normalized_subject = subject or "é—â•ƒæ‚Š"
-        if "é—â•ƒæ‚Š" not in normalized_subject:
+        normalized_subject = subject or "物理"
+        if "物理" not in normalized_subject:
             return "当前题目未被识别为物理题，暂不支持生成物理动画演示。"
 
         scene_type = self._physics_scene_type_from_context(
@@ -438,51 +452,46 @@ class DiagnosticService:
 - 用户答案：{request.user_answer or "未提供"}
 - 用户自述错因：{request.wrong_reason_hint or "未提供"}
 
+字段职责与前端展示顺序：
+{ANALYSIS_FIELD_GUIDANCE}
+
 输出 JSON 字段要求：
 {{
   "cleaned_question": "清洗后的题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "100字以内总结",
-  "solution_steps": ["步骤1", "步骤2", "步骤3"],
-  "mistake_diagnosis": "对错因的简明诊断",
+  "solution_summary": "破题关键和最终结论，60-100字",
+  "solution_steps": ["推导步骤1，35-70字", "推导步骤2，35-70字", "推导步骤3，35-70字"],
+  "mistake_diagnosis": "具体错因，40-80字，不重复解法",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "本次复习重点",
+    "focus": "一句复习动作，20-40字",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
     {{
-      "prompt": "变式题1",
-      "answer_outline": "答案提纲"
-    }},
-    {{
-      "prompt": "变式题2",
-      "answer_outline": "答案提纲"
+      "prompt": "1道变式题，60字以内",
+      "answer_outline": "答案提纲，80字以内"
     }}
   ],
-  "rich_artifacts": [
-    {{
-      "artifact_type": "interactive_html",
-      "title": "扩展展示标题",
-      "description": "给前端的简短说明",
-      "mime_type": "text/html",
-      "content": "<html>...</html>"
-    }}
-  ]
+  "rich_artifacts": []
 }}
 
 要求：
 1. 所有字段必须返回，没有内容时返回空数组或空字符串。
-2. solution_steps 要可读、分步清晰，适合学生复盘。
-3. similar_questions 最多返回 2 个。
-4. rich_artifacts 默认可为空数组。
-5. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-6. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-7. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
-8. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 可返回空数组。"}
-9. {extension_detail or "如果没有把握生成高质量扩展内容，可以让 rich_artifacts 返回空数组。"}
-10. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
+2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+3. solution_summary 只写关键突破口和最终结论，60-100字。
+4. mistake_diagnosis 只写错因，40-80字。
+5. solution_steps 最多 4 步，每步 35-70 字，只写推导。
+6. similar_questions 最多返回 1 个。
+7. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+8. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
+9. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+10. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+11. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
+12. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+13. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+14. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
 """.strip()
 
     def _build_vision_prompt(self, request: AnalysisRequest, cleaned_ocr_draft: str) -> str:
@@ -513,52 +522,47 @@ class DiagnosticService:
 - 用户答案：{request.user_answer or "未提供"}
 - 用户自述错因：{request.wrong_reason_hint or "未提供"}
 
+字段职责与前端展示顺序：
+{ANALYSIS_FIELD_GUIDANCE}
+
 输出 JSON 字段要求：
 {{
   "cleaned_question": "根据图片纠正后的完整题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "100字以内总结",
-  "solution_steps": ["步骤1", "步骤2", "步骤3"],
-  "mistake_diagnosis": "对错因的简明诊断",
+  "solution_summary": "破题关键和最终结论，60-100字",
+  "solution_steps": ["推导步骤1，35-70字", "推导步骤2，35-70字", "推导步骤3，35-70字"],
+  "mistake_diagnosis": "具体错因，40-80字，不重复解法",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "本次复习重点",
+    "focus": "一句复习动作，20-40字",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
     {{
-      "prompt": "变式题1",
-      "answer_outline": "答案提纲"
-    }},
-    {{
-      "prompt": "变式题2",
-      "answer_outline": "答案提纲"
+      "prompt": "1道变式题，60字以内",
+      "answer_outline": "答案提纲，80字以内"
     }}
   ],
-  "rich_artifacts": [
-    {{
-      "artifact_type": "interactive_html",
-      "title": "扩展展示标题",
-      "description": "给前端的简短说明",
-      "mime_type": "text/html",
-      "content": "<html>...</html>"
-    }}
-  ]
+  "rich_artifacts": []
 }}
 
 要求：
 1. 只输出 JSON，不要加 Markdown 代码块。
 2. cleaned_question 必须尽量还原图片里的原题；如果仍有局部不确定，可保守表达但不要照搬明显错误的 OCR。
 3. 如果是数学、物理、化学题，优先纠正公式、符号、单位和结构。
-4. solution_steps 要分步清晰，适合学生复盘。
-5. similar_questions 最多返回 2 个。
-6. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-7. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-8. rich_artifacts 默认可为空数组。
-9. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 可返回空数组。"}
-10. {extension_detail or "如果没有把握生成高质量扩展内容，可以让 rich_artifacts 返回空数组。"}
-11. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
+4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+5. solution_summary 只写关键突破口和最终结论，60-100字。
+6. mistake_diagnosis 只写错因，40-80字。
+7. solution_steps 最多 4 步，每步 35-70 字，只写推导。
+8. similar_questions 最多返回 1 个。
+9. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
+11. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+12. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+13. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+14. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+15. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
 """.strip()
 
     def _parse_json(self, raw_output: str) -> dict:

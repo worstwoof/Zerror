@@ -8,6 +8,7 @@ import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
+import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
@@ -122,8 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = MediaQuery.of(context).padding.top + 38;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-          24, topPadding, 24, 120),
+      padding: EdgeInsets.fromLTRB(24, topPadding, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -223,8 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = MediaQuery.of(context).padding.top + 38;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-          24, topPadding, 24, 120),
+      padding: EdgeInsets.fromLTRB(24, topPadding, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -844,14 +843,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildAnalysisQueueLauncher(BuildContext context, AppStore store) {
     final completedCount = store.completedAnalysisTaskCount;
     final failedCount = store.failedAnalysisTaskCount;
+    final activeCount = store.activeAnalysisTaskCount;
     final totalCount = store.analysisTasks.length;
     final hasFailure = failedCount > 0;
     final hasCompleted = completedCount > 0;
+    final hasActive = activeCount > 0;
     final tint = hasFailure
         ? Colors.redAccent
-        : hasCompleted
-            ? AppPalette.matchaMist
-            : AppPalette.almondCream;
+        : hasActive
+            ? AppPalette.almondCream
+            : hasCompleted
+                ? AppPalette.matchaMist
+                : AppPalette.almondCream;
 
     return Material(
       color: Colors.transparent,
@@ -875,13 +878,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                hasFailure
-                    ? Icons.error_outline_rounded
-                    : Icons.file_download_rounded,
-                color: tint,
-                size: 21,
-              ),
+              hasActive && !hasFailure
+                  ? const _ActiveDownloadIndicator()
+                  : Icon(
+                      hasFailure
+                          ? Icons.error_outline_rounded
+                          : Icons.file_download_rounded,
+                      color: tint,
+                      size: 21,
+                    ),
               const SizedBox(width: 8),
               Text(
                 '$totalCount',
@@ -1120,6 +1125,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _openFailedAnalysisTask(task);
       };
     }
+    if (task.isActive) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openWaitingAnalysisTask(task);
+      };
+    }
     return null;
   }
 
@@ -1269,7 +1280,8 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.file_download_rounded,
           color: AppPalette.almondCream,
           label: '\u6b63\u5728\u6574\u7406',
-          note: '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
+          note:
+              '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
         );
       case AnalysisTaskStatus.completed:
         return (
@@ -1283,7 +1295,8 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.error_outline_rounded,
           color: Colors.redAccent,
           label: '\u9700\u8981\u91cd\u8bd5',
-          note: '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
+          note:
+              '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
         );
     }
   }
@@ -1319,6 +1332,14 @@ class _HomeScreenState extends State<HomeScreen> {
           initialText: task.extractedText,
           onArchived: () => store.dismissAnalysisTask(task.id),
         ),
+      ),
+    );
+  }
+
+  void _openWaitingAnalysisTask(BackgroundAnalysisTask task) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AnalysisTaskWaitingScreen(taskId: task.id),
       ),
     );
   }
@@ -1503,5 +1524,302 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Icon(Icons.person_rounded,
           color: AppPalette.textPrimary, size: iconSize),
     );
+  }
+}
+
+class _ActiveDownloadIndicator extends StatefulWidget {
+  const _ActiveDownloadIndicator();
+
+  @override
+  State<_ActiveDownloadIndicator> createState() =>
+      _ActiveDownloadIndicatorState();
+}
+
+class _ActiveDownloadIndicatorState extends State<_ActiveDownloadIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _dropAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+    _dropAnimation = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: -2, end: 3), weight: 50),
+        TweenSequenceItem(tween: Tween(begin: 3, end: -2), weight: 50),
+      ],
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 27,
+      height: 27,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RotationTransition(
+            turns: _controller,
+            child: const CustomPaint(
+              size: Size.square(27),
+              painter: _DownloadRingPainter(color: AppPalette.almondCream),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _dropAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _dropAnimation.value),
+                child: child,
+              );
+            },
+            child: const Icon(
+              Icons.file_download_rounded,
+              color: AppPalette.almondCream,
+              size: 17,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AnalysisTaskWaitingScreen extends StatefulWidget {
+  const AnalysisTaskWaitingScreen({
+    super.key,
+    required this.taskId,
+  });
+
+  final String taskId;
+
+  @override
+  State<AnalysisTaskWaitingScreen> createState() =>
+      _AnalysisTaskWaitingScreenState();
+}
+
+class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
+  AppStore? _store;
+  bool _isNavigating = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextStore = AppStateScope.of(context);
+    if (_store == nextStore) {
+      return;
+    }
+    _store?.removeListener(_handleStoreChanged);
+    _store = nextStore;
+    _store?.addListener(_handleStoreChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleStoreChanged());
+  }
+
+  @override
+  void dispose() {
+    _store?.removeListener(_handleStoreChanged);
+    super.dispose();
+  }
+
+  void _handleStoreChanged() {
+    if (!mounted || _isNavigating) {
+      return;
+    }
+    final task = _taskForCurrentStore();
+    if (task == null) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
+      _replaceWithEditScreen(task, hasAnalysis: true);
+    } else if (task.status == AnalysisTaskStatus.failed) {
+      _replaceWithEditScreen(task, hasAnalysis: false);
+    }
+  }
+
+  void _replaceWithEditScreen(
+    BackgroundAnalysisTask task, {
+    required bool hasAnalysis,
+  }) {
+    final store = _store;
+    if (store == null) return;
+    _isNavigating = true;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ErrorEditScreen(
+          imagePath: task.imagePath,
+          initialText: task.extractedText,
+          initialAnalysis: hasAnalysis ? task.analysis : null,
+          onArchived: () => store.dismissAnalysisTask(task.id),
+        ),
+      ),
+    );
+  }
+
+  BackgroundAnalysisTask? _taskForCurrentStore() {
+    final store = _store;
+    if (store == null) {
+      return null;
+    }
+    for (final task in store.analysisTasks) {
+      if (task.id == widget.taskId) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final task = _taskForCurrentStore();
+    final isQueued = task?.status == AnalysisTaskStatus.queued;
+
+    return Scaffold(
+      backgroundColor: AppPalette.night,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        title: const Text(
+          'AI 正在整理',
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: AppSurface(
+        topSafe: false,
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 28),
+        child: Center(
+          child: AppPanel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (task != null) ...[
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.34,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppPalette.kombuGreen,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(task.imagePath),
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox(
+                            height: 160,
+                            child: Icon(
+                              Icons.image_rounded,
+                              color: AppPalette.textPrimary,
+                              size: 42,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                ],
+                const RoseThreeLoader(size: 142),
+                const SizedBox(height: 24),
+                Text(
+                  isQueued ? '正在排队等待整理...' : '知芽 AI 正在深度分析题目...',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                const Text(
+                  '识别题干、定位知识点、生成错因诊断和复习建议。完成后会自动进入确认入档页面。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppPalette.almondCream.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isQueued ? '已加入后台队列' : '正在生成错题分析',
+                    style: const TextStyle(
+                      color: AppPalette.almondCream,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadRingPainter extends CustomPainter {
+  const _DownloadRingPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 2.1;
+    final rect = Offset.zero & size;
+    final arcRect = rect.deflate(strokeWidth / 2);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      arcRect,
+      -1.35,
+      4.75,
+      false,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DownloadRingPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

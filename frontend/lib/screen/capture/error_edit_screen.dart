@@ -264,36 +264,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     }
   }
 
-  Future<void> _saveToArchive() async {
-    final question = _questionController.text.trim();
-    if (question.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容')));
-      return;
-    }
-
-    try {
-      final draft = _buildDraft(question);
-      final created = AppStateScope.of(context).addErrorRecord(draft);
-      widget.onArchived?.call();
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('错题已加入档案，并进入后续复习链路')));
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ErrorDetailScreen(errorId: created.id),
-        ),
-      );
-    } catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('保存失败：$error')));
-    }
-  }
-
   Future<void> _saveToArchiveWithUpload() async {
     final question = _questionController.text.trim();
     if (_isSaving) return;
@@ -308,10 +278,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       _isSaving = true;
     });
 
+    final store = AppStateScope.of(context);
+
     try {
       String? imageUrl;
       if (widget.imagePath.isNotEmpty) {
-        final store = AppStateScope.of(context);
         final uploaded = await _fileUploadClient.uploadFile(
           filePath: widget.imagePath,
           category: 'error-image',
@@ -322,7 +293,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       }
 
       final draft = _buildDraftWithImage(question, imageUrl: imageUrl);
-      final created = AppStateScope.of(context).addErrorRecord(draft);
+      final created = store.addErrorRecord(draft);
       widget.onArchived?.call();
 
       if (!mounted) return;
@@ -591,7 +562,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         children: [
           const AppSectionTitle(
             title: '原题与识别结果',
-            subtitle: '这里可以继续修正识别文本，再收入档案',
+            subtitle: '点击渲染结果即可修正题干',
             icon: Icons.document_scanner_rounded,
           ),
           const SizedBox(height: 16),
@@ -599,72 +570,90 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             _buildOriginalImagePreview(),
             const SizedBox(height: 14),
           ],
-          TextField(
-            controller: _questionController,
-            maxLines: null,
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 15,
-              height: 1.6,
-            ),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-              ),
-            ),
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _questionController,
-              builder: (context, value, _) {
-                final previewText = value.text.trim();
-                if (previewText.isEmpty) {
-                  return const Text(
-                    '这里会实时显示题干的 LaTeX 渲染效果。',
-                    style: TextStyle(
-                      color: AppPalette.textSecondary,
-                      fontSize: 13,
-                    ),
-                  );
-                }
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '题干渲染预览',
-                      style: TextStyle(
-                        color: AppPalette.almondCream,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _questionController,
+            builder: (context, value, _) {
+              final previewText = value.text.trim();
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openQuestionTextEditor,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    AppLatexText(
-                      previewText,
-                      style: const TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 14,
-                        height: 1.6,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                '题干渲染预览',
+                                style: TextStyle(
+                                  color: AppPalette.almondCream,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.edit_rounded,
+                              color: AppPalette.textSecondary
+                                  .withValues(alpha: 0.82),
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        if (previewText.isEmpty)
+                          const Text(
+                            '点击这里补充题干内容。',
+                            style: TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 13,
+                            ),
+                          )
+                        else
+                          AppLatexText(
+                            previewText,
+                            style: const TextStyle(
+                              color: AppPalette.textPrimary,
+                              fontSize: 14,
+                              height: 1.6,
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                );
-              },
-            ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openQuestionTextEditor() async {
+    final updatedText = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => QuestionTextEditorScreen(
+          initialText: _questionController.text,
+        ),
+      ),
+    );
+    if (!mounted || updatedText == null) {
+      return;
+    }
+    _questionController.text = updatedText;
   }
 
   Widget _buildOriginalImagePreview() {
@@ -723,28 +712,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             subtitle: '现在已经接入真实后端结果',
             icon: Icons.auto_awesome,
           ),
-          const SizedBox(height: 16),
-          Container(
-            height: 84,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppPalette.night.withValues(alpha: 0.70),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              '预留：后续可接入动态板书 / HTML 扩展内容',
-              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
-            ),
-          ),
-          if (_supportsPhysicsAnimation()) ...[
-            const SizedBox(height: 12),
-            _buildPhysicsAnimationActionCard(),
-          ],
-          if (_richArtifacts.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildRichArtifactsPreview(),
-          ],
           const SizedBox(height: 16),
           _buildSectionLabel('💡 破题技巧'),
           const SizedBox(height: 6),
@@ -833,6 +800,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          if (_supportsPhysicsAnimation() || _richArtifacts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildSectionLabel('学科拓展'),
+            const SizedBox(height: 8),
+            if (_supportsPhysicsAnimation()) _buildPhysicsAnimationActionCard(),
+            if (_supportsPhysicsAnimation() && _richArtifacts.isNotEmpty)
+              const SizedBox(height: 12),
+            if (_richArtifacts.isNotEmpty) _buildRichArtifactsPreview(),
+          ],
           Text(
             '归档方向：$subject · $topic',
             style: const TextStyle(
@@ -998,18 +974,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTagChip(String label) {
-    return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      backgroundColor: AppPalette.almondCream.withValues(alpha: 0.12),
-      side: BorderSide.none,
-      labelStyle: const TextStyle(
-        color: AppPalette.textPrimary,
-        fontWeight: FontWeight.w500,
       ),
     );
   }
@@ -2031,6 +1995,111 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       default:
         return scene;
     }
+  }
+}
+
+class QuestionTextEditorScreen extends StatefulWidget {
+  const QuestionTextEditorScreen({
+    super.key,
+    required this.initialText,
+  });
+
+  final String initialText;
+
+  @override
+  State<QuestionTextEditorScreen> createState() =>
+      _QuestionTextEditorScreenState();
+}
+
+class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _saveAndClose() {
+    Navigator.of(context).pop(_controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppPalette.night,
+      appBar: AppBar(
+        backgroundColor: AppPalette.night,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        title: const Text(
+          '编辑题干',
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saveAndClose,
+            child: const Text(
+              '完成',
+              style: TextStyle(
+                color: AppPalette.almondCream,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: AppSurface(
+        topSafe: false,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          children: [
+            Expanded(
+              child: AppPanel(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textAlignVertical: TextAlignVertical.top,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 16,
+                    height: 1.65,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '在这里修正 OCR 识别结果，支持 LaTeX 公式...',
+                    hintStyle: TextStyle(color: AppPalette.textSecondary),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: AppPrimaryButton(
+                label: '完成并查看渲染结果',
+                icon: Icons.check_rounded,
+                onPressed: _saveAndClose,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
