@@ -87,7 +87,13 @@ class _SubjectProfile:
 
 
 def _resolve_subject_profile(subject: str, cleaned_question: str) -> Optional[_SubjectProfile]:
+    subject_normalized = subject.lower()
     normalized = f"{subject} {cleaned_question}".lower()
+
+    if any(keyword in subject_normalized for keyword in ["物理", "力学", "电路", "电学", "光学", "磁场", "电场", "电磁"]):
+        return _SubjectProfile("interactive_html", _build_physics_html)
+    if any(keyword in subject_normalized for keyword in ["数学", "线性代数", "高数", "概率", "统计", "函数", "几何"]):
+        return _SubjectProfile("chart_spec", _build_math_chart_spec)
 
     if any(
         keyword in normalized
@@ -113,7 +119,7 @@ def _resolve_subject_profile(subject: str, cleaned_question: str) -> Optional[_S
         ]
     ):
         return _SubjectProfile("chart_spec", _build_math_chart_spec)
-    if any(keyword in normalized for keyword in ["物理", "力学", "电路", "电学", "光学", "运动", "速度", "加速度"]):
+    if any(keyword in normalized for keyword in ["物理", "力学", "电路", "电学", "光学", "运动", "速度", "加速度", "磁场", "电场", "电磁", "电子", "电荷", "带电粒子", "洛伦兹力", "安培力"]):
         return _SubjectProfile("interactive_html", _build_physics_html)
     if any(keyword in normalized for keyword in ["化学", "离子", "氧化还原", "平衡", "有机", "实验", "反应"]):
         return _SubjectProfile("study_card", _build_chemistry_study_card)
