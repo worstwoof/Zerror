@@ -373,13 +373,12 @@ class _ChargedParticleFieldPainter extends CustomPainter {
     canvas.drawLine(q, Offset(q.dx, p.dy), helperPaint);
     canvas.drawLine(Offset(q.dx, p.dy), straightEnd, helperPaint);
 
-    final metric = path.computeMetrics().fold<PathMetric?>(
-      null,
-      (previous, metric) => metric,
-    );
-    final tangent = metric == null
-        ? null
-        : metric.getTangentForOffset(metric.length * progress);
+    final metrics = path.computeMetrics().iterator;
+    final tangent = metrics.moveNext()
+        ? metrics.current.getTangentForOffset(
+            metrics.current.length * progress,
+          )
+        : null;
     if (tangent != null) {
       canvas.drawCircle(
         tangent.position,
