@@ -43,7 +43,10 @@ class _PhysicsScenePreviewScreenState extends State<PhysicsScenePreviewScreen>
   @override
   Widget build(BuildContext context) {
     final title = _stringValue(widget.spec['title'], widget.title);
-    final summary = _stringValue(widget.spec['summary'], '观察题目中的场区、粒子运动和受力方向。');
+    final summary = _shortSceneSummary(
+      widget.spec['summary'],
+      fallback: '观察题目中的场区、粒子运动和受力方向。',
+    );
     final field = _mapValue(widget.spec['field']);
     final particle = _mapValue(widget.spec['particle']);
     final parameters = _mapValue(widget.spec['parameters']);
@@ -106,6 +109,8 @@ class _PhysicsScenePreviewScreenState extends State<PhysicsScenePreviewScreen>
                   const SizedBox(height: 10),
                   Text(
                     summary,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppPalette.textSecondary,
                       fontSize: 13,
@@ -692,6 +697,18 @@ String _normalizeFormulaLatex(String formula) {
 String _stringValue(Object? value, String fallback) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? fallback : text;
+}
+
+String _shortSceneSummary(Object? value, {required String fallback}) {
+  final raw = value?.toString().trim() ?? '';
+  if (raw.isEmpty) {
+    return fallback;
+  }
+  final normalized = raw.replaceAll(RegExp(r'\s+'), ' ');
+  if (normalized.length <= 54) {
+    return normalized;
+  }
+  return '${normalized.substring(0, 53).trimRight()}...';
 }
 
 Map<String, dynamic> _mapValue(Object? value) {

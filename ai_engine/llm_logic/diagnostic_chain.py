@@ -377,13 +377,9 @@ class DiagnosticService:
             subtype=subtype,
             field_type=field_type,
         )
-        summary = (
-            self._display_plain_text(solution_summary, limit=80)
-            or self._guess_electromagnetism_summary(
-                cleaned_question=combined_context or cleaned_question,
-                subtype=subtype,
-                field_type=field_type,
-            )
+        summary = self._native_physics_scene_summary(
+            subtype=subtype,
+            field_type=field_type,
         )
         params = {
             "a": self._extract_named_number(combined_context, "a"),
@@ -453,6 +449,15 @@ class DiagnosticService:
                 "线圈",
             ]
         )
+
+    def _native_physics_scene_summary(self, *, subtype: str, field_type: str) -> str:
+        if subtype == "electromagnetic_induction":
+            return "按导体棒、磁场方向和回路位置展示电磁感应过程。"
+        if field_type == "electric":
+            return "按入射方向、场区边界和受力方向展示带电粒子的偏转过程。"
+        if field_type == "mixed":
+            return "按速度方向、电场力和洛伦兹力展示复合场中的粒子运动。"
+        return "按题图展示粒子从 P 水平射出、进入磁场并到达 Q 的两种可能情形。"
 
     def _extract_named_number(self, text: str, name: str) -> str:
         if not text:
