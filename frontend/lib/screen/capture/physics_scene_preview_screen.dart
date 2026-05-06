@@ -259,172 +259,191 @@ class _ChargedParticleFieldPainter extends CustomPainter {
     final shell = RRect.fromRectAndRadius(rect, const Radius.circular(22));
     canvas.drawRRect(shell, bgPaint);
 
+    final gap = size.width * 0.045;
+    final panelWidth = (size.width - gap * 3) / 2;
+    final panelHeight = size.height * 0.74;
+    final top = size.height * 0.12;
+    final leftPanel = Rect.fromLTWH(gap, top, panelWidth, panelHeight);
+    final rightPanel = Rect.fromLTWH(gap * 2 + panelWidth, top, panelWidth, panelHeight);
+
+    _drawCasePanel(
+      canvas,
+      leftPanel,
+      title: '甲  r > L',
+      bendsEarly: true,
+      progress: progress,
+    );
+    _drawCasePanel(
+      canvas,
+      rightPanel,
+      title: '乙  r <= L',
+      bendsEarly: false,
+      progress: (progress + 0.38) % 1,
+    );
+
+    _drawText(
+      canvas,
+      '$particleLabel  从 P 水平射出，磁场左边界可能有两种位置',
+      Offset(gap, size.height - 30),
+      color: AppPalette.textSecondary.withValues(alpha: 0.82),
+      size: 12,
+    );
+  }
+
+  void _drawCasePanel(
+    Canvas canvas,
+    Rect panel, {
+    required String title,
+    required bool bendsEarly,
+    required double progress,
+  }) {
+    final panelPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.025)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(panel, const Radius.circular(18)),
+      panelPaint,
+    );
+    _drawText(
+      canvas,
+      title,
+      panel.topLeft.translate(12, 10),
+      color: AppPalette.almondCream,
+      size: 12,
+    );
+
     final plot = Rect.fromLTWH(
-      size.width * 0.11,
-      size.height * 0.12,
-      size.width * 0.78,
-      size.height * 0.70,
+      panel.left + panel.width * 0.13,
+      panel.top + panel.height * 0.18,
+      panel.width * 0.78,
+      panel.height * 0.68,
     );
     final axisPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.54)
-      ..strokeWidth = 1.4
+      ..color = Colors.white.withValues(alpha: 0.58)
+      ..strokeWidth = 1.3
       ..style = PaintingStyle.stroke;
-    final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..strokeWidth = 1;
+    final helperPaint = Paint()
+      ..color = AppPalette.matchaMist.withValues(alpha: 0.42)
+      ..strokeWidth = 1.1;
 
-    for (var i = 1; i < 4; i++) {
-      final x = plot.left + plot.width * i / 4;
-      canvas.drawLine(Offset(x, plot.top), Offset(x, plot.bottom), gridPaint);
-      final y = plot.top + plot.height * i / 4;
-      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), gridPaint);
+    canvas.drawLine(Offset(plot.left, plot.bottom), Offset(plot.right, plot.bottom), axisPaint);
+    canvas.drawLine(Offset(plot.left, plot.bottom), Offset(plot.left, plot.top), axisPaint);
+    _drawArrowHead(canvas, Offset(plot.right, plot.bottom), 0, axisPaint.color);
+    _drawArrowHead(canvas, Offset(plot.left, plot.top), -math.pi / 2, axisPaint.color);
+
+    final p = Offset(plot.left, plot.top + plot.height * 0.20);
+    final q = Offset(plot.right - plot.width * 0.05, plot.bottom);
+    final fieldLeft = bendsEarly ? plot.left + plot.width * 0.34 : plot.left + plot.width * 0.58;
+    final fieldRect = Rect.fromLTWH(
+      fieldLeft,
+      plot.top + plot.height * 0.02,
+      plot.width * 0.28,
+      plot.height * 0.82,
+    );
+    _drawField(canvas, fieldRect);
+
+    final straightEnd = Offset(fieldLeft, p.dy);
+    final path = Path()
+      ..moveTo(p.dx, p.dy)
+      ..lineTo(straightEnd.dx, straightEnd.dy);
+    if (bendsEarly) {
+      path.quadraticBezierTo(
+        fieldLeft + fieldRect.width * 0.78,
+        p.dy + plot.height * 0.22,
+        q.dx - plot.width * 0.05,
+        q.dy,
+      );
+    } else {
+      final arcStart = Offset(fieldRect.left + fieldRect.width * 0.58, p.dy);
+      path.lineTo(arcStart.dx, arcStart.dy);
+      path.quadraticBezierTo(
+        fieldRect.right + plot.width * 0.18,
+        p.dy + plot.height * 0.45,
+        q.dx - plot.width * 0.02,
+        q.dy,
+      );
     }
 
-    final origin = Offset(plot.left, plot.bottom);
-    canvas.drawLine(
-      Offset(plot.left, plot.bottom),
-      Offset(plot.right + 8, plot.bottom),
-      axisPaint,
-    );
-    canvas.drawLine(
-      Offset(plot.left, plot.bottom),
-      Offset(plot.left, plot.top - 8),
-      axisPaint,
-    );
-    _drawArrowHead(canvas, Offset(plot.right + 8, plot.bottom), 0, axisPaint.color);
-    _drawArrowHead(
-      canvas,
-      Offset(plot.left, plot.top - 8),
-      -math.pi / 2,
-      axisPaint.color,
-    );
+    final tracePaint = Paint()
+      ..color = AppPalette.almondCream
+      ..strokeWidth = 2.7
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, tracePaint);
+    canvas.drawLine(q, Offset(q.dx, p.dy), helperPaint);
+    canvas.drawLine(Offset(q.dx, p.dy), straightEnd, helperPaint);
 
-    final fieldRect = Rect.fromLTWH(
-      plot.left + plot.width * 0.08,
-      plot.top + plot.height * 0.04,
-      plot.width * 0.36,
-      plot.height * 0.88,
+    final metric = path.computeMetrics().fold<PathMetric?>(
+      null,
+      (previous, metric) => metric,
     );
+    final tangent = metric == null
+        ? null
+        : metric.getTangentForOffset(metric.length * progress);
+    if (tangent != null) {
+      canvas.drawCircle(
+        tangent.position,
+        12,
+        Paint()
+          ..color = AppPalette.almondCream.withValues(alpha: 0.16)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        tangent.position,
+        5,
+        Paint()
+          ..color = chargeSign == 'negative' ? const Color(0xFF9ED6FF) : AppPalette.honeyOrange
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    _drawPoint(canvas, p, 'P');
+    _drawPoint(canvas, q, 'Q', labelAbove: false);
+    _drawVector(
+      canvas,
+      p.translate(4, 0),
+      p.translate(math.min(36, plot.width * 0.22), 0),
+      Paint()
+        ..color = AppPalette.almondCream
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+    _drawText(canvas, 'v0', p.translate(28, -18), color: AppPalette.almondCream, size: 11);
+    _drawText(canvas, 'x', Offset(plot.right + 4, plot.bottom - 5), size: 11);
+    _drawText(canvas, 'y', Offset(plot.left + 4, plot.top - 15), size: 11);
+    _drawText(canvas, 'L', fieldRect.topCenter.translate(-4, -15), color: AppPalette.textSecondary, size: 11);
+  }
+
+  void _drawField(Canvas canvas, Rect fieldRect) {
     final fieldPaint = Paint()
-      ..color = AppPalette.matchaMist.withValues(alpha: 0.11)
+      ..color = AppPalette.matchaMist.withValues(alpha: 0.10)
       ..style = PaintingStyle.fill;
     final fieldBorder = Paint()
-      ..color = AppPalette.matchaMist.withValues(alpha: 0.36)
-      ..strokeWidth = 1.2
+      ..color = AppPalette.matchaMist.withValues(alpha: 0.34)
+      ..strokeWidth = 1.1
       ..style = PaintingStyle.stroke;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(fieldRect, const Radius.circular(16)),
+      RRect.fromRectAndRadius(fieldRect, const Radius.circular(10)),
       fieldPaint,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(fieldRect, const Radius.circular(16)),
+      RRect.fromRectAndRadius(fieldRect, const Radius.circular(10)),
       fieldBorder,
     );
-
     final marker = fieldMarker == 'dot' ? '•' : '×';
-    for (var x = fieldRect.left + 20; x < fieldRect.right; x += 34) {
-      for (var y = fieldRect.top + 24; y < fieldRect.bottom; y += 34) {
+    for (var x = fieldRect.left + 12; x < fieldRect.right; x += 22) {
+      for (var y = fieldRect.top + 18; y < fieldRect.bottom; y += 24) {
         _drawText(
           canvas,
           marker,
           Offset(x, y),
           color: AppPalette.textSecondary.withValues(alpha: 0.62),
-          size: 16,
+          size: 14,
           align: TextAlign.center,
         );
       }
     }
-
-    final p = Offset(plot.left, plot.top + plot.height * 0.28);
-    final q = Offset(plot.left + plot.width * 0.72, plot.bottom);
-    final c1 = Offset(plot.left + plot.width * 0.16, plot.top + plot.height * 0.24);
-    final c2 = Offset(plot.left + plot.width * 0.42, plot.bottom - plot.height * 0.10);
-    final path = Path()
-      ..moveTo(p.dx, p.dy)
-      ..cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, q.dx, q.dy);
-
-    final tracePaint = Paint()
-      ..color = AppPalette.almondCream.withValues(alpha: 0.95)
-      ..strokeWidth = 3.2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, tracePaint);
-
-    final helperPaint = Paint()
-      ..color = AppPalette.matchaMist.withValues(alpha: 0.48)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(p, Offset(plot.left, plot.bottom), helperPaint);
-    canvas.drawLine(q, Offset(q.dx, p.dy), helperPaint);
-    canvas.drawLine(Offset(q.dx, p.dy), q, helperPaint);
-
-    final metric = path.computeMetrics().first;
-    final tangent = metric.getTangentForOffset(metric.length * progress);
-    if (tangent != null) {
-      final glow = Paint()
-        ..color = AppPalette.almondCream.withValues(alpha: 0.18)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(tangent.position, 16, glow);
-      final particlePaint = Paint()
-        ..color = chargeSign == 'negative'
-            ? const Color(0xFF9ED6FF)
-            : AppPalette.almondCream
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(tangent.position, 6.5, particlePaint);
-    }
-
-    final velocityPaint = Paint()
-      ..color = AppPalette.almondCream
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final forcePaint = Paint()
-      ..color = const Color(0xFF9ED6FF)
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    _drawVector(canvas, p.translate(8, 0), p.translate(52, 0), velocityPaint);
-    _drawVector(canvas, p.translate(72, 28), p.translate(72, -22), forcePaint);
-
-    _drawPoint(canvas, p, 'P(0,a)');
-    _drawPoint(canvas, q, 'Q(b,0)', labelAbove: false);
-    _drawText(
-      canvas,
-      particleLabel,
-      p.translate(46, -30),
-      color: AppPalette.textSecondary,
-      size: 12,
-    );
-    _drawText(
-      canvas,
-      'v0',
-      p.translate(54, -2),
-      color: AppPalette.almondCream,
-      size: 12,
-    );
-    _drawText(
-      canvas,
-      'F',
-      p.translate(78, -36),
-      color: const Color(0xFF9ED6FF),
-      size: 12,
-    );
-    _drawText(canvas, 'x', Offset(plot.right + 13, plot.bottom - 8));
-    _drawText(canvas, 'y', Offset(plot.left + 7, plot.top - 16));
-    _drawText(
-      canvas,
-      '磁场区域',
-      fieldRect.topLeft.translate(12, 10),
-      color: AppPalette.textSecondary,
-      size: 12,
-    );
-    _drawText(
-      canvas,
-      '轨迹由 App 原生模板绘制',
-      Offset(origin.dx, size.height - 18),
-      color: AppPalette.textSecondary.withValues(alpha: 0.76),
-      size: 12,
-    );
   }
 
   void _drawPoint(

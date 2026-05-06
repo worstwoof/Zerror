@@ -419,10 +419,10 @@ class DiagnosticService:
             },
             "parameters": {key: value for key, value in params.items() if value},
             "formula_steps": [
-                {"label": "圆周半径", "formula": "R = mv0/(eB)"},
-                {"label": "几何关系", "formula": "L = R sin(theta)"},
-                {"label": "竖直位移", "formula": "Delta y = R(1 - cos(theta))"},
-                {"label": "最终关系", "formula": "tan(theta) = (a - Delta y) / x1"},
+                {"label": "圆周半径", "formula": "r = mv0/(eB)"},
+                {"label": "情形一：r > L", "formula": "x1 = b - L - [a - r(1 - cos theta)] cot theta"},
+                {"label": "转角关系", "formula": "theta = arcsin(eBL/mv0)"},
+                {"label": "情形二：r <= L", "formula": "x2 = b - sqrt(2mv0a/(eB) - a^2)"},
             ],
             "focus_points": focus_points[:4],
         }
@@ -3283,7 +3283,7 @@ class DiagnosticService:
         lowered = f"{cleaned_question} {' '.join(knowledge_points)}".lower()
         has_electric = any(
             token in lowered
-            for token in ["电场", "电势", "电压", "平行板", "极板", "带电", "匀强电场"]
+            for token in ["电场", "电势", "电压", "平行板", "极板", "匀强电场"]
         )
         has_magnetic = any(
             token in lowered

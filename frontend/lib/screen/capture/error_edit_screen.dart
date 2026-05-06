@@ -577,6 +577,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             valueListenable: _questionController,
             builder: (context, value, _) {
               final previewText = value.text.trim();
+              final renderPreviewText = _sanitizeQuestionTextForPreview(
+                previewText,
+              );
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -626,7 +629,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                           )
                         else
                           AppLatexText(
-                            previewText,
+                            renderPreviewText,
                             style: const TextStyle(
                               color: AppPalette.textPrimary,
                               fontSize: 14,
@@ -2196,7 +2199,7 @@ class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
   }
 
   void _saveAndClose() {
-    Navigator.of(context).pop(_controller.text.trim());
+    Navigator.of(context).pop(_sanitizeQuestionTextForPreview(_controller.text).trim());
   }
 
   @override
@@ -2514,5 +2517,56 @@ class _MathCoordinateGraphPainter extends CustomPainter {
   bool shouldRepaint(covariant _MathCoordinateGraphPainter oldDelegate) {
     return oldDelegate.graph != graph;
   }
+}
+
+String _sanitizeQuestionTextForPreview(String text) {
+  if (text.trim().isEmpty || !text.contains(r'$')) {
+    return text;
+  }
+
+  final buffer = StringBuffer();
+  var index = 0;
+  while (index < text.length) {
+    final start = text.indexOf(r'$', index);
+    if (start < 0) {
+      buffer.write(text.substring(index));
+      break;
+    }
+    final end = text.indexOf(r'$', start + 1);
+    if (end < 0) {
+      buffer.write(text.substring(index, start));
+      buffer.write(text.substring(start + 1));
+      break;
+    }
+
+    buffer.write(text.substring(index, start));
+    final body = text.substring(start + 1, end);
+    if (_looksLikeRealMathSegment(body)) {
+      buffer.write(r'$');
+      buffer.write(body);
+      buffer.write(r'$');
+    } else {
+      buffer.write(body);
+    }
+    index = end + 1;
+  }
+
+  return buffer.toString();
+}
+
+bool _looksLikeRealMathSegment(String text) {
+  final body = text.trim();
+  if (body.isEmpty) {
+    return false;
+  }
+  if (RegExp(r'[\u4e00-\u9fff]').hasMatch(body)) {
+    return false;
+  }
+  if ('('.allMatches(body).length != ')'.allMatches(body).length ||
+      '['.allMatches(body).length != ']'.allMatches(body).length ||
+      '{'.allMatches(body).length != '}'.allMatches(body).length) {
+    return false;
+  }
+  return RegExp(r'(\\[A-Za-z]+|[_^=<>+\-*/]|[A-Za-z]\s*\(|\d)').hasMatch(body);
 }
 
