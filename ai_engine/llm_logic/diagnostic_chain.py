@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "本题无需返回 rich_artifacts，数学题的主答案必须全部放在 solution_summary 和 solution_steps 中，rich_artifacts 必须返回空数组。",
+    "数学": "数学题可以返回一个 chart_spec，但只能用于坐标图、函数图像、几何示意或圆锥曲线草图；不要在 rich_artifacts 中写解题步骤、核心思路、易错提醒或复习清单。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
@@ -44,7 +44,7 @@ ANALYSIS_FIELD_GUIDANCE = """
 - solution_summary：只写“破题关键 + 最终结论”。控制在 60-100 字。必须包含最终答案、轨迹方程、结论或核心判断。不要写详细推导过程，不要分点，不要写“首先/然后/接着”。
 - mistake_diagnosis：字段仅为兼容旧 schema 保留，前端不展示。除非用户明确提供了错误答案或自述错因，否则返回空字符串；不要生成独立错因板块。
 - review_plan.focus：字段仅为兼容旧 schema 保留，前端不展示。默认返回空字符串；不要生成独立复习建议板块。
-- solution_steps：只写详细推导步骤，建议 5-7 步。每一步控制在 70-140 字。每一步都要写清“为什么这样做”和关键等式/代换/条件来源。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
+- solution_steps：只写详细推导步骤，建议 5-7 步。每一步控制在 70-160 字。每一步都要写清“为什么这样做”和关键等式/代换/条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配一句简短文字讲解。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
 - similar_questions：最多返回 1 个变式题。prompt 控制在 60 字以内，answer_outline 控制在 80 字以内。不要返回多道相似题。
 - rich_artifacts：默认返回空数组。只有当能提供真正可视化内容时才返回，例如函数图像、几何图、物理动画、化学流程图。不要返回 study_card 类型的纯文字知识卡片。不要把“学科拓展说明”“知识点总结”“关键联系”塞进 rich_artifacts。如果没有高质量图表或交互内容，必须返回 []。
 如果题目要求“说明它表示什么曲线/物理含义/化学意义”，这个解释属于 solution_summary 的结尾，不属于 rich_artifacts。
@@ -190,9 +190,7 @@ class DiagnosticService:
             ]
         physics_html_elapsed = 0.0
         if request.enable_subject_extensions:
-            should_auto_build_extension = not any(
-                subject_name in subject for subject_name in ["物理", "数学"]
-            )
+            should_auto_build_extension = "物理" not in subject
             if should_auto_build_extension:
                 rich_artifacts.extend(
                     build_subject_extension_artifacts(
@@ -464,7 +462,7 @@ class DiagnosticService:
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
   "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["推导步骤1，70-140字", "推导步骤2，70-140字", "推导步骤3，70-140字", "推导步骤4，70-140字", "推导步骤5，70-140字"],
+  "solution_steps": ["讲解文字。\\n$$核心公式1$$\\n继续说明公式来源。", "讲解文字。\\n$$核心公式2$$\\n继续说明代换依据。", "讲解文字。\\n$$核心公式3$$\\n继续说明结论。"],
   "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
@@ -485,10 +483,10 @@ class DiagnosticService:
 2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
 3. solution_summary 只写关键突破口和最终结论，60-100字。
 4. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-5. solution_steps 建议 5-7 步，每步 70-140 字，只写推导；必须写出关键等式、代换依据和条件来源。
+5. solution_steps 建议 5-7 步，每步 70-160 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
 6. similar_questions 最多返回 1 个。
 7. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-8. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
+8. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
 9. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
 10. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
 11. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
@@ -534,7 +532,7 @@ class DiagnosticService:
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
   "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["推导步骤1，70-140字", "推导步骤2，70-140字", "推导步骤3，70-140字", "推导步骤4，70-140字", "推导步骤5，70-140字"],
+  "solution_steps": ["讲解文字。\\n$$核心公式1$$\\n继续说明公式来源。", "讲解文字。\\n$$核心公式2$$\\n继续说明代换依据。", "讲解文字。\\n$$核心公式3$$\\n继续说明结论。"],
   "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
@@ -557,10 +555,10 @@ class DiagnosticService:
 4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
 5. solution_summary 只写关键突破口和最终结论，60-100字。
 6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-7. solution_steps 建议 5-7 步，每步 70-140 字，只写推导；必须写出关键等式、代换依据和条件来源。
+7. solution_steps 建议 5-7 步，每步 70-160 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
 8. similar_questions 最多返回 1 个。
 9. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts。
+10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
 11. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
 12. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
 13. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
@@ -791,7 +789,7 @@ class DiagnosticService:
             )
         if subject_name == "数学":
             return (
-                "数学题不要返回 rich_artifacts，所有解析、公式变形、几何含义和最终结论都必须放入 solution_summary 或 solution_steps；rich_artifacts 必须返回空数组。"
+                "数学题如果返回 chart_spec，只允许用于坐标图、函数图像、几何示意或圆锥曲线草图；content 必须是 JSON 字符串并包含 coordinate_graph。不要在 chart_spec 中承载解题步骤、核心思路、易错提醒或复习清单。"
             )
         if subject_name == "化学":
             return (

@@ -752,19 +752,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: _solutionSteps
-                              .map(
-                                (step) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: AppLatexText(
-                                    step,
-                                    style: const TextStyle(
-                                      color: AppPalette.textPrimary,
-                                      height: 1.6,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              )
+                              .map(_buildSolutionStep)
                               .toList(),
                         ),
                 ),
@@ -772,15 +760,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_supportsPhysicsAnimation()) ...[
+          if (_supportsPhysicsAnimation() || _visibleRichArtifacts.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildSectionLabel('学科拓展'),
             const SizedBox(height: 8),
-            _buildPhysicsAnimationActionCard(),
-            if (_richArtifacts.isNotEmpty) ...[
+            if (_supportsPhysicsAnimation()) _buildPhysicsAnimationActionCard(),
+            if (_supportsPhysicsAnimation() && _visibleRichArtifacts.isNotEmpty)
               const SizedBox(height: 12),
-              _buildRichArtifactsPreview(),
-            ],
+            if (_visibleRichArtifacts.isNotEmpty) _buildRichArtifactsPreview(),
           ],
           Text(
             '归档方向：$subject · $topic',
@@ -792,6 +779,80 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildSolutionStep(String step) {
+    final parts = _splitDisplayMath(step);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: parts.map((part) {
+          final text = part.text.trim();
+          if (text.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          if (part.isFormula) {
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppPalette.night.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                ),
+              ),
+              child: AppLatexText(
+                r'$$' + text + r'$$',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  height: 1.7,
+                  fontSize: 15,
+                ),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: AppLatexText(
+              text,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                height: 1.65,
+                fontSize: 14,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<_SolutionStepPart> _splitDisplayMath(String text) {
+    final normalized = text
+        .replaceAll(r'\[', r'$$')
+        .replaceAll(r'\]', r'$$')
+        .trim();
+    final parts = <_SolutionStepPart>[];
+    final pattern = RegExp(r'\$\$(.*?)\$\$', dotAll: true);
+    var cursor = 0;
+    for (final match in pattern.allMatches(normalized)) {
+      if (match.start > cursor) {
+        parts.add(_SolutionStepPart(normalized.substring(cursor, match.start)));
+      }
+      parts.add(_SolutionStepPart(match.group(1) ?? '', isFormula: true));
+      cursor = match.end;
+    }
+    if (cursor < normalized.length) {
+      parts.add(_SolutionStepPart(normalized.substring(cursor)));
+    }
+    if (parts.isEmpty) {
+      parts.add(_SolutionStepPart(normalized));
+    }
+    return parts;
   }
 
   Widget _buildSimilarQuestionsArea(String topic) {
@@ -1064,11 +1125,27 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionLabel('🧩 学科扩展'),
-        const SizedBox(height: 8),
-        ..._richArtifacts.map(_buildRichArtifactCard),
+        ..._visibleRichArtifacts.map(_buildRichArtifactCard),
       ],
     );
+  }
+
+  List<Map<String, dynamic>> get _visibleRichArtifacts {
+    return _richArtifacts.where(_shouldDisplayRichArtifact).toList();
+  }
+
+  bool _shouldDisplayRichArtifact(Map<String, dynamic> artifact) {
+    final type = (artifact['artifact_type'] ?? '').toString();
+    final mimeType = (artifact['mime_type'] ?? '').toString().trim();
+    final content = (artifact['content'] ?? '').toString().trim();
+    if (type == 'study_card') {
+      return false;
+    }
+    if (type == 'chart_spec') {
+      final parsed = _tryParseArtifactJson(mimeType, content);
+      return parsed?['coordinate_graph'] is Map<String, dynamic>;
+    }
+    return content.isNotEmpty;
   }
 
   Widget _buildRichArtifactCard(Map<String, dynamic> artifact) {
@@ -1286,6 +1363,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final coordinateGraph = data['coordinate_graph'] is Map<String, dynamic>
         ? data['coordinate_graph'] as Map<String, dynamic>
         : null;
+    if (coordinateGraph != null) {
+      return _buildCoordinateGraphArtifact(coordinateGraph);
+    }
     final knowledgePoints =
         (data['knowledge_points'] as List<dynamic>? ?? const [])
             .map((item) => item.toString())
@@ -2076,6 +2156,13 @@ class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
   }
 }
 
+class _SolutionStepPart {
+  const _SolutionStepPart(this.text, {this.isFormula = false});
+
+  final String text;
+  final bool isFormula;
+}
+
 class _MathCoordinateGraphPainter extends CustomPainter {
   const _MathCoordinateGraphPainter(this.graph);
 
@@ -2312,3 +2399,4 @@ class _MathCoordinateGraphPainter extends CustomPainter {
     return oldDelegate.graph != graph;
   }
 }
+
