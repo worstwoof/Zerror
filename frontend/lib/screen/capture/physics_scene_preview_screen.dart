@@ -118,7 +118,7 @@ class _PhysicsScenePreviewScreenState extends State<PhysicsScenePreviewScreen>
             _SceneCard(
               padding: const EdgeInsets.all(10),
               child: AspectRatio(
-                aspectRatio: 1.08,
+                aspectRatio: 0.62,
                 child: AnimatedBuilder(
                   animation: _controller,
                   builder: (context, _) {
@@ -259,23 +259,28 @@ class _ChargedParticleFieldPainter extends CustomPainter {
     final shell = RRect.fromRectAndRadius(rect, const Radius.circular(22));
     canvas.drawRRect(shell, bgPaint);
 
-    final gap = size.width * 0.045;
-    final panelWidth = (size.width - gap * 3) / 2;
-    final panelHeight = size.height * 0.74;
-    final top = size.height * 0.12;
-    final leftPanel = Rect.fromLTWH(gap, top, panelWidth, panelHeight);
-    final rightPanel = Rect.fromLTWH(gap * 2 + panelWidth, top, panelWidth, panelHeight);
+    final gap = size.width * 0.055;
+    final panelWidth = size.width - gap * 2;
+    final panelHeight = (size.height - gap * 4 - 28) / 2;
+    final top = gap;
+    final upperPanel = Rect.fromLTWH(gap, top, panelWidth, panelHeight);
+    final lowerPanel = Rect.fromLTWH(
+      gap,
+      top + panelHeight + gap,
+      panelWidth,
+      panelHeight,
+    );
 
     _drawCasePanel(
       canvas,
-      leftPanel,
+      upperPanel,
       title: '甲  r > L',
       bendsEarly: true,
       progress: progress,
     );
     _drawCasePanel(
       canvas,
-      rightPanel,
+      lowerPanel,
       title: '乙  r <= L',
       bendsEarly: false,
       progress: (progress + 0.38) % 1,
@@ -284,7 +289,7 @@ class _ChargedParticleFieldPainter extends CustomPainter {
     _drawText(
       canvas,
       '$particleLabel  从 P 水平射出，磁场左边界可能有两种位置',
-      Offset(gap, size.height - 30),
+      Offset(gap, size.height - 24),
       color: AppPalette.textSecondary.withValues(alpha: 0.82),
       size: 12,
     );
@@ -316,7 +321,7 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       panel.left + panel.width * 0.13,
       panel.top + panel.height * 0.18,
       panel.width * 0.78,
-      panel.height * 0.68,
+      panel.height * 0.72,
     );
     final axisPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.58)
@@ -338,7 +343,7 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       fieldLeft,
       plot.top + plot.height * 0.02,
       plot.width * 0.28,
-      plot.height * 0.82,
+      plot.height * 0.78,
     );
     _drawField(canvas, fieldRect);
 
