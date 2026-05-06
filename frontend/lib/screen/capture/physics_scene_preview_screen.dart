@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 
 class PhysicsScenePreviewScreen extends StatefulWidget {
@@ -328,8 +329,8 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       ..strokeWidth = 1.3
       ..style = PaintingStyle.stroke;
     final helperPaint = Paint()
-      ..color = AppPalette.matchaMist.withValues(alpha: 0.42)
-      ..strokeWidth = 1.1;
+      ..color = AppPalette.matchaMist.withValues(alpha: 0.22)
+      ..strokeWidth = 1.0;
 
     canvas.drawLine(Offset(plot.left, plot.bottom), Offset(plot.right, plot.bottom), axisPaint);
     canvas.drawLine(Offset(plot.left, plot.bottom), Offset(plot.left, plot.top), axisPaint);
@@ -346,6 +347,13 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       plot.height * 0.78,
     );
     _drawField(canvas, fieldRect);
+    _drawText(
+      canvas,
+      'L',
+      fieldRect.topCenter.translate(-4, -17),
+      color: AppPalette.textSecondary,
+      size: 11,
+    );
 
     final straightEnd = Offset(fieldLeft, p.dy);
     final path = Path()
@@ -375,8 +383,8 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(path, tracePaint);
-    canvas.drawLine(q, Offset(q.dx, p.dy), helperPaint);
-    canvas.drawLine(Offset(q.dx, p.dy), straightEnd, helperPaint);
+    _drawDashedLine(canvas, Offset(q.dx, p.dy), q, helperPaint);
+    _drawDashedLine(canvas, straightEnd, Offset(q.dx, p.dy), helperPaint);
 
     final metrics = path.computeMetrics().iterator;
     final tangent = metrics.moveNext()
@@ -416,7 +424,6 @@ class _ChargedParticleFieldPainter extends CustomPainter {
     _drawText(canvas, 'v0', p.translate(28, -18), color: AppPalette.almondCream, size: 11);
     _drawText(canvas, 'x', Offset(plot.right + 4, plot.bottom - 5), size: 11);
     _drawText(canvas, 'y', Offset(plot.left + 4, plot.top - 15), size: 11);
-    _drawText(canvas, 'L', fieldRect.topCenter.translate(-4, -15), color: AppPalette.textSecondary, size: 11);
   }
 
   void _drawField(Canvas canvas, Rect fieldRect) {
@@ -436,8 +443,12 @@ class _ChargedParticleFieldPainter extends CustomPainter {
       fieldBorder,
     );
     final marker = fieldMarker == 'dot' ? '•' : '×';
-    for (var x = fieldRect.left + 12; x < fieldRect.right; x += 22) {
-      for (var y = fieldRect.top + 18; y < fieldRect.bottom; y += 24) {
+    canvas.save();
+    canvas.clipRRect(
+      RRect.fromRectAndRadius(fieldRect.deflate(2), const Radius.circular(8)),
+    );
+    for (var x = fieldRect.left + 14; x < fieldRect.right - 6; x += 24) {
+      for (var y = fieldRect.top + 20; y < fieldRect.bottom - 8; y += 26) {
         _drawText(
           canvas,
           marker,
@@ -447,6 +458,26 @@ class _ChargedParticleFieldPainter extends CustomPainter {
           align: TextAlign.center,
         );
       }
+    }
+    canvas.restore();
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    final vector = end - start;
+    final distance = vector.distance;
+    if (distance <= 0) {
+      return;
+    }
+    final direction = vector / distance;
+    var drawn = 0.0;
+    while (drawn < distance) {
+      final next = math.min(drawn + 6, distance);
+      canvas.drawLine(
+        start + direction * drawn,
+        start + direction * next,
+        paint,
+      );
+      drawn += 11;
     }
   }
 
@@ -613,14 +644,14 @@ class _FormulaLine extends StatelessWidget {
                 color: AppPalette.pastelGrey.withValues(alpha: 0.08),
               ),
             ),
-            child: Text(
-              formula,
+            child: AppLatexText(
+              _formulaAsLatex(formula),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                height: 1.4,
+                height: 1.45,
               ),
             ),
           ),
@@ -628,6 +659,34 @@ class _FormulaLine extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formulaAsLatex(String formula) {
+  final trimmed = formula.trim();
+  if (trimmed.startsWith(r'$')) {
+    return trimmed;
+  }
+  return r'$$' + _normalizeFormulaLatex(trimmed) + r'$$';
+}
+
+String _normalizeFormulaLatex(String formula) {
+  var text = formula;
+  text = text.replaceAllMapped(
+    RegExp(r'\bsqrt\((.*)\)'),
+    (match) => r'\sqrt{' + (match.group(1) ?? '') + '}',
+  );
+  text = text.replaceAllMapped(
+    RegExp(r'\b(theta|Delta|arcsin|sin|cos|cot)\b'),
+    (match) {
+      final command = match.group(1) ?? '';
+      return '\\$command';
+    },
+  );
+  text = text.replaceAllMapped(
+    RegExp(r'\b([A-Za-z])([0-9]+)\b'),
+    (match) => '${match.group(1)}_${match.group(2)}',
+  );
+  return text;
 }
 
 String _stringValue(Object? value, String fallback) {
