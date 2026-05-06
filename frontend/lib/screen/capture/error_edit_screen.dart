@@ -13,6 +13,7 @@ import '../../data/ai_api_client.dart';
 import '../../data/file_upload_client.dart';
 import '../base/error_detail_screen.dart';
 import 'html_artifact_preview_screen.dart';
+import 'physics_scene_preview_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
   const ErrorEditScreen({
@@ -180,24 +181,26 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     return _subject;
   }
 
-  bool _hasInteractiveHtmlArtifact() {
-    return _findInteractiveHtmlArtifactIndex() != -1;
+  bool _hasPhysicsAnimationArtifact() {
+    return _findPhysicsAnimationArtifactIndex() != -1;
   }
 
-  int _findInteractiveHtmlArtifactIndex() {
+  int _findPhysicsAnimationArtifactIndex() {
     return _richArtifacts.indexWhere((artifact) {
       final type = (artifact['artifact_type'] ?? '').toString();
       final mimeType = (artifact['mime_type'] ?? '').toString();
-      return type == 'interactive_html' || mimeType == 'text/html';
+      return type == 'physics_scene_spec' ||
+          type == 'interactive_html' ||
+          mimeType == 'text/html';
     });
   }
 
-  void _upsertInteractiveHtmlArtifact(Map<String, dynamic> artifact) {
+  void _upsertPhysicsAnimationArtifact(Map<String, dynamic> artifact) {
     final normalizedArtifact = artifact.map(
       (key, value) => MapEntry(key.toString(), value),
     );
     final updatedArtifacts = List<Map<String, dynamic>>.from(_richArtifacts);
-    final existingIndex = _findInteractiveHtmlArtifactIndex();
+    final existingIndex = _findPhysicsAnimationArtifactIndex();
     if (existingIndex >= 0) {
       updatedArtifacts[existingIndex] = normalizedArtifact;
     } else {
@@ -236,7 +239,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       setState(() {
         _isGeneratingPhysicsAnimation = false;
         if (result.generated && result.artifact != null) {
-          _upsertInteractiveHtmlArtifact(result.artifact!);
+          _upsertPhysicsAnimationArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
           _physicsAnimationError =
@@ -1013,7 +1016,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildPhysicsAnimationActionCard() {
-    final hasArtifact = _hasInteractiveHtmlArtifact();
+    final hasArtifact = _hasPhysicsAnimationArtifact();
 
     return Container(
       width: double.infinity,
@@ -1218,6 +1221,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   IconData _artifactIcon(String type) {
     switch (type) {
+      case 'physics_scene_spec':
+        return Icons.auto_awesome_motion_rounded;
       case 'interactive_html':
         return Icons.motion_photos_auto_rounded;
       case 'chart_spec':
@@ -1235,6 +1240,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _fallbackArtifactTitle(String type) {
     switch (type) {
+      case 'physics_scene_spec':
+        return '题目情景动画';
       case 'interactive_html':
         return '交互式演示内容';
       case 'chart_spec':
@@ -1252,6 +1259,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _fallbackArtifactDescription(String type) {
     switch (type) {
+      case 'physics_scene_spec':
+        return '已生成适合 App 原生渲染的物理场景规格，点击可播放统一风格的题目动画。';
       case 'interactive_html':
         return '已生成适合接入 WebView 的 HTML 内容，后续可用于播放学科演示动画。';
       case 'chart_spec':
@@ -1270,6 +1279,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   String _artifactPreviewText(String type, String mimeType, String content) {
     if (content.isEmpty) {
       return '';
+    }
+    if (type == 'physics_scene_spec') {
+      return '已生成 App 原生物理动画规格，可直接打开预览。';
     }
     if (type == 'interactive_html' || mimeType == 'text/html') {
       return '已生成 HTML 片段，可在后续版本中直接接入 WebView 展示交互动画。';
@@ -1292,6 +1304,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final parsed = _tryParseArtifactJson(mimeType, content);
 
     switch (type) {
+      case 'physics_scene_spec':
+        if (parsed != null) {
+          return _buildPhysicsSceneSpecArtifact(title: title, spec: parsed);
+        }
+        break;
       case 'chart_spec':
         if (parsed != null) {
           return _buildChartSpecArtifact(parsed);
@@ -1840,6 +1857,105 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           ],
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildPhysicsSceneSpecArtifact({
+    required String title,
+    required Map<String, dynamic> spec,
+  }) {
+    final templateId = (spec['template_id'] ?? '').toString().trim();
+    final field = spec['field'] is Map ? spec['field'] as Map : const {};
+    final particle = spec['particle'] is Map ? spec['particle'] as Map : const {};
+    final parameters = spec['parameters'] is Map
+        ? (spec['parameters'] as Map).cast<dynamic, dynamic>()
+        : const <dynamic, dynamic>{};
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildArtifactMetaChip('类型', 'App 原生动画'),
+              if (templateId.isNotEmpty) _buildArtifactMetaChip('模板', templateId),
+              _buildArtifactMetaChip(
+                '场区',
+                (field['direction_label'] ?? '物理场景').toString(),
+              ),
+              _buildArtifactMetaChip(
+                '粒子',
+                (particle['label'] ?? '带电粒子').toString(),
+              ),
+            ],
+          ),
+          if (parameters.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: parameters.entries
+                  .map(
+                    (entry) => _buildArtifactMetaChip(
+                      entry.key.toString(),
+                      entry.value.toString(),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Text(
+            '这次不再用后端随机生成的 HTML，而是由后端返回结构化参数，App 使用内置模板绘制动画，风格会和当前页面保持一致。',
+            style: TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PhysicsScenePreviewScreen(
+                      title: title,
+                      spec: spec,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: AppPalette.almondCream,
+              ),
+              label: const Text(
+                '打开原生动画',
+                style: TextStyle(color: AppPalette.almondCream),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: AppPalette.almondCream.withValues(alpha: 0.45),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

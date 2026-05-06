@@ -250,6 +250,17 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
+        artifact = self._generate_native_physics_scene_spec_artifact(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        if artifact is not None:
+            logger.info("physics animation used native scene spec")
+            return artifact
+
         logger.info("physics animation attempting direct html generation")
         artifact = self._generate_physics_html_artifact(
             cleaned_question=cleaned_question,
@@ -304,6 +315,170 @@ class DiagnosticService:
                 logger.info("physics animation fell back to local electromagnetism template")
                 return artifact
         return None
+
+    def _generate_native_physics_scene_spec_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                solution_summary,
+                " ".join(knowledge_points),
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        if scene_type != "electromagnetism" and not self._looks_like_electromagnetism(
+            combined_context
+        ):
+            return None
+
+        subtype = self._guess_electromagnetism_subtype(combined_context)
+        field_type = self._guess_electromagnetism_field_type(
+            cleaned_question=combined_context,
+            knowledge_points=[],
+        )
+        if subtype != "charged_particle":
+            return None
+
+        field_marker = self._infer_electromagnetism_field_marker(
+            combined_context=combined_context,
+            field_type=field_type,
+        )
+        charge_sign = self._infer_electromagnetism_charge_sign(combined_context)
+        velocity_direction = self._infer_electromagnetism_velocity_direction(
+            combined_context,
+            subtype,
+        )
+        force_direction = self._infer_electromagnetism_force_direction(combined_context)
+        focus_points = self._build_electromagnetism_focus_points(
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        title = self._guess_electromagnetism_title(
+            cleaned_question=combined_context or cleaned_question,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        summary = (
+            self._display_plain_text(solution_summary, limit=80)
+            or self._guess_electromagnetism_summary(
+                cleaned_question=combined_context or cleaned_question,
+                subtype=subtype,
+                field_type=field_type,
+            )
+        )
+        params = {
+            "a": self._extract_named_number(combined_context, "a"),
+            "b": self._extract_named_number(combined_context, "b"),
+            "L": self._extract_named_number(combined_context, "L"),
+            "R": "mv0/(eB)",
+        }
+        spec = {
+            "version": 1,
+            "template_id": "charged_particle_field",
+            "scene_type": "electromagnetism",
+            "subtype": subtype,
+            "field_type": field_type,
+            "title": title,
+            "summary": summary,
+            "field": {
+                "marker": field_marker,
+                "direction_label": self._field_marker_label(field_marker),
+            },
+            "particle": {
+                "label": self._particle_label(charge_sign),
+                "charge_sign": charge_sign,
+                "velocity_direction": velocity_direction,
+                "force_direction": force_direction,
+            },
+            "geometry": {
+                "start_label": "P",
+                "target_label": "Q",
+                "start_point": {"x": "0", "y": "a"},
+                "target_point": {"x": "b", "y": "0"},
+                "field_width": "L",
+                "radius": "R",
+            },
+            "parameters": {key: value for key, value in params.items() if value},
+            "formula_steps": [
+                {"label": "圆周半径", "formula": "R = mv0/(eB)"},
+                {"label": "几何关系", "formula": "L = R sin(theta)"},
+                {"label": "竖直位移", "formula": "Delta y = R(1 - cos(theta))"},
+                {"label": "最终关系", "formula": "tan(theta) = (a - Delta y) / x1"},
+            ],
+            "focus_points": focus_points[:4],
+        }
+        return RichArtifact(
+            artifact_type="physics_scene_spec",
+            title=title,
+            description="使用 App 内置物理模板渲染的题目情景动画。",
+            mime_type="application/json",
+            content=json.dumps(spec, ensure_ascii=False),
+        )
+
+    def _looks_like_electromagnetism(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            token in lowered
+            for token in [
+                "磁场",
+                "电场",
+                "带电",
+                "电子",
+                "电荷",
+                "洛伦兹",
+                "安培力",
+                "电磁",
+                "感应电流",
+                "磁通量",
+                "导体棒",
+                "线圈",
+            ]
+        )
+
+    def _extract_named_number(self, text: str, name: str) -> str:
+        if not text:
+            return ""
+        pattern = re.compile(
+            rf"(?<![A-Za-z]){re.escape(name)}\s*[=＝]\s*([0-9]+(?:\.[0-9]+)?)",
+            re.IGNORECASE,
+        )
+        match = pattern.search(text)
+        if not match:
+            return ""
+        return match.group(1)
+
+    def _field_marker_label(self, marker: str) -> str:
+        if marker == "dot":
+            return "磁场垂直纸面向外"
+        if marker == "cross":
+            return "磁场垂直纸面向里"
+        return "电场方向"
+
+    def _particle_label(self, charge_sign: str) -> str:
+        if charge_sign == "negative":
+            return "电子"
+        if charge_sign == "positive":
+            return "带正电粒子"
+        return "带电粒子"
 
     def _should_generate_physics_html(
         self,

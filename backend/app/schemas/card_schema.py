@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 ArtifactType = Literal[
     "interactive_html",
+    "physics_scene_spec",
     "chart_spec",
     "code_snippet",
     "study_card",
