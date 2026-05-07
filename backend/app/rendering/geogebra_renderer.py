@@ -287,40 +287,61 @@ def _build_electromagnetism_variant(
     left_value = _safe_expression(variant.get("left_boundary_x") or variant.get("x_left") or "")
     if not left_value:
         left_value = "b - L" if index == 0 else "b - L/2"
-    curve_power = "2" if index == 0 else "3"
+    curve_height = "a" if index == 0 else "a * 0.75"
     title = str(variant.get("title") or variant.get("id") or f"情形 {index + 1}").strip()
     condition = str(variant.get("condition") or "").strip()
     prefix = f"v{index + 1}_"
     commands = [
-        f"a = {a_value}",
-        f"b = {b_value}",
-        f"L = {l_value}",
-        f"{prefix}a = {a_value}",
-        f"{prefix}b = {b_value}",
-        f"{prefix}L = {l_value}",
+        "a = Slider(2, 6, 0.1)",
+        "b = Slider(7, 13, 0.1)",
+        "L = Slider(1, 5, 0.1)",
+        "R = Slider(1.5, 6, 0.1)",
+        f"SetValue(a, {a_value})",
+        f"SetValue(b, {b_value})",
+        f"SetValue(L, {l_value})",
         f"{prefix}left = {left_value}",
-        f"{prefix}P = (0, {prefix}a)",
-        f"{prefix}Q = ({prefix}b, 0)",
-        f"{prefix}A = ({prefix}left, 0)",
-        f"{prefix}B = ({prefix}left, {prefix}a + 1)",
-        f"{prefix}C = ({prefix}left + {prefix}L, {prefix}a + 1)",
-        f"{prefix}D = ({prefix}left + {prefix}L, 0)",
+        f"{prefix}right = {prefix}left + L",
+        f"{prefix}mid = ({prefix}left + {prefix}right) / 2",
+        f"{prefix}P = (0, a)",
+        f"{prefix}Q = (b, 0)",
+        f"{prefix}A = ({prefix}left, -0.35)",
+        f"{prefix}B = ({prefix}left, a + 1.2)",
+        f"{prefix}C = ({prefix}right, a + 1.2)",
+        f"{prefix}D = ({prefix}right, -0.35)",
+        f"{prefix}E = ({prefix}left, a)",
+        f"{prefix}F = (b, 0.35)",
+        f"{prefix}Base1 = (-0.5, -0.35)",
+        f"{prefix}Base2 = (b + 1.1, -0.35)",
+        f"{prefix}Rail = Segment({prefix}Base1, {prefix}Base2)",
         f"{prefix}field = Polygon({prefix}A, {prefix}B, {prefix}C, {prefix}D)",
-        f"{prefix}entry = Segment({prefix}P, ({prefix}left, {prefix}a))",
-        f"{prefix}trace = Curve((1 - t) * {prefix}left + t * {prefix}b, {prefix}a * (1 - t^{curve_power}), t, 0, 1)",
-        f"{prefix}exit = Segment(({prefix}left, {prefix}a), {prefix}Q)",
-        f"{prefix}v0 = Vector({prefix}P, ({prefix}left, {prefix}a))",
-        f'Text("{title}", ({prefix}left - 0.4, {prefix}a + 1.55))',
+        f"{prefix}entry = Segment({prefix}P, {prefix}E)",
+        f"{prefix}trace = Curve({prefix}left + (b - {prefix}left) * t, a - {curve_height} * t^2 + 0.35 * t, t, 0, 1)",
+        f"{prefix}exit = Segment({prefix}F, {prefix}Q)",
+        f"{prefix}vTip = ({prefix}left + 1.15, a)",
+        f"{prefix}v0 = Vector({prefix}P, {prefix}vTip)",
+        f"{prefix}forceStart = ({prefix}mid, a * 0.42)",
+        f"{prefix}forceTip = ({prefix}mid + 0.75, a * 0.42 + 1.05)",
+        f"{prefix}force = Vector({prefix}forceStart, {prefix}forceTip)",
+        f'Text("{title}", ({prefix}left - 0.2, a + 1.75))',
+        f'Text("B", ({prefix}mid, -0.85))',
+        f'Text("P", {prefix}P)',
+        f'Text("Q", {prefix}Q)',
+        f'Text("v0", ({prefix}left + 0.8, a + 0.25))',
+        f'Text("R", ({prefix}mid + 0.95, a * 0.42 + 1.05))',
     ]
     if condition:
-        commands.append(f'Text("{condition}", ({prefix}left - 0.4, {prefix}a + 1.15))')
+        commands.append(f'Text("{condition}", ({prefix}left - 0.2, a + 1.38))')
     commands.extend(
         [
-            f'Text("×", ({prefix}left + {prefix}L * 0.25, {prefix}a * 0.25))',
-            f'Text("×", ({prefix}left + {prefix}L * 0.50, {prefix}a * 0.50))',
-            f'Text("×", ({prefix}left + {prefix}L * 0.75, {prefix}a * 0.75))',
-            f'Text("P", {prefix}P)',
-            f'Text("Q", {prefix}Q)',
+            f'Text("×", ({prefix}left + L * 0.20, 0.35))',
+            f'Text("×", ({prefix}left + L * 0.50, 0.35))',
+            f'Text("×", ({prefix}left + L * 0.80, 0.35))',
+            f'Text("×", ({prefix}left + L * 0.20, 1.35))',
+            f'Text("×", ({prefix}left + L * 0.50, 1.35))',
+            f'Text("×", ({prefix}left + L * 0.80, 1.35))',
+            f'Text("×", ({prefix}left + L * 0.20, 2.35))',
+            f'Text("×", ({prefix}left + L * 0.50, 2.35))',
+            f'Text("×", ({prefix}left + L * 0.80, 2.35))',
         ]
     )
     return {

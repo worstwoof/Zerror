@@ -113,32 +113,41 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
   }
 
   String _prepareHtmlForPreview(String rawHtml) {
-    const mathJaxSetup = r'''
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
-      displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']]
-    },
-    svg: {
-      fontCache: 'global'
-    },
-    options: {
-      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
-    }
-  };
-</script>
-<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    final normalized = rawHtml.trim();
+    const previewFitHead = '''
+<style id="zerror-preview-fit">
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    min-width: 0;
+    max-width: 100vw;
+    max-height: 100vh;
+    touch-action: pan-x pan-y;
+  }
+  svg, canvas, video {
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>
 <script>
   window.addEventListener('load', function () {
-    if (window.MathJax && window.MathJax.typesetPromise) {
-      window.MathJax.typesetPromise().catch(function () {});
-    }
+    document.documentElement.style.width = '100%';
+    document.documentElement.style.height = '100%';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    window.scrollTo(0, 0);
   });
 </script>
 ''';
 
-    final normalized = rawHtml.trim();
     if (normalized.isEmpty) {
       return '''
 <!DOCTYPE html>
@@ -146,7 +155,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  $mathJaxSetup
+  $previewFitHead
 </head>
 <body></body>
 </html>
@@ -154,12 +163,12 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     }
 
     if (RegExp(r'<head[^>]*>', caseSensitive: false).hasMatch(normalized)) {
-      final withMathJax = normalized.replaceFirstMapped(
+      final withFitHead = normalized.replaceFirstMapped(
         RegExp(r'</head>', caseSensitive: false),
-        (match) => '$mathJaxSetup</head>',
+        (match) => '$previewFitHead</head>',
       );
-      if (withMathJax != normalized) {
-        return withMathJax;
+      if (withFitHead != normalized) {
+        return withFitHead;
       }
     }
 
@@ -169,7 +178,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
         (match) => '${match.group(0)}\n<head>\n'
             '<meta charset="UTF-8" />\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n'
-            '$mathJaxSetup\n'
+            '$previewFitHead\n'
             '</head>',
       );
     }
@@ -180,7 +189,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  $mathJaxSetup
+  $previewFitHead
 </head>
 <body>
 $normalized

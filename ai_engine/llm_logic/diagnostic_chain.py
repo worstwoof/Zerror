@@ -257,17 +257,121 @@ class DiagnosticService:
         model_scene_spec: Dict[str, Any] | None = None,
     ) -> List[RichArtifact]:
         normalized_subject = subject or ""
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                normalized_subject,
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        normalized_context = combined_context.lower()
         is_supported_subject = any(
-            marker in normalized_subject
-            for marker in ["数学", "物理", "鏁板", "鐗╃悊", "math", "physics"]
+            marker in normalized_context
+            for marker in [
+                "数学",
+                "物理",
+                "解析几何",
+                "圆锥曲线",
+                "椭圆",
+                "抛物线",
+                "双曲线",
+                "焦点",
+                "磁场",
+                "电场",
+                "洛伦兹",
+                "鏁板",
+                "鐗╃悊",
+                "math",
+                "physics",
+                "ellipse",
+                "parabola",
+                "hyperbola",
+                "conic",
+            ]
         )
         if not is_supported_subject:
             return []
 
         existing_types = {artifact.artifact_type for artifact in existing_artifacts}
-        scene_subject = "math" if any(marker in normalized_subject for marker in ["数学", "鏁板", "math"]) else "physics"
+        looks_like_math = any(
+            marker in normalized_context
+            for marker in [
+                "数学",
+                "解析几何",
+                "圆锥曲线",
+                "椭圆",
+                "抛物线",
+                "双曲线",
+                "焦点",
+                "x^2",
+                "y^2",
+                "鏁板",
+                "math",
+                "ellipse",
+                "parabola",
+                "hyperbola",
+                "conic",
+            ]
+        )
+        looks_like_physics = any(
+            marker in normalized_context
+            for marker in [
+                "物理",
+                "磁场",
+                "电场",
+                "洛伦兹",
+                "带电粒子",
+                "受力",
+                "速度",
+                "鐗╃悊",
+                "physics",
+            ]
+        )
+        scene_subject = "math" if looks_like_math and not looks_like_physics else "physics"
+        if scene_subject == "physics":
+            if "interactive_html" in existing_types:
+                return []
+            artifact = self._build_electromagnetism_template_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            if artifact is None:
+                artifact = self._build_physics_template_artifact(
+                    cleaned_question=cleaned_question,
+                    knowledge_points=knowledge_points,
+                    solution_steps=solution_steps,
+                )
+            if artifact is not None:
+                artifact.title = f"Algodoo 物理沙盒 · {artifact.title}"
+                artifact.description = "物理题使用 Algodoo 风格的交互沙盒演示，支持拖动滑块观察参数变化。"
+                return [artifact]
+            return []
+        deterministic_math_spec = None
+        if scene_subject == "math":
+            deterministic_math_spec = self._build_ellipse_focus_chord_scene_spec_v2(
+                " ".join(
+                    part.strip()
+                    for part in [
+                        cleaned_question,
+                        scene_brief,
+                        solution_summary,
+                        " ".join(knowledge_points),
+                        " ".join(solution_steps),
+                    ]
+                    if part and part.strip()
+                )
+            )
         scene_spec = (
-            dict(model_scene_spec)
+            deterministic_math_spec
+            if deterministic_math_spec
+            else dict(model_scene_spec)
             if model_scene_spec
             else self._build_scene_spec_from_context(
                 subject=scene_subject,
@@ -308,6 +412,14 @@ class DiagnosticService:
                         content=json.dumps(
                             {
                                 "url": job.get("video_url"),
+                                "video_url": job.get("video_url"),
+                                "job_id": job.get("job_id"),
+                                "status": job.get("status"),
+                                "progress": job.get("progress"),
+                                "message": job.get("message"),
+                                "error": job.get("error"),
+                                "updated_at": job.get("updated_at"),
+                                "diagnostics": job.get("diagnostics"),
                                 "duration": job.get("duration"),
                                 "thumbnail_url": job.get("thumbnail_url"),
                             },
@@ -359,17 +471,33 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
-        artifact = self._generate_geogebra_scene_artifact(
+        artifact = self._build_electromagnetism_template_artifact(
             cleaned_question=cleaned_question,
-            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
         )
+        if artifact is None:
+            artifact = self._build_physics_template_artifact(
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_steps=solution_steps,
+            )
+        if artifact is None:
+            artifact = self._generate_physics_html_artifact(
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
         if artifact is not None:
-            logger.info("physics animation used geogebra scene")
+            artifact.title = f"Algodoo 物理沙盒 · {artifact.title}"
+            artifact.description = "物理题使用 Algodoo 风格的交互沙盒演示，支持拖动滑块观察参数变化。"
+            logger.info("physics animation used algodoo-style html scene")
             return artifact
-        logger.info("physics animation skipped legacy html/native renderers")
+
+        logger.info("physics animation skipped geogebra because physics uses algodoo-style html")
         return None
 
     def _generate_geogebra_scene_artifact(
@@ -676,16 +804,68 @@ class DiagnosticService:
                     "caption": "Drag P or Q to inspect the field boundary and trajectory relation.",
                 },
             }
+        return self._build_mechanics_geogebra_scene_spec(
+            scene_type=scene_type,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+        )
+
+    def _build_mechanics_geogebra_scene_spec(
+        self,
+        *,
+        scene_type: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+    ) -> Dict[str, Any]:
+        focus = " / ".join(
+            str(point).strip() for point in knowledge_points[:2] if str(point).strip()
+        )
+        fallback_text = (
+            solution_summary
+            or scene_brief
+            or "用 GeoGebra 查看物体受力、加速度和位移之间的关系。"
+        )
+        caption = focus or "拖动 F 和 m，观察 a = F / m 与位移变化。"
         return {
+            "schema_version": 2,
             "subject": "physics",
             "scene_type": scene_type if scene_type != "unknown" else "generic",
-            "title": "Physics scene",
-            "objects": [],
-            "relations": [],
+            "title": "牛顿第二定律 GeoGebra 图",
+            "objects": [
+                {"type": "slider", "id": "F", "min": 1, "max": 8, "step": 0.5},
+                {"type": "slider", "id": "m", "min": 1, "max": 6, "step": 0.5},
+                {"type": "point", "id": "O", "label": "O", "x": 0, "y": 0},
+                {"type": "point", "id": "X", "label": "X", "x": 8, "y": 0},
+                {"type": "point", "id": "A", "label": "A", "x": 1.2, "y": 0.35},
+                {"type": "point", "id": "B", "label": "B", "x": 2.8, "y": 0.35},
+                {"type": "point", "id": "C", "label": "C", "x": 2.8, "y": 1.25},
+                {"type": "point", "id": "D", "label": "D", "x": 1.2, "y": 1.25},
+                {"type": "vector", "id": "F_net", "start": "B", "end": {"x": "2.8 + F / 2", "y": 0.35}},
+                {"type": "vector", "id": "accel", "start": "C", "end": {"x": "2.8 + F / m", "y": 1.25}},
+                {"type": "trajectory", "id": "trace", "x": "1.2 + F * t^2 / (2 * m)", "y": "-0.35", "t_min": 0, "t_max": 3},
+                {"type": "text", "text": "F = ma", "at": {"x": 0.2, "y": 2.3}},
+                {"type": "text", "text": "a = F / m", "at": {"x": 0.2, "y": 1.85}},
+                {"type": "text", "text": "合力 F", "at": {"x": "3.1 + F / 2", "y": 0.55}},
+                {"type": "text", "text": "加速度 a", "at": {"x": "3.1 + F / m", "y": 1.45}},
+            ],
+            "relations": [
+                {"type": "segment", "points": ["O", "X"]},
+                {"type": "segment", "points": ["A", "B"]},
+                {"type": "segment", "points": ["B", "C"]},
+                {"type": "segment", "points": ["C", "D"]},
+                {"type": "segment", "points": ["D", "A"]},
+                {"type": "text", "text": "水平面", "at": {"x": 6.6, "y": -0.35}},
+            ],
             "steps": [],
             "parameters": {},
-            "render_targets": ["manim"],
-            "fallback_text": solution_summary or "This scene is not structured enough for a reliable graph yet.",
+            "render_targets": ["geogebra"],
+            "fallback_text": fallback_text,
+            "geogebra": {
+                "app_name": "classic",
+                "caption": caption,
+            },
         }
 
     def _build_charged_particle_geogebra_commands(self, *, params: Dict[str, str]) -> List[str]:
@@ -736,6 +916,10 @@ class DiagnosticService:
         )
 
     def _build_math_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        ellipse_focus_chord_spec = self._build_ellipse_focus_chord_scene_spec_v2(text)
+        if ellipse_focus_chord_spec is not None:
+            return ellipse_focus_chord_spec
+
         objects: List[Dict[str, Any]] = []
         relations: List[Dict[str, Any]] = []
         formula_steps: List[Dict[str, str]] = []
@@ -850,6 +1034,119 @@ class DiagnosticService:
                 "app_name": "classic",
                 "commands": [],
                 "caption": "拖动图中的点或滑块，观察几何关系变化。",
+            },
+        }
+
+    def _build_ellipse_focus_chord_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        normalized = text.replace(" ", "")
+        normalized_ascii = (
+            normalized.replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("锛圿", "(")
+            .replace("锛塢", ")")
+            .replace("锛宂", ",")
+        )
+        lowered = normalized.lower()
+        has_ellipse = any(token in normalized for token in ["椭圆", "妞渾"]) or "ellipse" in lowered
+        has_focus = any(token in normalized for token in ["焦点", "鐒︾偣"]) or "focus" in lowered
+        has_focus_point = "F(1,0)" in normalized_ascii
+        has_intersections = "A" in normalized and "B" in normalized and any(
+            token in normalized for token in ["交于", "交於", "浜や簬", "intersect"]
+        )
+        has_chord_condition = "OA" in normalized and "OB" in normalized and "AB" in normalized
+        has_ellipse_equation = "x^2" in lowered and "y^2" in lowered and (
+            "a^2" in lowered or "b^2" in lowered
+        )
+        has_ellipse = has_ellipse or any(
+            token in normalized for token in ["椭圆", "圆锥曲线"]
+        )
+        has_focus = has_focus or any(
+            token in normalized for token in ["焦点", "焦点F"]
+        )
+        has_focus_point = has_focus_point or bool(
+            re.search(r"F\((-?1(?:\.0+)?),0(?:\.0+)?\)", normalized_ascii)
+        )
+        has_intersections = has_intersections or (
+            "A" in normalized
+            and "B" in normalized
+            and any(token in normalized for token in ["交于", "相交", "交点"])
+        )
+        has_chord_condition = has_chord_condition or (
+            (
+                ("OA" in normalized and "OB" in normalized)
+                or "OAB" in normalized
+                or "△OAB" in normalized
+                or "三角形OAB" in normalized
+            )
+            and ("AB" in normalized or has_intersections)
+        )
+        looks_like_focus_chord = (
+            (has_focus_point or has_focus)
+            and has_chord_condition
+            and (has_ellipse or has_ellipse_equation)
+        )
+        if not looks_like_focus_chord and has_ellipse_equation and has_focus and has_intersections:
+            looks_like_focus_chord = True
+        if not looks_like_focus_chord:
+            return None
+
+        commands = [
+            "a = Slider(1.15, 5, 0.01)",
+            "m = Slider(-4, 4, 0.01)",
+            "SetValue(a, 5)",
+            "SetValue(m, 1.77)",
+            "b = sqrt(a^2 - 1)",
+            "O = (0, 0)",
+            "F = (1, 0)",
+            "F_prime = (-1, 0)",
+            "C: x^2 / a^2 + y^2 / b^2 = 1",
+            "l: y = m * (x - 1)",
+            "A = Intersect(C, l, 1)",
+            "B = Intersect(C, l, 2)",
+            "OA = Segment(O, A)",
+            "OB = Segment(O, B)",
+            "AB = Segment(A, B)",
+            "tri = Polygon(O, A, B)",
+            "axis = Segment((-a, 0), (a, 0))",
+            "SetColor(C, 70, 70, 70)",
+            "SetColor(l, 140, 140, 140)",
+            "SetLineStyle(l, 1)",
+            "SetColor(A, 255, 0, 0)",
+            "SetColor(B, 0, 70, 255)",
+            "SetColor(OA, 30, 35, 80)",
+            "SetColor(OB, 90, 90, 230)",
+            "SetColor(AB, 90, 90, 230)",
+            "SetColor(tri, 120, 120, 255)",
+            "SetFilling(tri, 0.18)",
+            "SetPointSize(A, 6)",
+            "SetPointSize(B, 6)",
+            "SetPointSize(F, 5)",
+            "SetPointSize(F_prime, 5)",
+            "SetLabelMode(A, 1)",
+            "SetLabelMode(B, 1)",
+            "SetLabelMode(F, 1)",
+            "SetLabelMode(F_prime, 1)",
+            'Text("a = " + a, (-6, 5))',
+            'Text("m = " + m, (-6, 4.25))',
+            'Text("拖动 a 和 m，观察焦点弦 AB 与三角形 OAB", (-3.6, -5.2))',
+        ]
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": "conic",
+            "title": "椭圆焦点弦 GeoGebra 图",
+            "objects": [],
+            "relations": [],
+            "parameters": {},
+            "formula_steps": [],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "拖动 a 和 m，观察过焦点直线与椭圆的交点 A、B，以及 OAB 的几何关系。",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": "拖动 a 和 m，观察椭圆焦点弦 AB、交点 A/B 和三角形 OAB。",
             },
         }
 
