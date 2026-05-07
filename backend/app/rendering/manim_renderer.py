@@ -72,15 +72,61 @@ import json
 from manim import *
 
 SCENE_SPEC = {spec_json!r}
+TEXT_FONT_CANDIDATES = [
+    "Noto Sans CJK SC",
+    "Noto Sans CJK",
+    "Source Han Sans SC",
+    "Source Han Sans CN",
+    "WenQuanYi Micro Hei",
+    "WenQuanYi Zen Hei",
+    "Microsoft YaHei",
+    "SimHei",
+    "Arial Unicode MS",
+]
+_CHOSEN_CJK_FONT = None
+
+
+def choose_cjk_font():
+    global _CHOSEN_CJK_FONT
+    if _CHOSEN_CJK_FONT is not None:
+        return _CHOSEN_CJK_FONT or None
+    try:
+        from manimpango import list_fonts
+        fonts = [str(font) for font in list_fonts()]
+    except Exception:
+        fonts = []
+    by_lower_name = {{font.lower(): font for font in fonts}}
+    for candidate in TEXT_FONT_CANDIDATES:
+        match = by_lower_name.get(candidate.lower())
+        if match:
+            _CHOSEN_CJK_FONT = match
+            return _CHOSEN_CJK_FONT
+    for candidate in TEXT_FONT_CANDIDATES:
+        needle = candidate.lower()
+        for font in fonts:
+            if needle in font.lower():
+                _CHOSEN_CJK_FONT = font
+                return _CHOSEN_CJK_FONT
+    _CHOSEN_CJK_FONT = ""
+    return None
+
+
+def cjk_text(value, font_size=24, color=WHITE, **kwargs):
+    text = str(value)
+    font = choose_cjk_font()
+    if font:
+        return Text(text, font=font, font_size=font_size, color=color, **kwargs)
+    return Text(text, font_size=font_size, color=color, **kwargs)
 
 
 class LearningScene(Scene):
     def construct(self):
         spec = json.loads(SCENE_SPEC)
         scene_type = str(spec.get("scene_type") or "generic")
-        title = Text(str(spec.get("title") or spec.get("fallback_text") or "题目讲解"), font_size=32)
-        title.to_edge(UP)
-        self.play(FadeIn(title, shift=DOWN * 0.2))
+        if spec.get("show_title"):
+            title = cjk_text(str(spec.get("title") or spec.get("fallback_text") or "题目讲解"), font_size=32)
+            title.to_edge(UP)
+            self.play(FadeIn(title, shift=DOWN * 0.2))
 
         if scene_type == "board_block":
             self._draw_board_block_scene(spec)
@@ -93,9 +139,10 @@ class LearningScene(Scene):
         else:
             self._draw_axes_scene(spec)
 
-        summary = str(spec.get("fallback_text") or "根据结构化场景生成讲解动画。")
-        note = Text(summary[:48], font_size=22, color=YELLOW).to_edge(DOWN)
-        self.play(FadeIn(note))
+        if spec.get("show_summary"):
+            summary = str(spec.get("fallback_text") or "根据结构化场景生成讲解动画。")
+            note = cjk_text(summary[:48], font_size=22, color=YELLOW).to_edge(DOWN)
+            self.play(FadeIn(note))
         self.wait(1)
 
     def _draw_board_block_scene(self, spec):
@@ -105,11 +152,11 @@ class LearningScene(Scene):
         block = RoundedRectangle(width=1.25, height=0.85, corner_radius=0.18, color=GREEN, fill_color=GREEN_E, fill_opacity=0.9)
         block.next_to(board, UP, buff=0)
         force_arrow = Arrow(board.get_right() + LEFT * 0.4 + UP * 0.75, board.get_right() + RIGHT * 1.25 + UP * 0.75, buff=0, color=ORANGE)
-        force_label = Text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.05)
+        force_label = cjk_text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.05)
         friction_arrow = Arrow(block.get_left() + LEFT * 0.95 + UP * 0.2, block.get_left() + LEFT * 0.15 + UP * 0.2, buff=0, color=RED)
-        friction_label = Text("f", font_size=22, color=RED).next_to(friction_arrow, UP, buff=0.05)
-        board_label = Text("木板 M", font_size=24).next_to(board, DOWN, buff=0.15)
-        block_label = Text("物块 m", font_size=24).next_to(block, UP, buff=0.12)
+        friction_label = cjk_text("f", font_size=22, color=RED).next_to(friction_arrow, UP, buff=0.05)
+        board_label = cjk_text("木板 M", font_size=24).next_to(board, DOWN, buff=0.15)
+        block_label = cjk_text("物块 m", font_size=24).next_to(block, UP, buff=0.12)
         self.play(Create(ground), FadeIn(board), FadeIn(block), FadeIn(board_label), FadeIn(block_label))
         self.play(GrowArrow(force_arrow), FadeIn(force_label), GrowArrow(friction_arrow), FadeIn(friction_label))
         self.play(
@@ -125,7 +172,7 @@ class LearningScene(Scene):
             rate_func=linear,
         )
         relative = DoubleArrow(block.get_center() + DOWN * 0.95, board.get_center() + DOWN * 0.95, buff=0, color=BLUE)
-        relative_label = Text("相对位移", font_size=22, color=BLUE).next_to(relative, DOWN, buff=0.1)
+        relative_label = cjk_text("相对位移", font_size=22, color=BLUE).next_to(relative, DOWN, buff=0.1)
         self.play(GrowArrow(relative), FadeIn(relative_label), run_time=0.8)
         self.wait(0.8)
 
@@ -135,7 +182,11 @@ class LearningScene(Scene):
         marks = VGroup()
         for x in [-0.5, 0.4, 1.3, 2.2]:
             for y in [-0.65, 0.0, 0.65]:
-                marks.add(Text("×", font_size=26, color=TEAL_A).move_to(RIGHT * x + UP * y))
+                cross = VGroup(
+                    Line(LEFT * 0.08 + DOWN * 0.08, RIGHT * 0.08 + UP * 0.08, color=TEAL_A),
+                    Line(LEFT * 0.08 + UP * 0.08, RIGHT * 0.08 + DOWN * 0.08, color=TEAL_A),
+                ).move_to(RIGHT * x + UP * y)
+                marks.add(cross)
         path = VMobject(color=YELLOW)
         path.set_points_smoothly([
             LEFT * 4 + DOWN * 0.4,
@@ -182,7 +233,7 @@ class LearningScene(Scene):
             if kind == "point":
                 point = self._point_from_item(axes, item)
                 dot = Dot(point, color=ORANGE)
-                label = Text(str(item.get("label") or item.get("id") or ""), font_size=22)
+                label = cjk_text(str(item.get("label") or item.get("id") or ""), font_size=22)
                 label.next_to(dot, UP + RIGHT, buff=0.08)
                 self.play(FadeIn(dot), FadeIn(label), run_time=0.35)
                 rendered_points[str(item.get("id") or item.get("label") or "")] = dot

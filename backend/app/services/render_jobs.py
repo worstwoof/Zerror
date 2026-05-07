@@ -9,16 +9,22 @@ from pathlib import Path
 from typing import Any, Dict
 
 from backend.app.core.config import PROJECT_ROOT
-from backend.app.rendering.manim_renderer import ManimUnavailable, render_manim_video
+from backend.app.rendering.manim_renderer import (
+    ManimUnavailable,
+    is_manim_available,
+    render_manim_video,
+)
 
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 MEDIA_URL_PREFIX = "/static/media/manim"
+MANIM_RENDER_CACHE_VERSION = "cjk-font-v3"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
 _cache: Dict[str, str] = {}
+_renderer_available_cache: bool | None = None
 
 
 def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
@@ -33,6 +39,8 @@ def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
                 status="succeeded",
                 progress=100,
                 video_url=cached_url,
+                message="Manim video is ready.",
+                diagnostics=_video_diagnostics(cached_url),
             )
             _jobs[job_id] = job
             return dict(job)
@@ -47,6 +55,7 @@ def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
             scene_hash=scene_hash,
             status="pending",
             progress=0,
+            message="Manim render job is queued.",
         )
         _jobs[job_id] = job
         _executor.submit(_run_manim_job, job_id, scene_hash, dict(scene_spec))
@@ -60,7 +69,17 @@ def get_manim_job(job_id: str) -> Dict[str, Any] | None:
 
 
 def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> None:
-    _update_job(job_id, status="running", progress=15, message="Manim renderer is starting.")
+    started_at = time.perf_counter()
+    _update_job(
+        job_id,
+        status="running",
+        progress=15,
+        message="Manim renderer is starting.",
+        diagnostics={
+            "renderer_available": _renderer_available(),
+            "render_started_at": time.time(),
+        },
+    )
     try:
         output_path = render_manim_video(
             scene_spec=scene_spec,
@@ -68,6 +87,15 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
             output_dir=MEDIA_ROOT,
         )
         video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
+        elapsed = time.perf_counter() - started_at
+        diagnostics = _video_diagnostics(video_url)
+        diagnostics.update(
+            {
+                "renderer_available": True,
+                "render_elapsed_seconds": round(elapsed, 3),
+                "error_summary": "",
+            }
+        )
         with _lock:
             _cache[scene_hash] = video_url
         _update_job(
@@ -76,22 +104,39 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
             progress=100,
             video_url=video_url,
             message="Manim video is ready.",
+            diagnostics=diagnostics,
         )
     except ManimUnavailable as exc:
+        elapsed = time.perf_counter() - started_at
         _update_job(
             job_id,
             status="failed",
             progress=100,
             error=str(exc),
             message="Manim is not available on this server yet.",
+            diagnostics={
+                "renderer_available": False,
+                "output_path_exists": False,
+                "file_size_bytes": 0,
+                "render_elapsed_seconds": round(elapsed, 3),
+                "error_summary": _error_summary(exc),
+            },
         )
     except Exception as exc:
+        elapsed = time.perf_counter() - started_at
         _update_job(
             job_id,
             status="failed",
             progress=100,
             error=str(exc),
             message="Manim render failed.",
+            diagnostics={
+                "renderer_available": _renderer_available(),
+                "output_path_exists": False,
+                "file_size_bytes": 0,
+                "render_elapsed_seconds": round(elapsed, 3),
+                "error_summary": _error_summary(exc),
+            },
         )
 
 
@@ -104,6 +149,7 @@ def _build_job(
     video_url: str = "",
     message: str = "",
     error: str = "",
+    diagnostics: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     return {
         "job_id": job_id,
@@ -115,6 +161,14 @@ def _build_job(
         "thumbnail_url": None,
         "message": message,
         "error": error,
+        "diagnostics": diagnostics
+        if diagnostics is not None
+        else {
+            "renderer_available": _renderer_available(),
+            "output_path_exists": False,
+            "file_size_bytes": 0,
+            "error_summary": "",
+        },
         "updated_at": time.time(),
     }
 
@@ -129,6 +183,53 @@ def _update_job(job_id: str, **updates: Any) -> None:
 
 
 def _scene_hash(scene_spec: Dict[str, Any]) -> str:
-    canonical = json.dumps(scene_spec, sort_keys=True, ensure_ascii=False, default=str)
+    canonical = json.dumps(
+        {
+            "renderer_version": MANIM_RENDER_CACHE_VERSION,
+            "scene_spec": scene_spec,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+
+def _renderer_available() -> bool:
+    global _renderer_available_cache
+    if _renderer_available_cache is not None:
+        return _renderer_available_cache
+    try:
+        _renderer_available_cache = is_manim_available()
+    except Exception:
+        _renderer_available_cache = False
+    return _renderer_available_cache
+
+
+def _video_diagnostics(video_url: str) -> Dict[str, Any]:
+    path = _path_for_video_url(video_url)
+    exists = path.exists() if path else False
+    size = path.stat().st_size if path and exists else 0
+    return {
+        "renderer_available": _renderer_available(),
+        "output_path_exists": exists,
+        "output_path": str(path) if path else "",
+        "file_size_bytes": size,
+        "error_summary": "",
+    }
+
+
+def _path_for_video_url(video_url: str) -> Path | None:
+    if not video_url.startswith(f"{MEDIA_URL_PREFIX}/"):
+        return None
+    name = Path(video_url).name
+    if not name:
+        return None
+    return MEDIA_ROOT / name
+
+
+def _error_summary(exc: Exception) -> str:
+    message = str(exc).strip()
+    if len(message) > 300:
+        return f"{message[:297]}..."
+    return message
