@@ -146,34 +146,45 @@ class LearningScene(Scene):
         self.wait(1)
 
     def _draw_board_block_scene(self, spec):
-        ground = Line(LEFT * 5.5, RIGHT * 5.5, color=GREY_B).shift(DOWN * 1.55)
-        board = RoundedRectangle(width=4.8, height=0.45, corner_radius=0.18, color=GOLD, fill_color=GOLD_E, fill_opacity=0.85)
-        board.shift(LEFT * 1.7 + DOWN * 1.25)
-        block = RoundedRectangle(width=1.25, height=0.85, corner_radius=0.18, color=GREEN, fill_color=GREEN_E, fill_opacity=0.9)
-        block.next_to(board, UP, buff=0)
-        force_arrow = Arrow(board.get_right() + LEFT * 0.4 + UP * 0.75, board.get_right() + RIGHT * 1.25 + UP * 0.75, buff=0, color=ORANGE)
-        force_label = cjk_text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.05)
-        friction_arrow = Arrow(block.get_left() + LEFT * 0.95 + UP * 0.2, block.get_left() + LEFT * 0.15 + UP * 0.2, buff=0, color=RED)
-        friction_label = cjk_text("f", font_size=22, color=RED).next_to(friction_arrow, UP, buff=0.05)
-        board_label = cjk_text("木板 M", font_size=24).next_to(board, DOWN, buff=0.15)
-        block_label = cjk_text("物块 m", font_size=24).next_to(block, UP, buff=0.12)
+        ground = Line(LEFT * 5.8, RIGHT * 5.8, color=GREY_B).shift(DOWN * 1.75)
+        board = RoundedRectangle(width=5.2, height=0.42, corner_radius=0.14, color=GOLD, fill_color=GOLD_E, fill_opacity=0.88)
+        board.move_to(DOWN * 1.45)
+        block = RoundedRectangle(width=0.85, height=0.9, corner_radius=0.10, color=GREEN, fill_color=GREEN_E, fill_opacity=0.92)
+        block.move_to(board.get_right() + LEFT * 0.48 + UP * 0.66)
+
+        board_label = cjk_text(str(spec.get("board_label") or "木板 A"), font_size=24).next_to(board, DOWN, buff=0.14)
+        block_label = cjk_text(str(spec.get("block_label") or "物块 B"), font_size=24).next_to(block, UP, buff=0.12)
+
+        velocity_arrow = Arrow(block.get_top() + UP * 0.28 + RIGHT * 0.25, block.get_top() + UP * 0.28 + LEFT * 0.62, buff=0, color=BLUE)
+        velocity_label = cjk_text("v0", font_size=22, color=BLUE).next_to(velocity_arrow, UP, buff=0.04)
+        force_arrow = Arrow(block.get_right() + RIGHT * 0.06, block.get_right() + RIGHT * 1.0, buff=0, color=ORANGE)
+        force_label = cjk_text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.04)
+        block_friction = Arrow(block.get_left() + DOWN * 0.1, block.get_left() + RIGHT * 0.72 + DOWN * 0.1, buff=0, color=RED)
+        block_friction_label = cjk_text("f", font_size=21, color=RED).next_to(block_friction, DOWN, buff=0.04)
+        board_friction = Arrow(board.get_center() + UP * 0.5, board.get_center() + LEFT * 1.1 + UP * 0.5, buff=0, color=TEAL_A)
+        board_friction_label = cjk_text("f", font_size=21, color=TEAL_A).next_to(board_friction, UP, buff=0.04)
+
+        board_group = VGroup(board, board_label, board_friction, board_friction_label)
+        block_group = VGroup(block, block_label, velocity_arrow, velocity_label, force_arrow, force_label, block_friction, block_friction_label)
+
         self.play(Create(ground), FadeIn(board), FadeIn(block), FadeIn(board_label), FadeIn(block_label))
-        self.play(GrowArrow(force_arrow), FadeIn(force_label), GrowArrow(friction_arrow), FadeIn(friction_label))
         self.play(
-            board.animate.shift(RIGHT * 2.6),
-            board_label.animate.shift(RIGHT * 2.6),
-            force_arrow.animate.shift(RIGHT * 2.6),
-            force_label.animate.shift(RIGHT * 2.6),
-            block.animate.shift(RIGHT * 1.35),
-            block_label.animate.shift(RIGHT * 1.35),
-            friction_arrow.animate.shift(RIGHT * 1.35),
-            friction_label.animate.shift(RIGHT * 1.35),
-            run_time=2.4,
-            rate_func=linear,
+            GrowArrow(velocity_arrow),
+            FadeIn(velocity_label),
+            GrowArrow(force_arrow),
+            FadeIn(force_label),
+            GrowArrow(block_friction),
+            FadeIn(block_friction_label),
+            GrowArrow(board_friction),
+            FadeIn(board_friction_label),
         )
-        relative = DoubleArrow(block.get_center() + DOWN * 0.95, board.get_center() + DOWN * 0.95, buff=0, color=BLUE)
-        relative_label = cjk_text("相对位移", font_size=22, color=BLUE).next_to(relative, DOWN, buff=0.1)
-        self.play(GrowArrow(relative), FadeIn(relative_label), run_time=0.8)
+        self.play(
+            board_group.animate.shift(LEFT * 0.85),
+            block_group.animate.shift(LEFT * 2.45),
+            run_time=2.4,
+            rate_func=smooth,
+        )
+        self.play(VGroup(board_group, block_group).animate.shift(LEFT * 0.45), run_time=0.9, rate_func=linear)
         self.wait(0.8)
 
     def _draw_electromagnetism_scene(self, spec):

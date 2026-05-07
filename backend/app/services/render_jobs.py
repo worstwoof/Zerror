@@ -18,7 +18,7 @@ from backend.app.rendering.manim_renderer import (
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "cjk-font-v3"
+MANIM_RENDER_CACHE_VERSION = "board-block-v4"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()

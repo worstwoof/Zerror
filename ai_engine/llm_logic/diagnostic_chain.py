@@ -560,7 +560,7 @@ class DiagnosticService:
             or self._display_plain_text(solution_summary, limit=72)
             or "用 Manim 展示题目中的物理对象、受力方向和运动变化。"
         )
-        return {
+        scene_spec = {
             "schema_version": 2,
             "subject": "physics",
             "scene_type": scene_type,
@@ -576,6 +576,19 @@ class DiagnosticService:
             "render_targets": ["manim"],
             "fallback_text": fallback_text,
         }
+        if scene_type == "board_block":
+            scene_spec.update(
+                {
+                    "board_label": "木板 A",
+                    "block_label": "物块 B",
+                    "initial_velocity_direction": "left",
+                    "force_target": "block",
+                    "force_direction": "right",
+                    "friction_on_block_direction": "right",
+                    "friction_on_board_direction": "left",
+                }
+            )
+        return scene_spec
 
     def _generate_geogebra_scene_artifact(
         self,
