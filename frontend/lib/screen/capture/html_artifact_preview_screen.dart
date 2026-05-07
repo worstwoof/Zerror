@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -16,7 +14,8 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
   final String htmlContent;
 
   @override
-  State<HtmlArtifactPreviewScreen> createState() => _HtmlArtifactPreviewScreenState();
+  State<HtmlArtifactPreviewScreen> createState() =>
+      _HtmlArtifactPreviewScreenState();
 }
 
 class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
@@ -33,8 +32,6 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final htmlSize = (utf8.encode(widget.htmlContent).length / 1024).toStringAsFixed(1);
-
     return Scaffold(
       backgroundColor: AppPalette.night,
       appBar: AppBar(
@@ -54,58 +51,17 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'HTML 学科扩展预览',
-                      style: TextStyle(
-                        color: AppPalette.almondCream,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '当前内容来自后端返回的 interactive_html artifact，已在 WebView 中本地加载。源码大小约 $htmlSize KB。',
-                      style: const TextStyle(
-                        color: AppPalette.textSecondary,
-                        fontSize: 12.5,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(
+                  color: AppPalette.pastelGrey.withValues(alpha: 0.10),
                 ),
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-                      ),
-                    ),
-                    child: WebViewWidget(controller: _controller),
-                  ),
-                ),
-              ),
-            ],
+              child: WebViewWidget(controller: _controller),
+            ),
           ),
         ),
       ),
@@ -132,18 +88,56 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     max-height: 100vh;
     touch-action: pan-x pan-y;
   }
+  body[data-scene] {
+    padding: 0 !important;
+  }
+  body[data-scene] .shell {
+    gap: 8px !important;
+  }
+  body[data-scene] .shell > section.card:first-child:not(.stage),
+  body[data-scene] .hero,
+  body[data-scene] .question-hint,
+  body[data-scene] .subtitle,
+  body[data-scene] .scene-chips {
+    display: none !important;
+  }
+  body[data-scene] .stage {
+    margin: 0 !important;
+  }
   svg, canvas, video {
     max-width: 100%;
     max-height: 100%;
   }
 </style>
 <script>
+  function zerrorStartAnimation() {
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('button'));
+    var startButton = buttons.find(function (button) {
+      var text = (button.textContent || '').toLowerCase();
+      return text.indexOf('开始') >= 0 ||
+        text.indexOf('播放') >= 0 ||
+        text.indexOf('start') >= 0 ||
+        text.indexOf('play') >= 0;
+    });
+    if (startButton) {
+      startButton.click();
+    }
+    ['start', 'play', 'run', 'startAnimation'].forEach(function (name) {
+      try {
+        if (typeof window[name] === 'function') {
+          window[name]();
+        }
+      } catch (_) {}
+    });
+  }
   window.addEventListener('load', function () {
     document.documentElement.style.width = '100%';
     document.documentElement.style.height = '100%';
     document.body.style.width = '100%';
     document.body.style.height = '100%';
     window.scrollTo(0, 0);
+    setTimeout(zerrorStartAnimation, 250);
+    setTimeout(zerrorStartAnimation, 1000);
   });
 </script>
 ''';

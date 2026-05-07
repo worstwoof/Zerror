@@ -89,10 +89,9 @@ class _SubjectProfile:
 def _resolve_subject_profile(subject: str, cleaned_question: str) -> Optional[_SubjectProfile]:
     subject_normalized = subject.lower()
     normalized = f"{subject} {cleaned_question}".lower()
-
     if any(keyword in subject_normalized for keyword in ["物理", "力学", "电路", "电学", "光学", "磁场", "电场", "电磁"]):
         return _SubjectProfile("interactive_html", _build_physics_html)
-    if any(keyword in subject_normalized for keyword in ["数学", "线性代数", "高数", "概率", "统计", "函数", "几何"]):
+    if any(keyword in subject_normalized for keyword in ["数学", "线性代数", "高数", "概率", "统计", "函数", "几何", "圆锥曲线", "椭圆", "抛物线", "双曲线"]):
         return _SubjectProfile("chart_spec", _build_math_chart_spec)
 
     if any(
@@ -1785,8 +1784,8 @@ def _physics_board_block_html(cleaned_question: str, knowledge_points: List[str]
         <button class="secondary" id="resetBtn">重置</button>
       </div>
       <label class="slider-row">
-        <div class="slider-label"><span>外力强度</span><span id="forceValue">1.2 N</span></div>
-        <input id="forceSlider" type="range" min="0.6" max="6.0" step="0.1" value="1.2" />
+        <div class="slider-label"><span>外力强度</span><span id="forceValue">3.2 N</span></div>
+        <input id="forceSlider" type="range" min="0.6" max="6.0" step="0.1" value="3.2" />
       </label>
       <label class="slider-row">
         <div class="slider-label"><span>摩擦系数</span><span id="muValue">{html.escape(friction)}</span></div>
@@ -1870,6 +1869,12 @@ def _physics_board_block_html(cleaned_question: str, knowledge_points: List[str]
 
       boardX = clamp(boardX, 0, 150);
       relativeX = clamp(relativeX, -90, 20);
+      if (boardX >= 148) {{
+        boardX = 0;
+        relativeX = 0;
+        boardSpeed = 0;
+        blockSpeed = 0;
+      }}
 
       const boardDisplayX = Number(modeSlider.value) === 0 ? boardX : 0;
       const blockDisplayX = Number(modeSlider.value) === 0 ? boardX + relativeX : relativeX;
@@ -1947,6 +1952,7 @@ def _physics_board_block_html(cleaned_question: str, knowledge_points: List[str]
 
     syncLabels();
     reset();
+    window.setTimeout(start, 180);
   </script>
 </body>
 </html>"""
@@ -3625,6 +3631,29 @@ def _with_chart_spec_legacy_display_fields(
 
 def _looks_like_physics_question(cleaned_question: str) -> bool:
     lowered = cleaned_question.lower()
+    readable_physics_keywords = [
+        "物块",
+        "木板",
+        "板块",
+        "滑块",
+        "小车",
+        "斜面",
+        "摩擦",
+        "加速度",
+        "速度",
+        "位移",
+        "受力",
+        "牛顿",
+        "电路",
+        "电流",
+        "电压",
+        "透镜",
+        "折射",
+        "反射",
+        "成像",
+    ]
+    if any(keyword in lowered for keyword in readable_physics_keywords):
+        return True
     physics_keywords = [
         "物块",
         "木板",
@@ -3664,6 +3693,47 @@ def _physics_html_matches_question(cleaned_question: str, html_content: str) -> 
 
 def _physics_scene_type(text: str) -> str:
     lowered = text.lower()
+    if any(
+        keyword in lowered
+        for keyword in ["木板", "板块", "物块", "滑块", "滑板", "摩擦", "传送带", "连接体"]
+    ):
+        return "board_block"
+    if any(keyword in lowered for keyword in ["电路", "电流", "电压", "电阻", "欧姆", "串联", "并联", "灯泡", "电源", "开关"]):
+        return "circuit"
+    if any(
+        keyword in lowered
+        for keyword in [
+            "电场",
+            "磁场",
+            "电磁场",
+            "带电粒子",
+            "粒子",
+            "洛伦兹力",
+            "安培力",
+            "电磁感应",
+            "感应电流",
+            "感应电动势",
+            "磁通量",
+            "导体棒",
+            "线圈",
+            "偏转",
+            "轨迹",
+            "右手定则",
+            "左手定则",
+            "匀强磁场",
+        ]
+    ):
+        return "electromagnetism"
+    if any(keyword in lowered for keyword in ["斜面", "斜坡", "倾角", "沿斜面"]):
+        return "incline"
+    if any(keyword in lowered for keyword in ["平抛", "斜抛", "抛体", "抛出", "射程", "落点", "飞行时间"]):
+        return "projectile"
+    if any(keyword in lowered for keyword in ["碰撞", "相碰", "对心碰撞", "弹性碰撞", "非弹性碰撞", "小球"]):
+        return "collision"
+    if any(keyword in lowered for keyword in ["光路", "透镜", "凸透镜", "凹透镜", "折射", "反射", "像距", "物距", "焦距", "成像"]):
+        return "optics"
+    if any(keyword in lowered for keyword in ["受力", "牛顿", "加速度", "速度", "位移", "弹簧", "振子"]):
+        return "mechanics"
 
     optics_keywords = [
         "光路",
