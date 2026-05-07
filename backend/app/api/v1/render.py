@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
@@ -32,6 +32,9 @@ class ManimJobResponse(BaseModel):
     thumbnail_url: str | None = None
     message: str = ""
     error: str = ""
+    absolute_video_url: str = ""
+    updated_at: float | None = None
+    diagnostics: Dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/geogebra", response_model=GeoGebraRenderResponse)
@@ -41,28 +44,44 @@ def render_geogebra(request: RenderSceneRequest) -> GeoGebraRenderResponse:
 
 
 @router.post("/manim", response_model=ManimJobResponse)
-def create_manim_render_job(request: RenderSceneRequest) -> ManimJobResponse:
-    job = create_manim_job(request.scene_spec)
-    return _job_response(job)
+def create_manim_render_job(
+    request: Request,
+    payload: RenderSceneRequest,
+) -> ManimJobResponse:
+    job = create_manim_job(payload.scene_spec)
+    return _job_response(job, request)
 
 
 @router.get("/manim/{job_id}", response_model=ManimJobResponse)
-def get_manim_render_job(job_id: str) -> ManimJobResponse:
+def get_manim_render_job(job_id: str, request: Request) -> ManimJobResponse:
     job = get_manim_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Manim job not found.")
-    return _job_response(job)
+    return _job_response(job, request)
 
 
-def _job_response(job: Dict[str, Any]) -> ManimJobResponse:
+def _job_response(job: Dict[str, Any], request: Request) -> ManimJobResponse:
+    video_url = str(job.get("video_url") or "")
     return ManimJobResponse(
         job_id=str(job.get("job_id") or ""),
         status=str(job.get("status") or "pending"),  # type: ignore[arg-type]
         progress=int(job.get("progress") or 0),
-        video_url=str(job.get("video_url") or ""),
+        video_url=video_url,
         duration=job.get("duration"),
         thumbnail_url=job.get("thumbnail_url"),
         message=str(job.get("message") or ""),
         error=str(job.get("error") or ""),
+        absolute_video_url=_absolute_url(request, video_url),
+        updated_at=job.get("updated_at"),
+        diagnostics=job.get("diagnostics")
+        if isinstance(job.get("diagnostics"), dict)
+        else {},
     )
 
+
+def _absolute_url(request: Request, video_url: str) -> str:
+    if not video_url:
+        return ""
+    if video_url.startswith("http://") or video_url.startswith("https://"):
+        return video_url
+    return f"{str(request.base_url).rstrip('/')}/{video_url.lstrip('/')}"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +29,7 @@ app = FastAPI(
 
 init_db()
 (PROJECT_ROOT / "static" / "media" / "manim").mkdir(parents=True, exist_ok=True)
+mimetypes.add_type("video/mp4", ".mp4")
 
 app.include_router(ai_router)
 app.include_router(auth_router)
