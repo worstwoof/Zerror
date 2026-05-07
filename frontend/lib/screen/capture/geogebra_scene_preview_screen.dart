@@ -774,6 +774,15 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
             failures.push(command + ' => ' + error);
           }
         });
+        if (isMathScene) {
+          const darkObjects = ['C', 'c', 'l', 'line', 'OA', 'OB', 'AB', 'axis'];
+          darkObjects.forEach(function(name) {
+            try { api.setColor(name, 0, 0, 0); } catch (_) {}
+            try { api.setLineThickness(name, name === 'axis' ? 3 : 5); } catch (_) {}
+          });
+          try { api.setColor('tri', 85, 120, 255); } catch (_) {}
+          try { api.setFilling('tri', 0.16); } catch (_) {}
+        }
         try {
           if (isMathScene) {
             api.setCoordSystem(-8, 8, -6, 6);
