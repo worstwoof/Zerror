@@ -560,6 +560,13 @@ class DiagnosticService:
             or self._display_plain_text(solution_summary, limit=72)
             or "用 Manim 展示题目中的物理对象、受力方向和运动变化。"
         )
+        formula_steps = self._extract_physics_formula_steps(solution_steps)
+        narration_steps = self._build_physics_animation_steps(
+            scene_type=scene_type,
+            knowledge_points=focus_points,
+            solution_steps=solution_steps,
+            solution_summary=solution_summary,
+        )
         scene_spec = {
             "schema_version": 2,
             "subject": "physics",
@@ -571,10 +578,12 @@ class DiagnosticService:
                 "question_excerpt": self._display_plain_text(cleaned_question, limit=96),
                 "focus_points": focus_points,
             },
-            "formula_steps": [],
-            "steps": [],
+            "formula_steps": formula_steps,
+            "steps": narration_steps,
             "render_targets": ["manim"],
             "fallback_text": fallback_text,
+            "show_title": True,
+            "show_summary": True,
         }
         if scene_type == "board_block":
             scene_spec.update(
@@ -589,6 +598,48 @@ class DiagnosticService:
                 }
             )
         return scene_spec
+
+    def _extract_physics_formula_steps(self, solution_steps: List[str]) -> List[str]:
+        formulas: List[str] = []
+        for step in solution_steps:
+            for match in re.findall(r"\$\$(.+?)\$\$", step, flags=re.S):
+                formula = self._display_plain_text(match, limit=54)
+                if formula and formula not in formulas:
+                    formulas.append(formula)
+            if len(formulas) >= 4:
+                break
+        return formulas[:4]
+
+    def _build_physics_animation_steps(
+        self,
+        *,
+        scene_type: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+        solution_summary: str,
+    ) -> List[str]:
+        scene_intro = {
+            "board_block": "先分清木板和物块两个研究对象",
+            "incline": "先把斜面方向和垂直斜面方向拆开",
+            "projectile": "先把运动分解为水平和竖直两个方向",
+            "collision": "先抓住碰撞前后的动量与能量关系",
+            "circuit": "先标出电流方向和关键元件关系",
+            "electromagnetism": "先确定速度、磁场和受力方向",
+            "mechanics": "先画出研究对象和主要受力",
+        }.get(scene_type, "先把题目中的物理对象可视化")
+        steps = [scene_intro]
+        for point in knowledge_points[:2]:
+            if point and point not in steps:
+                steps.append(point)
+        for step in solution_steps[:3]:
+            cleaned = re.sub(r"\$\$.+?\$\$", "", step, flags=re.S)
+            text = self._display_plain_text(cleaned, limit=34)
+            if text and text not in steps:
+                steps.append(text)
+        summary = self._display_plain_text(solution_summary, limit=36)
+        if summary and summary not in steps:
+            steps.append(summary)
+        return steps[:6]
 
     def _generate_geogebra_scene_artifact(
         self,
