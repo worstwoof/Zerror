@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -56,7 +57,8 @@ class AnalysisResult {
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
-    final reviewPlan = (json['review_plan'] as Map<String, dynamic>?) ?? const {};
+    final reviewPlan =
+        (json['review_plan'] as Map<String, dynamic>?) ?? const {};
     final schedule = (reviewPlan['schedule'] as List<dynamic>? ?? const [])
         .map((item) => int.tryParse(item.toString()) ?? 0)
         .where((item) => item > 0)
@@ -77,17 +79,19 @@ class AnalysisResult {
       mistakeDiagnosis: (json['mistake_diagnosis'] ?? '').toString(),
       reviewSchedule: schedule,
       reviewFocus: (reviewPlan['focus'] ?? '').toString(),
-      similarQuestions: (json['similar_questions'] as List<dynamic>? ?? const [])
-          .whereType<Map>()
-          .map(
-            (item) => SimilarQuestionItem.fromJson(
-              item.map((key, value) => MapEntry(key.toString(), value)),
-            ),
-          )
-          .toList(),
+      similarQuestions:
+          (json['similar_questions'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map(
+                (item) => SimilarQuestionItem.fromJson(
+                  item.map((key, value) => MapEntry(key.toString(), value)),
+                ),
+              )
+              .toList(),
       richArtifacts: (json['rich_artifacts'] as List<dynamic>? ?? const [])
           .whereType<Map>()
-          .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
+          .map((item) =>
+              item.map((key, value) => MapEntry(key.toString(), value)))
           .toList(),
     );
   }
@@ -105,8 +109,8 @@ class ImageAnalysisPayload {
   factory ImageAnalysisPayload.fromJson(Map<String, dynamic> json) {
     final ocr = (json['ocr'] as Map<String, dynamic>?) ?? const {};
     return ImageAnalysisPayload(
-      extractedText: (json['cleaned_question'] ?? ocr['normalized_text'] ?? '')
-          .toString(),
+      extractedText:
+          (json['cleaned_question'] ?? ocr['normalized_text'] ?? '').toString(),
       analysis: AnalysisResult.fromJson(json),
     );
   }
@@ -179,16 +183,22 @@ class ManimRenderJob {
   final String status;
   final int progress;
   final String videoUrl;
+  final String absoluteVideoUrl;
   final String message;
   final String error;
+  final double? updatedAt;
+  final Map<String, dynamic> diagnostics;
 
   const ManimRenderJob({
     required this.jobId,
     required this.status,
     required this.progress,
     required this.videoUrl,
+    required this.absoluteVideoUrl,
     required this.message,
     required this.error,
+    required this.updatedAt,
+    required this.diagnostics,
   });
 
   bool get isFinished => status == 'succeeded' || status == 'failed';
@@ -199,8 +209,11 @@ class ManimRenderJob {
       status: (json['status'] ?? 'pending').toString(),
       progress: int.tryParse((json['progress'] ?? 0).toString()) ?? 0,
       videoUrl: (json['video_url'] ?? '').toString(),
+      absoluteVideoUrl: (json['absolute_video_url'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
       error: (json['error'] ?? '').toString(),
+      updatedAt: double.tryParse((json['updated_at'] ?? '').toString()),
+      diagnostics: _staticAsMap(json['diagnostics']),
     );
   }
 
@@ -210,9 +223,22 @@ class ManimRenderJob {
       'status': status,
       'progress': progress,
       'video_url': videoUrl,
+      'absolute_video_url': absoluteVideoUrl,
       'message': message,
       'error': error,
+      'updated_at': updatedAt,
+      'diagnostics': diagnostics,
     };
+  }
+
+  static Map<String, dynamic> _staticAsMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
+    }
+    return const <String, dynamic>{};
   }
 }
 
@@ -220,11 +246,23 @@ class AiApiClient {
   const AiApiClient();
 
   Future<String> extractTextFromImage(String imagePath) async {
-    final request = http.MultipartRequest('POST', Uri.parse(AppConstants.ocrEndpoint))
-      ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+    final request =
+        http.MultipartRequest('POST', Uri.parse(AppConstants.ocrEndpoint))
+          ..files.add(await http.MultipartFile.fromPath('image', imagePath));
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    late final http.Response response;
+    try {
+      final streamedResponse = await request.send().timeout(
+            const Duration(seconds: 150),
+          );
+      response = await http.Response.fromStream(streamedResponse).timeout(
+        const Duration(seconds: 150),
+      );
+    } on TimeoutException catch (_) {
+      throw const AiApiException('AI 解析耗时过长，请稍后重试；题目图片可以先保留在后台整理中。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断了，请稍后重试；如果连续失败，可以先用手动整理保存题目。');
+    }
     final payload = _decodeJson(response);
 
     if (response.statusCode >= 400) {
@@ -278,11 +316,23 @@ class AiApiClient {
       ..fields['subject'] = subject
       ..fields['user_answer'] = ''
       ..fields['wrong_reason_hint'] = wrongReasonHint
-      ..fields['enable_subject_extensions'] = enableSubjectExtensions ? 'true' : 'false'
+      ..fields['enable_subject_extensions'] =
+          enableSubjectExtensions ? 'true' : 'false'
       ..files.add(await http.MultipartFile.fromPath('image', imagePath));
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    late final http.Response response;
+    try {
+      final streamedResponse = await request.send().timeout(
+            const Duration(seconds: 150),
+          );
+      response = await http.Response.fromStream(streamedResponse).timeout(
+        const Duration(seconds: 150),
+      );
+    } on TimeoutException catch (_) {
+      throw const AiApiException('AI 解析耗时过长，请稍后重试；题目图片可以先保留在后台整理中。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断了，请稍后重试；如果连续失败，可以先用手动整理保存题目。');
+    }
     final payload = _decodeJson(response);
 
     if (response.statusCode >= 400) {
