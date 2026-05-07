@@ -28,6 +28,8 @@ htmlcov/
 *.log
 server.err
 server.out
+static/media/manim/
+backend/static/media/manim/
 
 # IDE and OS files
 .idea/

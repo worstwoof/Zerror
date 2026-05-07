@@ -174,6 +174,48 @@ class PhysicsAnimationResult {
   }
 }
 
+class ManimRenderJob {
+  final String jobId;
+  final String status;
+  final int progress;
+  final String videoUrl;
+  final String message;
+  final String error;
+
+  const ManimRenderJob({
+    required this.jobId,
+    required this.status,
+    required this.progress,
+    required this.videoUrl,
+    required this.message,
+    required this.error,
+  });
+
+  bool get isFinished => status == 'succeeded' || status == 'failed';
+
+  factory ManimRenderJob.fromJson(Map<String, dynamic> json) {
+    return ManimRenderJob(
+      jobId: (json['job_id'] ?? '').toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      progress: int.tryParse((json['progress'] ?? 0).toString()) ?? 0,
+      videoUrl: (json['video_url'] ?? '').toString(),
+      message: (json['message'] ?? '').toString(),
+      error: (json['error'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toArtifactContent() {
+    return {
+      'job_id': jobId,
+      'status': status,
+      'progress': progress,
+      'video_url': videoUrl,
+      'message': message,
+      'error': error,
+    };
+  }
+}
+
 class AiApiClient {
   const AiApiClient();
 
@@ -271,6 +313,19 @@ class AiApiClient {
     }
 
     return PhysicsAnimationResult.fromJson(decoded);
+  }
+
+  Future<ManimRenderJob> fetchManimJob(String jobId) async {
+    final response = await http.get(
+      Uri.parse(AppConstants.manimJobEndpoint(jobId)),
+    );
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(decoded));
+    }
+
+    return ManimRenderJob.fromJson(decoded);
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {

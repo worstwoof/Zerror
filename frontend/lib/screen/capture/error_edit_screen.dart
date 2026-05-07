@@ -12,8 +12,9 @@ import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
 import '../../data/file_upload_client.dart';
 import '../base/error_detail_screen.dart';
+import 'geogebra_scene_preview_screen.dart';
 import 'html_artifact_preview_screen.dart';
-import 'physics_scene_preview_screen.dart';
+import 'manim_video_preview_screen.dart';
 
 class ErrorEditScreen extends StatefulWidget {
   const ErrorEditScreen({
@@ -62,6 +63,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   List<Map<String, dynamic>> _richArtifacts = const [];
   String? _analysisError;
   bool _isGeneratingPhysicsAnimation = false;
+  bool _isPollingManimJob = false;
   String? _physicsAnimationError;
 
   @override
@@ -188,10 +190,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   int _findPhysicsAnimationArtifactIndex() {
     return _richArtifacts.indexWhere((artifact) {
       final type = (artifact['artifact_type'] ?? '').toString();
-      final mimeType = (artifact['mime_type'] ?? '').toString();
-      return type == 'physics_scene_spec' ||
-          type == 'interactive_html' ||
-          mimeType == 'text/html';
+      return type == 'geogebra_scene' ||
+          type == 'manim_job' ||
+          type == 'manim_video' ||
+          type == 'physics_scene_spec';
     });
   }
 
@@ -265,6 +267,74 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _physicsAnimationError = '动画演示生成失败，请检查后端服务后重试。';
       });
     }
+  }
+
+  Future<void> _pollManimJob(String jobId) async {
+    if (_isPollingManimJob) {
+      return;
+    }
+    setState(() {
+      _isPollingManimJob = true;
+    });
+    try {
+      for (var attempt = 0; attempt < 20; attempt += 1) {
+        final job = await _apiClient.fetchManimJob(jobId);
+        if (!mounted) return;
+        _applyManimJobUpdate(jobId, job);
+        if (job.isFinished) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPollingManimJob = false;
+        });
+      }
+    }
+  }
+
+  void _applyManimJobUpdate(String jobId, ManimRenderJob job) {
+    setState(() {
+      final updatedArtifacts = List<Map<String, dynamic>>.from(_richArtifacts);
+      final index = updatedArtifacts.indexWhere((artifact) {
+        if ((artifact['artifact_type'] ?? '').toString() != 'manim_job') {
+          return false;
+        }
+        final parsed = _tryParseArtifactJson(
+          (artifact['mime_type'] ?? '').toString(),
+          (artifact['content'] ?? '').toString(),
+        );
+        return (parsed?['job_id'] ?? '').toString() == jobId;
+      });
+      if (index < 0) {
+        return;
+      }
+      if (job.status == 'succeeded' && job.videoUrl.isNotEmpty) {
+        updatedArtifacts[index] = {
+          'artifact_type': 'manim_video',
+          'title': 'Manim 讲解视频',
+          'description': 'Manim 已生成讲解视频。',
+          'mime_type': 'application/json',
+          'content': jsonEncode({
+            'url': job.videoUrl,
+            'duration': null,
+            'thumbnail_url': null,
+          }),
+        };
+      } else {
+        final current = Map<String, dynamic>.from(updatedArtifacts[index]);
+        current['content'] = jsonEncode(job.toArtifactContent());
+        updatedArtifacts[index] = current;
+      }
+      _richArtifacts = updatedArtifacts;
+    });
   }
 
   Future<void> _saveToArchiveWithUpload() async {
@@ -1042,7 +1112,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      '物理动画演示',
+                      'GeoGebra 交互演示',
                       style: TextStyle(
                         color: AppPalette.textPrimary,
                         fontSize: 14,
@@ -1052,8 +1122,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                     const SizedBox(height: 6),
                     Text(
                       hasArtifact
-                          ? '已生成当前题目的 HTML 动画，可重新生成以刷新展示内容。'
-                          : '按需调用后端生成与题目对应的 HTML 动画，并复用下方 WebView 预览。',
+                          ? '已生成当前题目的 GeoGebra 交互图，可重新生成以刷新参数和图形。'
+                          : '按需生成 GeoGebra 交互图；Manim 讲解视频后续会在后台异步生成。',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 13,
@@ -1224,8 +1294,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   IconData _artifactIcon(String type) {
     switch (type) {
+      case 'geogebra_scene':
+        return Icons.dynamic_form_rounded;
+      case 'manim_job':
+        return Icons.movie_filter_rounded;
+      case 'manim_video':
+        return Icons.play_circle_fill_rounded;
+      case 'text_explanation':
+        return Icons.notes_rounded;
+      case 'image_analysis':
+        return Icons.image_search_rounded;
       case 'physics_scene_spec':
-        return Icons.auto_awesome_motion_rounded;
+        return Icons.dynamic_form_rounded;
       case 'interactive_html':
         return Icons.motion_photos_auto_rounded;
       case 'chart_spec':
@@ -1243,8 +1323,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _fallbackArtifactTitle(String type) {
     switch (type) {
+      case 'geogebra_scene':
+        return 'GeoGebra 交互图';
+      case 'manim_job':
+        return 'Manim 讲解视频生成中';
+      case 'manim_video':
+        return 'Manim 讲解视频';
+      case 'text_explanation':
+        return '补充说明';
+      case 'image_analysis':
+        return '图像识别分析';
       case 'physics_scene_spec':
-        return '题目情景动画';
+        return 'GeoGebra 交互图';
       case 'interactive_html':
         return '交互式演示内容';
       case 'chart_spec':
@@ -1262,8 +1352,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   String _fallbackArtifactDescription(String type) {
     switch (type) {
+      case 'geogebra_scene':
+        return '已生成 GeoGebra 交互图，可拖动点或调节参数观察变化。';
+      case 'manim_job':
+        return '已创建 Manim 讲解视频任务，完成后可播放视频。';
+      case 'manim_video':
+        return '已生成 Manim 讲解视频，可直接播放或复习。';
+      case 'text_explanation':
+        return '当前题目暂时不适合生成可靠图形，先展示文字降级说明。';
+      case 'image_analysis':
+        return '来自图片内容的结构化识别与分析。';
       case 'physics_scene_spec':
-        return '已生成适合 App 原生渲染的物理场景规格，点击可播放统一风格的题目动画。';
+        return '旧版场景规格将使用 GeoGebra 交互图打开。';
       case 'interactive_html':
         return '已生成适合接入 WebView 的 HTML 内容，后续可用于播放学科演示动画。';
       case 'chart_spec':
@@ -1283,8 +1383,17 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (content.isEmpty) {
       return '';
     }
+    if (type == 'geogebra_scene') {
+      return '已生成 GeoGebra 交互图配置，可打开交互预览。';
+    }
+    if (type == 'manim_job') {
+      return 'Manim 讲解视频正在等待后台生成。';
+    }
+    if (type == 'manim_video') {
+      return 'Manim 讲解视频已生成。';
+    }
     if (type == 'physics_scene_spec') {
-      return '已生成 App 原生物理动画规格，可直接打开预览。';
+      return '旧版场景规格可使用 GeoGebra 交互图打开。';
     }
     if (type == 'interactive_html' || mimeType == 'text/html') {
       return '已生成 HTML 片段，可在后续版本中直接接入 WebView 展示交互动画。';
@@ -1307,9 +1416,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final parsed = _tryParseArtifactJson(mimeType, content);
 
     switch (type) {
+      case 'geogebra_scene':
+        if (parsed != null) {
+          return _buildGeoGebraSceneArtifact(title: title, spec: parsed);
+        }
+        break;
+      case 'manim_job':
+        if (parsed != null) {
+          return _buildManimJobArtifact(parsed);
+        }
+        break;
+      case 'manim_video':
+        return _buildManimVideoArtifact(title: title, content: content);
       case 'physics_scene_spec':
         if (parsed != null) {
-          return _buildPhysicsSceneSpecArtifact(title: title, spec: parsed);
+          return _buildGeoGebraSceneArtifact(title: title, spec: parsed);
         }
         break;
       case 'chart_spec':
@@ -1863,7 +1984,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     );
   }
 
-  Widget _buildPhysicsSceneSpecArtifact({
+  Widget _buildGeoGebraSceneArtifact({
     required String title,
     required Map<String, dynamic> spec,
   }) {
@@ -1888,7 +2009,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildArtifactMetaChip('类型', 'App 原生动画'),
+              _buildArtifactMetaChip('类型', 'GeoGebra 交互'),
               if (templateId.isNotEmpty) _buildArtifactMetaChip('模板', templateId),
               _buildArtifactMetaChip(
                 '场区',
@@ -1917,7 +2038,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           ],
           const SizedBox(height: 12),
           const Text(
-            '这次不再用后端随机生成的 HTML，而是由后端返回结构化参数，App 使用内置模板绘制动画，风格会和当前页面保持一致。',
+            '后端返回结构化场景参数，App 使用 GeoGebra WebView 渲染交互图；Manim 讲解视频会走后续异步生成链路。',
             style: TextStyle(
               color: AppPalette.textPrimary,
               fontSize: 13,
@@ -1931,7 +2052,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => PhysicsScenePreviewScreen(
+                    builder: (_) => GeoGebraScenePreviewScreen(
                       title: title,
                       spec: spec,
                     ),
@@ -1939,11 +2060,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 );
               },
               icon: const Icon(
-                Icons.play_circle_fill_rounded,
+                Icons.open_in_browser_rounded,
                 color: AppPalette.almondCream,
               ),
               label: const Text(
-                '打开原生动画',
+                '打开 GeoGebra 交互图',
                 style: TextStyle(color: AppPalette.almondCream),
               ),
               style: OutlinedButton.styleFrom(
@@ -1955,6 +2076,123 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManimJobArtifact(Map<String, dynamic> data) {
+    final status = (data['status'] ?? 'pending').toString();
+    final progress = int.tryParse((data['progress'] ?? 0).toString()) ?? 0;
+    final jobId = (data['job_id'] ?? '').toString();
+    final error = (data['error'] ?? '').toString();
+    final message = (data['message'] ?? '讲解视频正在等待后台生成。').toString();
+    return _buildArtifactStatusBox(
+      icon: Icons.movie_filter_rounded,
+      title: 'Manim 任务：$status',
+      message: error.isNotEmpty ? error : '$message 进度 $progress%',
+      actionLabel: jobId.isEmpty
+          ? null
+          : (_isPollingManimJob ? '正在轮询' : '轮询状态'),
+      onAction: jobId.isEmpty || _isPollingManimJob
+          ? null
+          : () => _pollManimJob(jobId),
+    );
+  }
+
+  Widget _buildManimVideoArtifact({
+    required String title,
+    required String content,
+  }) {
+    final parsed = _tryParseArtifactJson('application/json', content);
+    final url = parsed == null
+        ? content
+        : (parsed['url'] ?? parsed['video_url'] ?? '').toString();
+    return _buildArtifactStatusBox(
+      icon: Icons.play_circle_fill_rounded,
+      title: 'Manim 讲解视频',
+      message: url.trim().isEmpty ? '视频地址为空。' : '视频已生成，可以打开播放。',
+      actionLabel: url.trim().isEmpty ? null : '播放视频',
+      onAction: url.trim().isEmpty
+          ? null
+          : () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ManimVideoPreviewScreen(
+                    title: title,
+                    videoUrl: url,
+                  ),
+                ),
+              );
+            },
+    );
+  }
+
+  Widget _buildArtifactStatusBox({
+    required IconData icon,
+    required String title,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppPalette.almondCream, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 12.5,
+                    height: 1.5,
+                  ),
+                ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: onAction,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: AppPalette.almondCream,
+                    ),
+                    label: Text(
+                      actionLabel,
+                      style: const TextStyle(color: AppPalette.almondCream),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: AppPalette.almondCream.withValues(alpha: 0.45),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

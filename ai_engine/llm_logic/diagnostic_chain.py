@@ -15,6 +15,8 @@ from backend.app.schemas.card_schema import (
     RichArtifact,
     SimilarQuestion,
 )
+from backend.app.rendering.geogebra_renderer import build_geogebra_scene
+from backend.app.services.render_jobs import create_manim_job
 
 from .ocr_parser import normalize_ocr_text
 from .subject_extensions import (
@@ -136,6 +138,7 @@ class DiagnosticService:
         knowledge_points = [str(item) for item in parsed.get("knowledge_points", []) if str(item).strip()]
         solution_steps = [str(item) for item in parsed.get("solution_steps", []) if str(item).strip()]
         solution_summary = str(parsed.get("solution_summary", "请结合详细步骤继续完善解析。"))
+        model_scene_spec = parsed.get("scene_spec") if isinstance(parsed.get("scene_spec"), dict) else None
 
         scene_brief_source = "model"
         if not scene_brief:
@@ -201,6 +204,18 @@ class DiagnosticService:
                         existing_artifacts=rich_artifacts,
                     )
                 )
+            rich_artifacts.extend(
+                self._build_structured_render_artifacts(
+                    subject=subject,
+                    cleaned_question=cleaned_question,
+                    scene_brief=scene_brief,
+                    knowledge_points=knowledge_points,
+                    solution_summary=solution_summary,
+                    solution_steps=solution_steps,
+                    existing_artifacts=rich_artifacts,
+                    model_scene_spec=model_scene_spec,
+                )
+            )
 
         response = AnalysisResponse(
             question_text=request.question_text,
@@ -229,6 +244,100 @@ class DiagnosticService:
         )
         return response
 
+    def _build_structured_render_artifacts(
+        self,
+        *,
+        subject: str,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+        existing_artifacts: List[RichArtifact],
+        model_scene_spec: Dict[str, Any] | None = None,
+    ) -> List[RichArtifact]:
+        normalized_subject = subject or ""
+        is_supported_subject = any(
+            marker in normalized_subject
+            for marker in ["数学", "物理", "鏁板", "鐗╃悊", "math", "physics"]
+        )
+        if not is_supported_subject:
+            return []
+
+        existing_types = {artifact.artifact_type for artifact in existing_artifacts}
+        scene_subject = "math" if any(marker in normalized_subject for marker in ["数学", "鏁板", "math"]) else "physics"
+        scene_spec = (
+            dict(model_scene_spec)
+            if model_scene_spec
+            else self._build_scene_spec_from_context(
+                subject=scene_subject,
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+        )
+        scene_spec.setdefault("subject", scene_subject)
+        scene_spec.setdefault("render_targets", ["geogebra", "manim"])
+        scene_spec.setdefault("fallback_text", solution_summary)
+        artifacts: List[RichArtifact] = []
+
+        if "geogebra" in scene_spec.get("render_targets", []) and "geogebra_scene" not in existing_types:
+            geogebra_payload = build_geogebra_scene(scene_spec)
+            if geogebra_payload.get("commands"):
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="geogebra_scene",
+                        title=str(scene_spec.get("title") or "GeoGebra interaction"),
+                        description=str(scene_spec.get("fallback_text") or "Interactive graph rendered by GeoGebra."),
+                        mime_type="application/json",
+                        content=json.dumps(geogebra_payload, ensure_ascii=False),
+                    )
+                )
+
+        if "manim" in scene_spec.get("render_targets", []) and "manim_job" not in existing_types:
+            job = create_manim_job(scene_spec)
+            if job.get("status") == "succeeded" and job.get("video_url"):
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="manim_video",
+                        title="Manim explanation video",
+                        description="Rendered Manim explanation video.",
+                        mime_type="application/json",
+                        content=json.dumps(
+                            {
+                                "url": job.get("video_url"),
+                                "duration": job.get("duration"),
+                                "thumbnail_url": job.get("thumbnail_url"),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    )
+                )
+            else:
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="manim_job",
+                        title="Manim explanation video",
+                        description="Background Manim render job for a short explanation video.",
+                        mime_type="application/json",
+                        content=json.dumps(job, ensure_ascii=False),
+                    )
+                )
+
+        if not artifacts and scene_spec.get("fallback_text") and "text_explanation" not in existing_types:
+            artifacts.append(
+                RichArtifact(
+                    artifact_type="text_explanation",
+                    title="Render fallback",
+                    description="This question is not structured enough for a reliable graph yet.",
+                    mime_type="text/plain",
+                    content=str(scene_spec.get("fallback_text") or ""),
+                )
+            )
+        return artifacts
+
     def generate_physics_animation(
         self,
         *,
@@ -250,7 +359,7 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
-        artifact = self._generate_native_physics_scene_spec_artifact(
+        artifact = self._generate_geogebra_scene_artifact(
             cleaned_question=cleaned_question,
             scene_brief=scene_brief,
             knowledge_points=knowledge_points,
@@ -258,65 +367,12 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         if artifact is not None:
-            logger.info("physics animation used native scene spec")
+            logger.info("physics animation used geogebra scene")
             return artifact
-
-        logger.info("physics animation attempting direct html generation")
-        artifact = self._generate_physics_html_artifact(
-            cleaned_question=cleaned_question,
-            scene_brief=scene_brief,
-            knowledge_points=knowledge_points,
-            solution_summary=solution_summary,
-            solution_steps=solution_steps,
-        )
-        if artifact is not None:
-            logger.info("physics animation used direct html generation")
-            return artifact
-
-        if scene_type == "circuit":
-            artifact = self._generate_circuit_scene_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to circuit scene spec renderer")
-                return artifact
-        if scene_type == "electromagnetism":
-            artifact = self._generate_electromagnetism_scene_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to electromagnetism scene spec renderer")
-                return artifact
-        if scene_type == "circuit":
-            artifact = self._build_physics_template_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to local circuit template")
-                return artifact
-        if scene_type == "electromagnetism":
-            artifact = self._build_electromagnetism_template_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to local electromagnetism template")
-                return artifact
+        logger.info("physics animation skipped legacy html/native renderers")
         return None
 
-    def _generate_native_physics_scene_spec_artifact(
+    def _generate_geogebra_scene_artifact(
         self,
         *,
         cleaned_question: str,
@@ -325,6 +381,25 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
+        scene_spec = self._build_scene_spec_from_context(
+            subject="physics",
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        payload = build_geogebra_scene(scene_spec)
+        if not payload.get("commands"):
+            return None
+        return RichArtifact(
+            artifact_type="geogebra_scene",
+            title=str(scene_spec.get("title") or "GeoGebra interaction"),
+            description=str(scene_spec.get("fallback_text") or "Interactive graph rendered by GeoGebra."),
+            mime_type="application/json",
+            content=json.dumps(payload, ensure_ascii=False),
+        )
+
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
             scene_brief=scene_brief,
@@ -389,6 +464,7 @@ class DiagnosticService:
         }
         spec = {
             "version": 1,
+            "engine": "geogebra",
             "template_id": "charged_particle_field",
             "scene_type": "electromagnetism",
             "subtype": subtype,
@@ -421,14 +497,208 @@ class DiagnosticService:
                 {"label": "情形二：r <= L", "formula": "x2 = b - sqrt(2mv0a/(eB) - a^2)"},
             ],
             "focus_points": focus_points[:4],
+            "geogebra": {
+                "app_name": "classic",
+                "commands": self._build_charged_particle_geogebra_commands(
+                    params=params,
+                ),
+                "caption": "拖动 P、Q 或调节 a、b、L，观察磁场边界与轨迹关系。",
+            },
+            "manim": {
+                "status": "available_later",
+                "message": "讲解视频将由 Manim 异步生成。",
+            },
         }
         return RichArtifact(
-            artifact_type="physics_scene_spec",
-            title=title,
-            description="使用 App 内置物理模板渲染的题目情景动画。",
+            artifact_type="geogebra_scene",
+            title=f"{title} · 交互图",
+            description="使用 GeoGebra 渲染的交互式物理几何图。",
             mime_type="application/json",
             content=json.dumps(spec, ensure_ascii=False),
         )
+
+    def _build_scene_spec_from_context(
+        self,
+        *,
+        subject: str,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> Dict[str, Any]:
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        if "math" in subject.lower() or "数学" in subject or "鏁板" in subject:
+            return self._build_math_scene_spec(combined_context)
+        return self._build_physics_scene_spec(
+            combined_context=combined_context,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+        )
+
+    def _build_math_scene_spec(self, text: str) -> Dict[str, Any]:
+        lowered = text.lower()
+        objects: List[Dict[str, Any]] = []
+        relations: List[Dict[str, Any]] = []
+        commands: List[str] = []
+        title = "GeoGebra interaction"
+        scene_type = "geometry"
+
+        point_matches = re.findall(
+            r"([A-Z])\s*[\(（]\s*([\-0-9.]+)\s*[,，]\s*([\-0-9.]+)\s*[\)）]",
+            text,
+        )
+        for label, x_value, y_value in point_matches[:8]:
+            objects.append({"type": "point", "id": label, "label": label, "x": x_value, "y": y_value})
+
+        if "椭圆" in text or "ellipse" in lowered or "阿波罗尼斯" in text:
+            scene_type = "conic"
+            title = "Conic section"
+        if "抛物线" in text or "parabola" in lowered:
+            scene_type = "conic"
+            title = "Parabola"
+        if "双曲线" in text or "hyperbola" in lowered:
+            scene_type = "conic"
+            title = "Hyperbola"
+
+        equations = re.findall(
+            r"([xy][^，。；;\n]{0,60}=[^，。；;\n]{1,60})",
+            text,
+            flags=re.IGNORECASE,
+        )
+        for index, equation in enumerate(equations[:4], start=1):
+            cleaned = (
+                equation.replace("$", "")
+                .replace("\\", "")
+                .replace("{", "")
+                .replace("}", "")
+                .replace(" ", "")
+            )
+            cleaned = cleaned.replace("²", "^2").replace("＋", "+").replace("－", "-")
+            if "x" in cleaned.lower() and "y" in cleaned.lower():
+                relations.append({"type": "conic", "id": f"c{index}", "equation": cleaned})
+            elif "y=" in cleaned.lower():
+                objects.append({"type": "function", "id": f"f{index}", "expression": cleaned.split("=", 1)[1]})
+
+        if not objects and not relations:
+            commands = [
+                "A = (-2, 0)",
+                "B = (2, 0)",
+                "c: x^2 / 4 + y^2 = 1",
+                "M = Point(c)",
+                "Tangent(M, c)",
+            ]
+            scene_type = "conic"
+            title = "Conic section"
+
+        return {
+            "subject": "math",
+            "scene_type": scene_type,
+            "title": title,
+            "objects": objects,
+            "relations": relations,
+            "steps": [],
+            "parameters": {},
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "Use GeoGebra to inspect points, curves, and tangents.",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": "Drag points on the graph to inspect the geometry.",
+            },
+        }
+
+    def _build_physics_scene_spec(
+        self,
+        *,
+        combined_context: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+    ) -> Dict[str, Any]:
+        scene_type = _physics_scene_type(combined_context)
+        if scene_type == "electromagnetism" or self._looks_like_electromagnetism(combined_context):
+            params = {
+                "a": self._extract_named_number(combined_context, "a") or "3",
+                "b": self._extract_named_number(combined_context, "b") or "10",
+                "L": self._extract_named_number(combined_context, "L") or "2",
+            }
+            return {
+                "subject": "physics",
+                "scene_type": "electromagnetism",
+                "title": "Charged particle in field",
+                "objects": [
+                    {"type": "point", "id": "P", "label": "P", "x": 0, "y": params["a"]},
+                    {"type": "point", "id": "Q", "label": "Q", "x": params["b"], "y": 0},
+                    {"type": "point", "id": "S", "label": "S", "x": f"{params['b']} - {params['L']}", "y": params["a"]},
+                    {"type": "point", "id": "T", "label": "T", "x": f"{params['b']} - {params['L']}", "y": 0},
+                ],
+                "relations": [
+                    {"type": "segment", "points": ["P", "S"]},
+                    {"type": "segment", "points": ["S", "T"]},
+                    {"type": "segment", "points": ["T", "Q"]},
+                    {"type": "circle", "center": "S", "radius": 4},
+                    {"type": "text", "text": "magnetic field", "at": {"x": f"{params['b']} - {params['L']} + 0.2", "y": 1}},
+                ],
+                "steps": [
+                    {"label": "radius", "formula": "r = mv0/(eB)"},
+                    {"label": "case 1", "formula": "x1 = b - L - [a - r(1 - cos(theta))]cot(theta)"},
+                    {"label": "case 2", "formula": "x2 = b - sqrt(2mv0a/(eB) - a^2)"},
+                ],
+                "parameters": params,
+                "render_targets": ["geogebra", "manim"],
+                "fallback_text": solution_summary or scene_brief or "Use GeoGebra to inspect the particle trajectory.",
+                "geogebra": {
+                    "app_name": "classic",
+                    "caption": "Drag P or Q to inspect the field boundary and trajectory relation.",
+                },
+            }
+        return {
+            "subject": "physics",
+            "scene_type": scene_type if scene_type != "unknown" else "generic",
+            "title": "Physics scene",
+            "objects": [],
+            "relations": [],
+            "steps": [],
+            "parameters": {},
+            "render_targets": ["manim"],
+            "fallback_text": solution_summary or "This scene is not structured enough for a reliable graph yet.",
+        }
+
+    def _build_charged_particle_geogebra_commands(self, *, params: Dict[str, str]) -> List[str]:
+        a_value = params.get("a") or "3"
+        b_value = params.get("b") or "10"
+        l_value = params.get("L") or "2"
+        return [
+            f"a = {a_value}",
+            f"b = {b_value}",
+            f"L = {l_value}",
+            "r = 4",
+            "P = (0, a)",
+            "Q = (b, 0)",
+            "S = (b - L, a)",
+            "T = (b - L, 0)",
+            "Segment((0, 0), (b + 1, 0))",
+            "Segment((0, 0), (0, a + 1))",
+            "Segment(P, S)",
+            "Segment(S, T)",
+            "Segment(T, Q)",
+            "Circle(S, r)",
+            "Text(\"P\", P + (0.2, 0.2))",
+            "Text(\"Q\", Q + (0.2, -0.4))",
+            "Text(\"磁场左边界\", T + (-0.6, -0.5))",
+        ]
 
     def _looks_like_electromagnetism(self, text: str) -> bool:
         lowered = text.lower()
@@ -643,6 +913,15 @@ class DiagnosticService:
   "knowledge_points": ["知识点1", "知识点2"],
   "solution_summary": "破题关键和最终结论，60-100字",
   "solution_steps": ["讲解文字。\\n$$核心公式1$$\\n继续说明公式来源。", "讲解文字。\\n$$核心公式2$$\\n继续说明代换依据。", "讲解文字。\\n$$核心公式3$$\\n继续说明结论。"],
+  "scene_spec": {{
+    "subject": "math|physics|other",
+    "scene_type": "conic|function_graph|geometry|electromagnetism|mechanics|generic",
+    "objects": [],
+    "relations": [],
+    "steps": [],
+    "render_targets": ["geogebra", "manim"],
+    "fallback_text": "fallback text when the graph cannot be rendered reliably"
+  }},
   "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,

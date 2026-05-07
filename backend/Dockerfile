@@ -6,6 +6,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        dvisvgm \
+        ffmpeg \
+        libcairo2 \
+        libcairo2-dev \
+        libpango-1.0-0 \
+        libpango1.0-dev \
+        libpangocairo-1.0-0 \
+        pkg-config \
+        texlive-latex-base \
+        texlive-latex-extra \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt /tmp/backend-requirements.txt
 COPY ai_engine/requirements.txt /tmp/ai-engine-requirements.txt
 
