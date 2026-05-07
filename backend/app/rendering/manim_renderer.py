@@ -152,10 +152,10 @@ class LearningScene(Scene):
         block = RoundedRectangle(width=0.85, height=0.9, corner_radius=0.10, color=GREEN, fill_color=GREEN_E, fill_opacity=0.92)
         block.move_to(board.get_right() + LEFT * 0.48 + UP * 0.66)
 
-        board_label = cjk_text(str(spec.get("board_label") or "木板 A"), font_size=24).next_to(board, DOWN, buff=0.14)
-        block_label = cjk_text(str(spec.get("block_label") or "物块 B"), font_size=24).next_to(block, UP, buff=0.12)
+        board_label = cjk_text("A", font_size=24).move_to(board.get_center() + UP * 0.03)
+        block_label = cjk_text("B", font_size=24).move_to(block.get_center())
 
-        velocity_arrow = Arrow(block.get_top() + UP * 0.28 + RIGHT * 0.25, block.get_top() + UP * 0.28 + LEFT * 0.62, buff=0, color=BLUE)
+        velocity_arrow = Arrow(block.get_top() + UP * 0.34 + RIGHT * 0.18, block.get_top() + UP * 0.34 + LEFT * 0.82, buff=0, color=BLUE)
         velocity_label = cjk_text("v0", font_size=22, color=BLUE).next_to(velocity_arrow, UP, buff=0.04)
         force_arrow = Arrow(block.get_right() + RIGHT * 0.06, block.get_right() + RIGHT * 1.0, buff=0, color=ORANGE)
         force_label = cjk_text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.04)
