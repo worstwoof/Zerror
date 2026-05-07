@@ -1090,6 +1090,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildPhysicsAnimationActionCard() {
     final hasArtifact = _hasPhysicsAnimationArtifact();
+    final geogebraArtifact = _findGeoGebraArtifact();
 
     return Container(
       width: double.infinity,
@@ -1182,9 +1183,66 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ],
+          if (geogebraArtifact != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => GeoGebraScenePreviewScreen(
+                        title: (geogebraArtifact['title'] ?? 'GeoGebra graph')
+                            .toString(),
+                        spec: geogebraArtifact['spec'] as Map<String, dynamic>,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.open_in_browser_rounded,
+                  color: AppPalette.almondCream,
+                ),
+                label: const Text(
+                  'Open GeoGebra graph',
+                  style: TextStyle(color: AppPalette.almondCream),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: AppPalette.almondCream.withValues(alpha: 0.45),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Map<String, dynamic>? _findGeoGebraArtifact() {
+    for (final artifact in _richArtifacts) {
+      final type = (artifact['artifact_type'] ?? '').toString();
+      if (type != 'geogebra_scene' && type != 'physics_scene_spec') {
+        continue;
+      }
+      final parsed = _tryParseArtifactJson(
+        (artifact['mime_type'] ?? '').toString(),
+        (artifact['content'] ?? '').toString(),
+      );
+      if (parsed == null) {
+        continue;
+      }
+      return {
+        'title': (artifact['title'] ?? 'GeoGebra graph').toString(),
+        'spec': parsed,
+      };
+    }
+    return null;
   }
 
   Widget _buildSectionLabel(String text) {

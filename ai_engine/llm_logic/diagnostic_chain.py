@@ -548,6 +548,10 @@ class DiagnosticService:
         )
 
     def _build_math_scene_spec(self, text: str) -> Dict[str, Any]:
+        v2_spec = self._build_math_scene_spec_v2(text)
+        if v2_spec:
+            return v2_spec
+
         lowered = text.lower()
         objects: List[Dict[str, Any]] = []
         relations: List[Dict[str, Any]] = []
@@ -627,6 +631,14 @@ class DiagnosticService:
         knowledge_points: List[str],
         solution_summary: str,
     ) -> Dict[str, Any]:
+        v2_spec = self._build_physics_scene_spec_v2(
+            combined_context=combined_context,
+            scene_brief=scene_brief,
+            solution_summary=solution_summary,
+        )
+        if v2_spec:
+            return v2_spec
+
         scene_type = _physics_scene_type(combined_context)
         if scene_type == "electromagnetism" or self._looks_like_electromagnetism(combined_context):
             params = {
@@ -701,6 +713,9 @@ class DiagnosticService:
         ]
 
     def _looks_like_electromagnetism(self, text: str) -> bool:
+        if self._looks_like_electromagnetism_v2(text):
+            return True
+
         lowered = text.lower()
         return any(
             token in lowered
@@ -717,6 +732,267 @@ class DiagnosticService:
                 "磁通量",
                 "导体棒",
                 "线圈",
+            ]
+        )
+
+    def _build_math_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        objects: List[Dict[str, Any]] = []
+        relations: List[Dict[str, Any]] = []
+        formula_steps: List[Dict[str, str]] = []
+        scene_type = "geometry"
+        title = "GeoGebra 交互图"
+
+        for label, x_value, y_value in self._extract_points_v2(text)[:8]:
+            objects.append(
+                {
+                    "type": "point",
+                    "id": label,
+                    "label": label,
+                    "x": x_value,
+                    "y": y_value,
+                }
+            )
+
+        equations = self._extract_math_equations_v2(text)
+        for index, equation in enumerate(equations[:5], start=1):
+            object_type = self._guess_conic_object_type_v2(equation)
+            if object_type:
+                scene_type = "conic"
+                title = self._math_scene_title_v2(object_type, text)
+                objects.append(
+                    {
+                        "type": object_type,
+                        "id": "c" if index == 1 else f"c{index}",
+                        "label": "c" if index == 1 else f"c{index}",
+                        "equation": equation,
+                    }
+                )
+            elif equation.lower().startswith("y="):
+                scene_type = "function_graph"
+                title = "函数图像"
+                objects.append(
+                    {
+                        "type": "function",
+                        "id": f"f{index}",
+                        "expression": equation.split("=", 1)[1],
+                    }
+                )
+
+        if self._looks_like_apollonius_problem_v2(text):
+            scene_type = "conic"
+            title = "阿波罗尼斯圆"
+            objects = [
+                {"type": "point", "id": "O", "label": "O", "x": 0, "y": 0},
+                {"type": "point", "id": "Q", "label": "Q", "x": 2, "y": 0},
+                {
+                    "type": "circle",
+                    "id": "c",
+                    "label": "c",
+                    "equation": "(x - 2)^2 + y^2 = 4",
+                },
+                {"type": "moving_point", "id": "M", "path": "c"},
+            ]
+            relations = [
+                {"type": "segment", "points": ["M", "Q"]},
+                {"type": "tangent", "point": "M", "curve": "c", "id": "t"},
+            ]
+            formula_steps = [
+                {"label": "距离比", "formula": "|MQ| / |MN| = lambda"},
+                {"label": "轨迹", "formula": "(x - 2)^2 + y^2 = 4"},
+            ]
+        elif self._looks_like_tangent_locus_v2(text) and any(
+            item.get("type") in {"circle", "ellipse", "hyperbola", "parabola"}
+            for item in objects
+        ):
+            scene_type = "locus_tangent"
+            curve_id = next(
+                str(item.get("id") or "c")
+                for item in objects
+                if item.get("type") in {"circle", "ellipse", "hyperbola", "parabola"}
+            )
+            objects.append({"type": "moving_point", "id": "M", "path": curve_id})
+            relations.append({"type": "tangent", "point": "M", "curve": curve_id, "id": "t"})
+            formula_steps.extend(
+                [
+                    {"label": "动点", "formula": "M in c"},
+                    {"label": "切线", "formula": "t = Tangent(M, c)"},
+                ]
+            )
+
+        if not objects and not relations:
+            return {
+                "schema_version": 2,
+                "subject": "math",
+                "scene_type": "generic",
+                "title": "数学图形",
+                "objects": [],
+                "relations": [],
+                "parameters": {},
+                "formula_steps": [],
+                "render_targets": ["manim"],
+                "fallback_text": "题目中的图形条件还不完整，暂不生成可能误导的 GeoGebra 图。",
+                "geogebra": {"app_name": "classic", "commands": []},
+            }
+
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": scene_type,
+            "title": title,
+            "objects": objects,
+            "relations": relations,
+            "parameters": {},
+            "formula_steps": formula_steps,
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "用 GeoGebra 检查点、曲线、动点和切线关系。",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": [],
+                "caption": "拖动图中的点或滑块，观察几何关系变化。",
+            },
+        }
+
+    def _build_physics_scene_spec_v2(
+        self,
+        *,
+        combined_context: str,
+        scene_brief: str,
+        solution_summary: str,
+    ) -> Dict[str, Any] | None:
+        if not self._looks_like_electromagnetism_v2(combined_context):
+            return None
+        params = {
+            "a": self._extract_named_number(combined_context, "a") or "4",
+            "b": self._extract_named_number(combined_context, "b") or "10",
+            "L": self._extract_named_number(combined_context, "L") or "3",
+        }
+        return {
+            "schema_version": 2,
+            "subject": "physics",
+            "scene_type": "charged_particle_magnetic_field",
+            "title": "磁场中圆周偏转",
+            "objects": [
+                {"type": "point", "id": "P", "label": "P", "x": 0, "y": params["a"]},
+                {"type": "point", "id": "Q", "label": "Q", "x": params["b"], "y": 0},
+                {"type": "magnetic_field", "id": "B", "direction": "into_page"},
+                {"type": "vector", "id": "v0", "start": "P", "end": {"x": "b - L", "y": params["a"]}},
+            ],
+            "relations": [
+                {"type": "text", "text": "磁场垂直纸面向里", "at": {"x": "b - L", "y": "a + 1.6"}},
+            ],
+            "parameters": params,
+            "formula_steps": [
+                {"label": "圆周半径", "formula": "R = mv0/(eB)"},
+                {"label": "情形一", "formula": "r > L"},
+                {"label": "情形二", "formula": "r <= L"},
+            ],
+            "scene_variants": [
+                {
+                    "id": "case_r_gt_l",
+                    "title": "甲  r > L",
+                    "condition": "粒子在磁场中转过不足四分之一圆弧后出场",
+                    "left_boundary_x": "b - L",
+                },
+                {
+                    "id": "case_r_le_l",
+                    "title": "乙  r <= L",
+                    "condition": "粒子在较窄半径条件下从右边界附近出场",
+                    "left_boundary_x": "b - L/2",
+                },
+            ],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": solution_summary
+            or scene_brief
+            or "用 GeoGebra 分别查看两种磁场边界位置与粒子轨迹。",
+            "geogebra": {
+                "app_name": "classic",
+                "caption": "上下切换两种情形，分别查看 P、Q、磁场边界和粒子轨迹。",
+            },
+        }
+
+    def _extract_points_v2(self, text: str) -> List[tuple[str, str, str]]:
+        results: List[tuple[str, str, str]] = []
+        seen = set()
+        for label, x_value, y_value in re.findall(
+            r"([A-Z])\s*[\(（]\s*([\-0-9.]+)\s*[,，]\s*([\-0-9.]+)\s*[\)）]",
+            text,
+        ):
+            key = (label, x_value, y_value)
+            if key not in seen:
+                seen.add(key)
+                results.append(key)
+        return results
+
+    def _extract_math_equations_v2(self, text: str) -> List[str]:
+        normalized = text
+        normalized = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", normalized)
+        normalized = normalized.replace("\\left", "").replace("\\right", "")
+        normalized = normalized.replace("{", "").replace("}", "")
+        normalized = normalized.replace("$", "")
+        normalized = normalized.replace("²", "^2").replace("＋", "+").replace("－", "-")
+        candidates = re.findall(
+            r"([xy0-9+\-*/^().\s]+=[xy0-9+\-*/^().\s]+)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        equations: List[str] = []
+        for candidate in candidates:
+            cleaned = re.sub(r"\s+", "", candidate)
+            if 3 <= len(cleaned) <= 96 and any(token in cleaned for token in ["x", "y"]):
+                equations.append(cleaned)
+        return equations[:8]
+
+    def _guess_conic_object_type_v2(self, equation: str) -> str:
+        lowered = equation.lower()
+        if "x^2" not in lowered and "y^2" not in lowered:
+            return ""
+        if "x^2" in lowered and "y^2" in lowered:
+            if re.search(r"x\^2[^=]*-\s*y\^2|y\^2[^=]*-\s*x\^2", lowered):
+                return "hyperbola"
+            if "/" in lowered:
+                return "ellipse"
+            return "circle"
+        return "parabola"
+
+    def _math_scene_title_v2(self, object_type: str, text: str) -> str:
+        if self._looks_like_apollonius_problem_v2(text):
+            return "阿波罗尼斯圆"
+        return {
+            "circle": "圆与轨迹",
+            "ellipse": "椭圆图形",
+            "hyperbola": "双曲线图形",
+            "parabola": "抛物线图形",
+        }.get(object_type, "圆锥曲线")
+
+    def _looks_like_tangent_locus_v2(self, text: str) -> bool:
+        return any(token in text for token in ["切线", "动点", "轨迹", "tangent", "locus", "MQ", "MN"])
+
+    def _looks_like_apollonius_problem_v2(self, text: str) -> bool:
+        return any(token in text for token in ["阿波罗尼斯", "Apollonius"]) or (
+            "切线" in text and "比" in text and "轨迹" in text
+        )
+
+    def _looks_like_electromagnetism_v2(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            token in lowered
+            for token in [
+                "磁场",
+                "电场",
+                "带电",
+                "电子",
+                "电荷",
+                "洛伦兹",
+                "安培力",
+                "电磁",
+                "感应电流",
+                "磁通量",
+                "导体棒",
+                "线圈",
+                "magnetic",
+                "electric",
             ]
         )
 
