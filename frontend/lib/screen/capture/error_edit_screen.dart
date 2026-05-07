@@ -183,28 +183,23 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     return _subject;
   }
 
-  bool _hasAlgodooArtifact() {
-    return _findAlgodooArtifactIndex() != -1;
+  bool _hasManimPhysicsArtifact() {
+    return _findManimPhysicsArtifactIndex() != -1;
   }
 
-  int _findAlgodooArtifactIndex() {
+  int _findManimPhysicsArtifactIndex() {
     return _richArtifacts.indexWhere((artifact) {
       final type = (artifact['artifact_type'] ?? '').toString();
-      final title = (artifact['title'] ?? '').toString();
-      final description = (artifact['description'] ?? '').toString();
-      return type == 'interactive_html' &&
-          (title.contains('Algodoo') ||
-              description.contains('Algodoo') ||
-              description.contains('物理'));
+      return type == 'manim_job' || type == 'manim_video';
     });
   }
 
-  void _upsertAlgodooArtifact(Map<String, dynamic> artifact) {
+  void _upsertManimPhysicsArtifact(Map<String, dynamic> artifact) {
     final normalizedArtifact = artifact.map(
       (key, value) => MapEntry(key.toString(), value),
     );
     final updatedArtifacts = List<Map<String, dynamic>>.from(_richArtifacts);
-    final existingIndex = _findAlgodooArtifactIndex();
+    final existingIndex = _findManimPhysicsArtifactIndex();
     if (existingIndex >= 0) {
       updatedArtifacts[existingIndex] = normalizedArtifact;
     } else {
@@ -218,7 +213,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (questionText.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容，再生成 Algodoo 演示。')));
+      ).showSnackBar(const SnackBar(content: Text('请先确认题目内容，再生成 Manim 视频。')));
       return;
     }
 
@@ -243,96 +238,32 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       setState(() {
         _isGeneratingPhysicsAnimation = false;
         if (result.generated && result.artifact != null) {
-          _upsertAlgodooArtifact(result.artifact!);
+          _upsertManimPhysicsArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
-          _upsertAlgodooArtifact(_buildLocalAlgodooFallbackArtifact());
-          _physicsAnimationError = null;
+          _physicsAnimationError =
+              result.reason.trim().isEmpty ? '当前题目暂时无法创建 Manim 视频任务。' : result.reason;
         }
       });
 
       if (result.generated && result.artifact != null && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Algodoo 物理沙盒已生成，可在下方学科扩展中打开。')));
-      } else if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已切换到本地 Algodoo 风格演示。')));
+        ).showSnackBar(const SnackBar(content: Text('Manim 视频任务已创建，可在下方查看进度。')));
       }
     } on AiApiException catch (error) {
       if (!mounted) return;
       setState(() {
         _isGeneratingPhysicsAnimation = false;
-        _upsertAlgodooArtifact(_buildLocalAlgodooFallbackArtifact());
-        _physicsAnimationError = null;
+        _physicsAnimationError = error.message;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('后端暂时不可用，已使用本地 Algodoo 风格演示。${error.message}')),
-      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _isGeneratingPhysicsAnimation = false;
-        _upsertAlgodooArtifact(_buildLocalAlgodooFallbackArtifact());
-        _physicsAnimationError = null;
+        _physicsAnimationError = 'Manim 视频任务创建失败，请检查后端服务后重试。';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已使用本地 Algodoo 风格演示。')),
-      );
     }
-  }
-
-  Map<String, dynamic> _buildLocalAlgodooFallbackArtifact() {
-    final summary = _solutionSummary.trim();
-    final caption = summary.isEmpty
-        ? '拖动滑块，观察力、质量和运动状态变化。'
-        : summary;
-    final html = '''
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f7f8f6;font-family:sans-serif;color:#1f2926}
-    .app{height:100%;box-sizing:border-box;padding:14px;display:flex;flex-direction:column;gap:12px}
-    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stage{flex:1;background:#fff;border-radius:18px;overflow:hidden}
-    label{font-size:12px;color:#51605b;display:grid;grid-template-columns:22px 1fr 34px;gap:6px;align-items:center}
-    input{width:100%;accent-color:#6b5bd6}svg{width:100%;height:100%;display:block}.caption{font-size:12px;color:#66736f;line-height:1.35}
-  </style>
-</head>
-<body>
-  <div class="app">
-    <div class="controls">
-      <label>F<input id="force" type="range" min="1" max="8" step="0.1" value="4"><span id="fv">4</span></label>
-      <label>m<input id="mass" type="range" min="1" max="6" step="0.1" value="2"><span id="mv">2</span></label>
-    </div>
-    <div class="stage"><svg id="scene" viewBox="0 0 720 430"></svg></div>
-    <div class="caption">${caption.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</div>
-  </div>
-  <script>
-    const svg=document.getElementById('scene'), f=document.getElementById('force'), m=document.getElementById('mass');
-    function draw(){const F=+f.value,M=+m.value,a=F/M,x=90+a*80;document.getElementById('fv').textContent=F.toFixed(1);document.getElementById('mv').textContent=M.toFixed(1);
-      svg.innerHTML='<defs><marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#43685b"/></marker></defs>'+
-      '<rect width="720" height="430" fill="#fff"/><line x1="40" y1="330" x2="680" y2="330" stroke="#9aa6a1" stroke-width="3"/>'+
-      '<rect x="'+x+'" y="250" width="120" height="80" rx="8" fill="#dfeee7" stroke="#4f806b" stroke-width="3"/>'+
-      '<line x1="'+(x+120)+'" y1="290" x2="'+(x+120+F*30)+'" y2="290" stroke="#43685b" stroke-width="5" marker-end="url(#arr)"/>'+
-      '<path d="M90 330 C180 320 260 300 '+x+' 290" fill="none" stroke="#6b5bd6" stroke-width="4"/>'+
-      '<text x="60" y="60" font-size="28" font-weight="800">Algodoo 物理沙盒</text><text x="60" y="98" font-size="18" fill="#66736f">a = F / m = '+a.toFixed(2)+'</text>'+
-      '<text x="'+(x+18)+'" y="296" font-size="18">m</text><text x="'+(x+145)+'" y="278" font-size="17" fill="#43685b">F</text>';}
-    f.oninput=draw;m.oninput=draw;draw();
-  </script>
-</body>
-</html>
-''';
-    return {
-      'artifact_type': 'interactive_html',
-      'title': 'Algodoo 物理沙盒演示',
-      'description': '本地 Algodoo 风格物理交互演示。',
-      'mime_type': 'text/html',
-      'content': html,
-    };
   }
 
   Future<void> _pollManimJob(String jobId) async {
@@ -1164,8 +1095,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   Widget _buildPhysicsAnimationActionCard() {
-    final hasArtifact = _hasAlgodooArtifact();
-    final algodooArtifact = _findAlgodooArtifact();
+    final hasArtifact = _hasManimPhysicsArtifact();
 
     return Container(
       width: double.infinity,
@@ -1188,7 +1118,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Algodoo 物理沙盒',
+                      'Manim 物理动画',
                       style: TextStyle(
                         color: AppPalette.textPrimary,
                         fontSize: 14,
@@ -1198,8 +1128,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                     const SizedBox(height: 6),
                     Text(
                       hasArtifact
-                          ? '已生成当前题目的 Algodoo 风格物理交互演示，可重新生成刷新参数。'
-                          : '物理题将使用 Algodoo 风格沙盒演示；数学题继续使用 GeoGebra。',
+                          ? '已创建当前题目的 Manim 视频任务，可重新生成刷新动画脚本。'
+                          : '物理题将直接使用 Manim 生成动画视频；数学题继续使用 GeoGebra。',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 13,
@@ -1232,7 +1162,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                         ? '生成中...'
                         : hasArtifact
                             ? '重新生成'
-                            : '生成 Algodoo',
+                            : '生成 Manim',
                     style: const TextStyle(color: AppPalette.almondCream),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -1258,66 +1188,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               ),
             ),
           ],
-          if (algodooArtifact != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => HtmlArtifactPreviewScreen(
-                        title: (algodooArtifact['title'] ?? 'Algodoo 物理沙盒')
-                            .toString(),
-                        htmlContent: (algodooArtifact['content'] ?? '').toString(),
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(
-                  Icons.open_in_browser_rounded,
-                  color: AppPalette.almondCream,
-                ),
-                label: const Text(
-                  '打开 Algodoo 演示',
-                  style: TextStyle(color: AppPalette.almondCream),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: AppPalette.almondCream.withValues(alpha: 0.45),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
-  }
-
-  Map<String, dynamic>? _findAlgodooArtifact() {
-    for (final artifact in _richArtifacts) {
-      final type = (artifact['artifact_type'] ?? '').toString();
-      if (type != 'interactive_html') {
-        continue;
-      }
-      final title = (artifact['title'] ?? '').toString();
-      final description = (artifact['description'] ?? '').toString();
-      if (!title.contains('Algodoo') &&
-          !description.contains('Algodoo') &&
-          !description.contains('物理')) {
-        continue;
-      }
-      return {
-        'title': title.isEmpty ? 'Algodoo 物理沙盒' : title,
-        'content': (artifact['content'] ?? '').toString(),
-      };
-    }
-    return null;
   }
 
   Widget _buildSectionLabel(String text) {

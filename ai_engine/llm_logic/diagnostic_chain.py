@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
-    "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
+    "物理": "不要返回 interactive_html。物理题的动画由后端 Manim 视频任务统一生成，rich_artifacts 默认留空即可。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
     "数学": "数学题可以返回一个 chart_spec，但只能用于坐标图、函数图像、几何示意或圆锥曲线草图；不要在 rich_artifacts 中写解题步骤、核心思路、易错提醒或复习清单。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
@@ -334,25 +334,16 @@ class DiagnosticService:
         )
         scene_subject = "math" if looks_like_math and not looks_like_physics else "physics"
         if scene_subject == "physics":
-            if "interactive_html" in existing_types:
+            if "manim_job" in existing_types or "manim_video" in existing_types:
                 return []
-            artifact = self._build_electromagnetism_template_artifact(
+            artifact = self._build_physics_manim_artifact(
                 cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
                 knowledge_points=knowledge_points,
                 solution_summary=solution_summary,
                 solution_steps=solution_steps,
             )
-            if artifact is None:
-                artifact = self._build_physics_template_artifact(
-                    cleaned_question=cleaned_question,
-                    knowledge_points=knowledge_points,
-                    solution_steps=solution_steps,
-                )
-            if artifact is not None:
-                artifact.title = f"Algodoo 物理沙盒 · {artifact.title}"
-                artifact.description = "物理题使用 Algodoo 风格的交互沙盒演示，支持拖动滑块观察参数变化。"
-                return [artifact]
-            return []
+            return [artifact] if artifact is not None else []
         deterministic_math_spec = None
         if scene_subject == "math":
             deterministic_math_spec = self._build_ellipse_focus_chord_scene_spec_v2(
@@ -471,34 +462,120 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
-        artifact = self._build_electromagnetism_template_artifact(
+        artifact = self._build_physics_manim_artifact(
             cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
             knowledge_points=knowledge_points,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
         )
-        if artifact is None:
-            artifact = self._build_physics_template_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_steps=solution_steps,
-            )
-        if artifact is None:
-            artifact = self._generate_physics_html_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
         if artifact is not None:
-            artifact.title = f"Algodoo 物理沙盒 · {artifact.title}"
-            artifact.description = "物理题使用 Algodoo 风格的交互沙盒演示，支持拖动滑块观察参数变化。"
-            logger.info("physics animation used algodoo-style html scene")
+            logger.info("physics animation used manim video job")
             return artifact
 
-        logger.info("physics animation skipped geogebra because physics uses algodoo-style html")
+        logger.info("physics animation skipped because manim job could not be created")
         return None
+
+    def _build_physics_manim_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        scene_spec = self._build_physics_manim_scene_spec(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        job = create_manim_job(scene_spec)
+        content = {
+            "url": job.get("video_url"),
+            "video_url": job.get("video_url"),
+            "job_id": job.get("job_id"),
+            "status": job.get("status"),
+            "progress": job.get("progress"),
+            "message": job.get("message"),
+            "error": job.get("error"),
+            "updated_at": job.get("updated_at"),
+            "diagnostics": job.get("diagnostics"),
+            "duration": job.get("duration"),
+            "thumbnail_url": job.get("thumbnail_url"),
+        }
+        if job.get("status") == "succeeded" and job.get("video_url"):
+            return RichArtifact(
+                artifact_type="manim_video",
+                title="Manim 物理动画视频",
+                description="Manim 已生成物理动画视频。",
+                mime_type="application/json",
+                content=json.dumps(content, ensure_ascii=False),
+            )
+        return RichArtifact(
+            artifact_type="manim_job",
+            title="Manim 物理动画视频",
+            description="后台 Manim 正在生成物理动画视频。",
+            mime_type="application/json",
+            content=json.dumps(content, ensure_ascii=False),
+        )
+
+    def _build_physics_manim_scene_spec(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> Dict[str, Any]:
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        if scene_type == "unknown":
+            scene_type = "mechanics"
+        title_map = {
+            "board_block": "木板-物块相对运动",
+            "incline": "斜面运动过程",
+            "projectile": "抛体运动过程",
+            "collision": "碰撞过程",
+            "circuit": "电路过程",
+            "electromagnetism": "电磁场中的运动",
+            "optics": "光路变化过程",
+            "mechanics": "受力与运动过程",
+        }
+        focus_points = [
+            self._display_plain_text(str(item), limit=18)
+            for item in knowledge_points[:4]
+            if str(item).strip()
+        ]
+        fallback_text = (
+            self._display_plain_text(scene_brief, limit=72)
+            or self._display_plain_text(solution_summary, limit=72)
+            or "用 Manim 展示题目中的物理对象、受力方向和运动变化。"
+        )
+        return {
+            "schema_version": 2,
+            "subject": "physics",
+            "scene_type": scene_type,
+            "title": title_map.get(scene_type, "物理动画视频"),
+            "objects": [],
+            "relations": [],
+            "parameters": {
+                "question_excerpt": self._display_plain_text(cleaned_question, limit=96),
+                "focus_points": focus_points,
+            },
+            "formula_steps": [],
+            "steps": [],
+            "render_targets": ["manim"],
+            "fallback_text": fallback_text,
+        }
 
     def _generate_geogebra_scene_artifact(
         self,
@@ -1817,14 +1894,8 @@ class DiagnosticService:
     def _subject_extension_detail(self, subject_name: str) -> str:
         if subject_name == "物理":
             return (
-                "如果返回 interactive_html，请严格满足以下要求："
-                "1. 必须是完整单文件 HTML，内联 CSS 和 JavaScript，不依赖外部 CDN、图片或脚本；"
-                "2. 页面主体以动画和交互展示为主，不要大段重复题干，不要把整道题原文塞进页面；"
-                "3. 必须围绕题目里的具体对象和过程来演示，例如木板-物块相对运动、受力方向、速度变化、电路状态或真实光路；"
-                "4. 页面默认适配手机竖屏，建议包含开始/暂停、重置、参数滑块或状态切换；"
-                "5. 如果题目是板块运动、斜面、连接体、摩擦或碰撞，必须优先生成力学情景动画，不能误生成光学模板；"
-                "6. 页面中的标签、按钮和参数说明请直接使用普通文本或 Unicode 字符，不要输出未渲染的 LaTeX 源码；"
-                "7. 只保留简短标题、关键参数和必要标签，重点展示动态过程。"
+                "物理题不要返回 interactive_html，也不要生成 Algodoo 风格页面；"
+                "动画视频由后端 Manim 管线根据 scene_brief、知识点和解析步骤统一异步生成。"
             )
         if subject_name == "数学":
             return (

@@ -82,7 +82,13 @@ class LearningScene(Scene):
         title.to_edge(UP)
         self.play(FadeIn(title, shift=DOWN * 0.2))
 
-        if scene_type in {{"function_graph", "conic", "geometry", "electromagnetism", "generic"}}:
+        if scene_type == "board_block":
+            self._draw_board_block_scene(spec)
+        elif scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+            self._draw_electromagnetism_scene(spec)
+        elif scene_type in {{"mechanics", "incline", "projectile", "collision", "circuit", "optics"}}:
+            self._draw_physics_motion_scene(spec)
+        elif scene_type in {{"function_graph", "conic", "geometry", "generic"}}:
             self._draw_axes_scene(spec)
         else:
             self._draw_axes_scene(spec)
@@ -91,6 +97,71 @@ class LearningScene(Scene):
         note = Text(summary[:48], font_size=22, color=YELLOW).to_edge(DOWN)
         self.play(FadeIn(note))
         self.wait(1)
+
+    def _draw_board_block_scene(self, spec):
+        ground = Line(LEFT * 5.5, RIGHT * 5.5, color=GREY_B).shift(DOWN * 1.55)
+        board = RoundedRectangle(width=4.8, height=0.45, corner_radius=0.18, color=GOLD, fill_color=GOLD_E, fill_opacity=0.85)
+        board.shift(LEFT * 1.7 + DOWN * 1.25)
+        block = RoundedRectangle(width=1.25, height=0.85, corner_radius=0.18, color=GREEN, fill_color=GREEN_E, fill_opacity=0.9)
+        block.next_to(board, UP, buff=0)
+        force_arrow = Arrow(board.get_right() + LEFT * 0.4 + UP * 0.75, board.get_right() + RIGHT * 1.25 + UP * 0.75, buff=0, color=ORANGE)
+        force_label = Text("F", font_size=24, color=ORANGE).next_to(force_arrow, UP, buff=0.05)
+        friction_arrow = Arrow(block.get_left() + LEFT * 0.95 + UP * 0.2, block.get_left() + LEFT * 0.15 + UP * 0.2, buff=0, color=RED)
+        friction_label = Text("f", font_size=22, color=RED).next_to(friction_arrow, UP, buff=0.05)
+        board_label = Text("木板 M", font_size=24).next_to(board, DOWN, buff=0.15)
+        block_label = Text("物块 m", font_size=24).next_to(block, UP, buff=0.12)
+        self.play(Create(ground), FadeIn(board), FadeIn(block), FadeIn(board_label), FadeIn(block_label))
+        self.play(GrowArrow(force_arrow), FadeIn(force_label), GrowArrow(friction_arrow), FadeIn(friction_label))
+        self.play(
+            board.animate.shift(RIGHT * 2.6),
+            board_label.animate.shift(RIGHT * 2.6),
+            force_arrow.animate.shift(RIGHT * 2.6),
+            force_label.animate.shift(RIGHT * 2.6),
+            block.animate.shift(RIGHT * 1.35),
+            block_label.animate.shift(RIGHT * 1.35),
+            friction_arrow.animate.shift(RIGHT * 1.35),
+            friction_label.animate.shift(RIGHT * 1.35),
+            run_time=2.4,
+            rate_func=linear,
+        )
+        relative = DoubleArrow(block.get_center() + DOWN * 0.95, board.get_center() + DOWN * 0.95, buff=0, color=BLUE)
+        relative_label = Text("相对位移", font_size=22, color=BLUE).next_to(relative, DOWN, buff=0.1)
+        self.play(GrowArrow(relative), FadeIn(relative_label), run_time=0.8)
+        self.wait(0.8)
+
+    def _draw_electromagnetism_scene(self, spec):
+        field = RoundedRectangle(width=4.2, height=2.4, corner_radius=0.25, color=TEAL, fill_color=TEAL_E, fill_opacity=0.25)
+        field.shift(RIGHT * 0.8)
+        marks = VGroup()
+        for x in [-0.5, 0.4, 1.3, 2.2]:
+            for y in [-0.65, 0.0, 0.65]:
+                marks.add(Text("×", font_size=26, color=TEAL_A).move_to(RIGHT * x + UP * y))
+        path = VMobject(color=YELLOW)
+        path.set_points_smoothly([
+            LEFT * 4 + DOWN * 0.4,
+            LEFT * 2.0 + DOWN * 0.4,
+            LEFT * 0.5 + DOWN * 0.15,
+            RIGHT * 1.0 + UP * 0.65,
+            RIGHT * 3.0 + UP * 0.85,
+        ])
+        particle = Dot(path.get_start(), color=ORANGE)
+        velocity = Arrow(LEFT * 4.4 + DOWN * 0.8, LEFT * 3.3 + DOWN * 0.8, color=ORANGE, buff=0)
+        force = Arrow(RIGHT * 0.4 + DOWN * 0.15, RIGHT * 0.4 + UP * 0.8, color=BLUE, buff=0)
+        self.play(FadeIn(field), FadeIn(marks), GrowArrow(velocity), Create(path))
+        self.play(MoveAlongPath(particle, path), GrowArrow(force), run_time=2.8, rate_func=linear)
+        self.wait(0.8)
+
+    def _draw_physics_motion_scene(self, spec):
+        ground = Line(LEFT * 5.0, RIGHT * 5.0, color=GREY_B).shift(DOWN * 1.3)
+        body = RoundedRectangle(width=1.2, height=0.8, corner_radius=0.12, color=BLUE, fill_color=BLUE_E, fill_opacity=0.9)
+        body.shift(LEFT * 3.2 + DOWN * 0.85)
+        velocity = Arrow(body.get_right(), body.get_right() + RIGHT * 1.0, buff=0, color=ORANGE)
+        force = Arrow(body.get_top(), body.get_top() + UP * 0.9, buff=0, color=YELLOW)
+        trace = TracedPath(body.get_center, stroke_color=YELLOW, stroke_width=4)
+        self.add(trace)
+        self.play(Create(ground), FadeIn(body), GrowArrow(velocity), GrowArrow(force))
+        self.play(body.animate.shift(RIGHT * 4.8 + UP * 0.25), velocity.animate.shift(RIGHT * 4.8 + UP * 0.25), force.animate.shift(RIGHT * 4.8 + UP * 0.25), run_time=2.6, rate_func=smooth)
+        self.wait(0.8)
 
     def _draw_axes_scene(self, spec):
         axes = Axes(
