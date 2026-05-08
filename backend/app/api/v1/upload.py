@@ -93,6 +93,9 @@ async def analyze_image(
     wrong_reason_hint: str = Form(""),
     enable_subject_extensions: bool = Form(True),
 ) -> ImageAnalysisResponse:
+    # Compatibility path for the current mobile client. New batch-photo flows
+    # should prefer /analysis/image/jobs so uploads return quickly and quality
+    # explanations can finish in the background.
     _ensure_credentials()
     started_at = time.perf_counter()
     upload_content_type = image.content_type or ""
@@ -209,6 +212,9 @@ async def create_analysis_image_job(
     wrong_reason_hint: str = Form(""),
     enable_subject_extensions: bool = Form(True),
 ) -> ImageAnalysisJobResponse:
+    # Two-stage path for batch capture: create a short-lived in-memory job,
+    # expose OCR partials quickly, then let the quality model finish detached
+    # from the phone's upload connection.
     _ensure_credentials()
     image_bytes = await image.read()
     if not image_bytes:

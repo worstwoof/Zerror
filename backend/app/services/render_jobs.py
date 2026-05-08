@@ -108,6 +108,9 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
         )
     except ManimUnavailable as exc:
         elapsed = time.perf_counter() - started_at
+        # Animation is an enhancement, not the source of truth for the answer.
+        # Keep the raw failure in diagnostics for maintainers while returning
+        # a short, student-safe message to the client.
         _update_job(
             job_id,
             status="failed",
@@ -124,6 +127,8 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
         )
     except Exception as exc:
         elapsed = time.perf_counter() - started_at
+        # Same contract as the unavailable case: do not let Manim failures
+        # degrade the completed explanation card.
         _update_job(
             job_id,
             status="failed",

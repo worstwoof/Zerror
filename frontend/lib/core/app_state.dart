@@ -165,6 +165,8 @@ enum ReviewFeedback { forgot, fuzzy, mastered }
 
 enum AnalysisTaskStatus { queued, analyzing, completed, failed }
 
+// TODO: 待切换到后端 job_id + polling 后再清理。当前本地串行队列仍被
+// 已发布客户端的后台整理面板使用，直接删除会影响旧拍照录入流程。
 class BackgroundAnalysisTask {
   const BackgroundAnalysisTask({
     required this.id,
@@ -798,6 +800,8 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> _pumpAnalysisQueue() async {
+    // TODO: 迁移到 /api/v1/analysis/image/jobs 后，这里应只负责提交 job
+    // 和轮询状态；当前保留串行实现作为旧客户端兼容路径。
     if (_isAnalysisQueueRunning) return;
 
     _isAnalysisQueueRunning = true;
