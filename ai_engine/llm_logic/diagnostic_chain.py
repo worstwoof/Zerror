@@ -43,14 +43,14 @@ ANALYSIS_FIELD_GUIDANCE = """
 前端展示顺序固定为：破题关键与最终结论 → 详细推导步骤 → 学科拓展（仅物理动画或真正高质量可视化）→ 举一反三。
 
 必须严格分工，禁止同一内容在多个字段重复出现：
-- solution_summary：只写“破题关键 + 最终结论”。控制在 60-100 字。必须包含最终答案、轨迹方程、结论或核心判断。不要写详细推导过程，不要分点，不要写“首先/然后/接着”。
+- solution_summary：只写“破题关键 + 最终结论”。单问控制在 60-120 字；多小问可放宽到 100-180 字。必须覆盖每个小问的最终答案、轨迹方程、结论或核心判断。不要写详细推导过程。
 - mistake_diagnosis：字段仅为兼容旧 schema 保留，前端不展示。除非用户明确提供了错误答案或自述错因，否则返回空字符串；不要生成独立错因板块。
 - review_plan.focus：字段仅为兼容旧 schema 保留，前端不展示。默认返回空字符串；不要生成独立复习建议板块。
-- solution_steps：只写详细推导步骤，建议 5-7 步。每一步控制在 70-160 字。每一步都要写清“为什么这样做”和关键等式/代换/条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配一句简短文字讲解。不要在每一步末尾重复最终答案。不要把错因、复习建议、拓展知识写进步骤里。
+- solution_steps：只写详细推导步骤。先判断题目是否含有（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等多小问信号；如果有，必须保留“小问标签”，按第(1)问、第(2)问……顺序分别求解，禁止把多个小问合并成一段总计算。单问建议 6-9 步，多小问建议 8-14 步，每个小问至少 2-3 步。每一步控制在 90-220 字，必须写清“为什么这样做”、条件来源、关键等式、代换依据和该步结论。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配一句简短文字讲解。不要把错因、复习建议、拓展知识写进步骤里。
 - similar_questions：最多返回 1 个变式题。prompt 控制在 60 字以内，answer_outline 控制在 80 字以内。不要返回多道相似题。
 - rich_artifacts：默认返回空数组。只有当能提供真正可视化内容时才返回，例如函数图像、几何图、物理动画、化学流程图。不要返回 study_card 类型的纯文字知识卡片。不要把“学科拓展说明”“知识点总结”“关键联系”塞进 rich_artifacts。如果没有高质量图表或交互内容，必须返回 []。
 如果题目要求“说明它表示什么曲线/物理含义/化学意义”，这个解释属于 solution_summary 的结尾，不属于 rich_artifacts。
-整体输出要克制，适合手机端阅读。宁可短而清楚，不要完整讲义式长答案。
+整体输出要适合手机端分段阅读，但复杂题以讲清楚优先；不要为了短而省略关键推导、小问答案或物理量方向判断。
 """.strip()
 
 
@@ -617,8 +617,14 @@ class DiagnosticService:
             "objects": [],
             "relations": [],
             "parameters": {
-                "question_excerpt": self._display_plain_text(cleaned_question, limit=96),
+                "question_excerpt": self._display_plain_text(cleaned_question, limit=140),
                 "focus_points": focus_points,
+                "solution_outline": [
+                    self._display_plain_text(step, limit=90)
+                    for step in solution_steps[:8]
+                    if str(step).strip()
+                ],
+                "target_duration_seconds": 65,
             },
             "formula_steps": formula_steps,
             "steps": narration_steps,
@@ -645,12 +651,12 @@ class DiagnosticService:
         formulas: List[str] = []
         for step in solution_steps:
             for match in re.findall(r"\$\$(.+?)\$\$", step, flags=re.S):
-                formula = self._display_plain_text(match, limit=54)
+                formula = self._display_plain_text(match, limit=72)
                 if formula and formula not in formulas:
                     formulas.append(formula)
-            if len(formulas) >= 4:
+            if len(formulas) >= 8:
                 break
-        return formulas[:4]
+        return formulas[:8]
 
     def _build_physics_animation_steps(
         self,
@@ -673,15 +679,18 @@ class DiagnosticService:
         for point in knowledge_points[:2]:
             if point and point not in steps:
                 steps.append(point)
-        for step in solution_steps[:3]:
+        # Manim should narrate the same reasoning shown in the detail card, so
+        # keep more steps and preserve labels such as "第(1)问" for multi-part
+        # physics problems. The renderer will pace these into a longer video.
+        for step in solution_steps[:8]:
             cleaned = re.sub(r"\$\$.+?\$\$", "", step, flags=re.S)
-            text = self._display_plain_text(cleaned, limit=34)
+            text = self._display_plain_text(cleaned, limit=64)
             if text and text not in steps:
                 steps.append(text)
-        summary = self._display_plain_text(solution_summary, limit=36)
+        summary = self._display_plain_text(solution_summary, limit=72)
         if summary and summary not in steps:
             steps.append(summary)
-        return steps[:6]
+        return steps[:10]
 
     def _generate_geogebra_scene_artifact(
         self,
@@ -1674,8 +1683,8 @@ class DiagnosticService:
   "cleaned_question": "清洗后的题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["讲解文字。\\n$$核心公式1$$\\n继续说明公式来源。", "讲解文字。\\n$$核心公式2$$\\n继续说明代换依据。", "讲解文字。\\n$$核心公式3$$\\n继续说明结论。"],
+  "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
+  "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
   "scene_spec": {{
     "subject": "math|physics|other",
     "scene_type": "conic|function_graph|geometry|electromagnetism|mechanics|generic",
@@ -1703,21 +1712,22 @@ class DiagnosticService:
 要求：
 1. 所有字段必须返回，没有内容时返回空数组或空字符串。
 2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
-3. solution_summary 只写关键突破口和最终结论，60-100字。
+3. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
 4. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-5. solution_steps 建议 5-7 步，每步 70-160 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
-6. similar_questions 最多返回 1 个。
-7. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-8. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
-9. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-10. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-11. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
-12. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
-13. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
-14. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
-15. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-16. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-17. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
+5. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+6. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+7. similar_questions 最多返回 1 个。
+8. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+9. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+10. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+11. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+12. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
+13. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+14. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+15. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+16. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+17. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+18. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
 """.strip()
 
     def _build_vision_prompt(self, request: AnalysisRequest, cleaned_ocr_draft: str) -> str:
@@ -1756,8 +1766,8 @@ class DiagnosticService:
   "cleaned_question": "根据图片纠正后的完整题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "破题关键和最终结论，60-100字",
-  "solution_steps": ["讲解文字。\\n$$核心公式1$$\\n继续说明公式来源。", "讲解文字。\\n$$核心公式2$$\\n继续说明代换依据。", "讲解文字。\\n$$核心公式3$$\\n继续说明结论。"],
+  "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
+  "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
   "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
@@ -1778,20 +1788,21 @@ class DiagnosticService:
 2. cleaned_question 必须尽量还原图片里的原题；如果仍有局部不确定，可保守表达但不要照搬明显错误的 OCR。
 3. 如果是数学、物理、化学题，优先纠正公式、符号、单位和结构。
 4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
-5. solution_summary 只写关键突破口和最终结论，60-100字。
+5. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
 6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-7. solution_steps 建议 5-7 步，每步 70-160 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
-8. similar_questions 最多返回 1 个。
-9. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
-11. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-12. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-13. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
-14. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
-15. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
-16. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-17. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-18. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
+7. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+8. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+9. similar_questions 最多返回 1 个。
+10. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+11. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+12. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+13. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+14. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+15. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+16. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+17. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+18. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+19. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
 """.strip()
 
     def _parse_json(self, raw_output: str) -> dict:
