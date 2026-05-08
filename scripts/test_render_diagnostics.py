@@ -229,9 +229,14 @@ class RenderDiagnosticsTest(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("_draw_blackboard_physics_scene", source)
+        self.assertIn("_draw_professional_physics_scene", source)
+        self.assertIn("第一阶段：全局物理过程预览", source)
+        self.assertIn("第二阶段：分段拆解与数学推导", source)
+        self.assertIn("_play_local_response", source)
+        self.assertIn("_aligned_formula_block", source)
+        self.assertIn("FadeOut(derivation", source)
+        self.assertNotIn("@ Zerror", source)
         self.assertIn("self.camera.background_color = BLACK", source)
-        self.assertIn("_show_blackboard_formula_steps", source)
         self.assertIn(r'R=\\frac{{mv_0}}{{qB}}', source)
 
     def test_geogebra_preview_hides_editor_chrome(self) -> None:

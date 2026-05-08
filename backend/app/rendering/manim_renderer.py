@@ -153,7 +153,7 @@ class LearningScene(Scene):
         }}
         if is_physics_scene:
             self.camera.background_color = BLACK
-            self._draw_blackboard_physics_scene(spec)
+            self._draw_professional_physics_scene(spec)
             self.wait(1.2)
             return
 
@@ -192,6 +192,267 @@ class LearningScene(Scene):
             self.wait(2.2)
             self.play(FadeOut(note))
         self.wait(1.8)
+
+    def _draw_professional_physics_scene(self, spec):
+        scene_type = str(spec.get("scene_type") or "mechanics")
+        self.camera.background_color = BLACK
+        question_block = self._build_question_block(spec, compact=False)
+        self.play(FadeIn(question_block, shift=DOWN * 0.12), run_time=0.65)
+        if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+            model = self._build_em_teaching_model()
+        else:
+            model = self._build_generic_teaching_model(scene_type)
+        preview_title = cjk_text("第一阶段：全局物理过程预览", font_size=25, color=YELLOW)
+        preview_title.move_to(RIGHT * 3.55 + UP * 2.95)
+        preview_note = cjk_text("先完整看一遍物理过程，不引入计算公式。", font_size=18, color=GREY_A)
+        preview_note.next_to(preview_title, DOWN, aligned_edge=LEFT, buff=0.18)
+        self.play(FadeIn(preview_title), FadeIn(preview_note), run_time=0.45)
+        self._play_global_physics_preview(model, scene_type)
+        self.wait(1.0)
+        self.play(FadeOut(VGroup(preview_title, preview_note)), question_block.animate.scale(0.86).to_corner(UL, buff=0.28), run_time=0.7)
+        self._play_step_breakdown(spec, model, scene_type)
+
+    def _wrap_cjk_lines(self, text, max_chars=24):
+        cleaned = " ".join(str(text).replace("\\n", " ").split())
+        if not cleaned:
+            return ["题目内容识别中，先根据图像建立物理模型。"]
+        lines = []
+        current = ""
+        break_chars = "。；;，,？?！!"
+        for char in cleaned:
+            current += char
+            if len(current) >= max_chars or char in break_chars:
+                lines.append(current.strip())
+                current = ""
+        if current.strip():
+            lines.append(current.strip())
+        return lines
+
+    def _build_question_block(self, spec, compact=False):
+        params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
+        question = str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
+        title = cjk_text("题目区", font_size=22 if not compact else 18, color=YELLOW)
+        lines = self._wrap_cjk_lines(question, max_chars=24 if not compact else 30)
+        body = VGroup(*[cjk_text(line, font_size=17 if not compact else 13, color=WHITE) for line in lines])
+        body.arrange(DOWN, aligned_edge=LEFT, buff=0.08 if compact else 0.10)
+        group = VGroup(title, body)
+        group.arrange(DOWN, aligned_edge=LEFT, buff=0.16)
+        group.to_corner(UL, buff=0.32)
+        if group.width > 6.0:
+            group.scale_to_fit_width(6.0)
+        if group.height > 2.05:
+            group.scale_to_fit_height(2.05)
+        return group
+
+    def _build_em_teaching_model(self):
+        axes_origin = LEFT * 5.85 + DOWN * 2.35
+        x_axis = Arrow(axes_origin, axes_origin + RIGHT * 5.25, buff=0, color=WHITE, stroke_width=3)
+        y_axis = Arrow(axes_origin, axes_origin + UP * 3.25, buff=0, color=WHITE, stroke_width=3)
+        x_label = self._label("x", x_axis.get_end() + RIGHT * 0.18, 20)
+        y_label = self._label("y", y_axis.get_end() + UP * 0.16, 20)
+        p = axes_origin + UP * 2.05
+        q = axes_origin + RIGHT * 4.35
+        p_dot = Dot(p, color=WHITE, radius=0.045)
+        q_dot = Dot(q, color=WHITE, radius=0.045)
+        p_label = self._label("P", p + LEFT * 0.28 + UP * 0.08, 23)
+        q_label = self._label("Q", q + DOWN * 0.26, 23)
+        v_arrow = Arrow(p + RIGHT * 0.06, p + RIGHT * 0.70, buff=0, color=WHITE, stroke_width=3)
+        v_label = MathTex("v_0", color=WHITE).scale(0.55).next_to(v_arrow, UP, buff=0.03)
+        field = Rectangle(width=1.55, height=2.65, color=WHITE, stroke_width=2)
+        field.move_to(axes_origin + RIGHT * 3.05 + UP * 1.25)
+        marks = VGroup()
+        for x in [-0.48, 0.0, 0.48]:
+            for y in [-0.82, -0.28, 0.28, 0.82]:
+                marks.add(cjk_text("x", font_size=15, color=GREY_B).move_to(field.get_center() + RIGHT * x + UP * y))
+        b_label = MathTex("B", color=WHITE).scale(0.62).next_to(field, UP, buff=0.08)
+        l_brace = Brace(field, DOWN, color=WHITE)
+        l_label = MathTex("L", color=WHITE).scale(0.58).next_to(l_brace, DOWN, buff=0.04)
+        path = VMobject(color=WHITE, stroke_width=4)
+        path.set_points_smoothly([p, p + RIGHT * 0.95, field.get_left() + UP * 1.00, field.get_center() + DOWN * 0.02, q + UP * 0.24, q])
+        local_arc = DashedVMobject(ArcBetweenPoints(field.get_left() + UP * 1.00, field.get_right() + DOWN * 0.40, angle=-PI / 2), num_dashes=16, color=GREY_A)
+        particle = Dot(p, color=YELLOW, radius=0.07)
+        axes = VGroup(x_axis, y_axis, x_label, y_label)
+        points = VGroup(p_dot, q_dot, p_label, q_label, v_arrow, v_label)
+        field_group = VGroup(field, marks, b_label, l_brace, l_label)
+        path_group = VGroup(path, local_arc)
+        full_group = VGroup(axes, points, field_group, path_group)
+        return {{
+            "type": "em",
+            "axes": axes,
+            "points": points,
+            "field": field_group,
+            "field_box": field,
+            "path": path,
+            "local_arc": local_arc,
+            "path_group": path_group,
+            "particle": particle,
+            "full_group": full_group,
+            "p": p,
+            "q": q,
+        }}
+
+    def _build_generic_teaching_model(self, scene_type):
+        base = Line(LEFT * 5.8 + DOWN * 2.25, LEFT * 0.55 + DOWN * 2.25, color=WHITE, stroke_width=3)
+        body = Square(side_length=0.62, color=WHITE, stroke_width=3).move_to(LEFT * 5.0 + DOWN * 1.90)
+        velocity = Arrow(body.get_right(), body.get_right() + RIGHT * 0.85, buff=0, color=WHITE)
+        force = Arrow(body.get_top(), body.get_top() + UP * 0.78, buff=0, color=WHITE)
+        path = VMobject(color=WHITE, stroke_width=4)
+        path.set_points_smoothly([body.get_center(), LEFT * 4.0 + DOWN * 1.80, LEFT * 2.65 + DOWN * 1.55, LEFT * 1.15 + DOWN * 1.32])
+        labels = VGroup(MathTex("v_0", color=WHITE).scale(0.55).next_to(velocity, UP, buff=0.03), MathTex("F", color=WHITE).scale(0.58).next_to(force, RIGHT, buff=0.04))
+        full_group = VGroup(base, body, velocity, force, path, labels)
+        return {{
+            "type": "generic",
+            "base": base,
+            "body": body,
+            "velocity": velocity,
+            "force": force,
+            "path": path,
+            "labels": labels,
+            "full_group": full_group,
+        }}
+
+    def _play_global_physics_preview(self, model, scene_type):
+        if model.get("type") == "em":
+            self.play(Create(model["axes"]), run_time=1.0)
+            self.play(FadeIn(model["points"]), Create(model["field"]), run_time=1.5)
+            self.play(Create(model["path_group"]), run_time=1.35)
+            particle = model["particle"].copy()
+            self.add(particle)
+            self.play(MoveAlongPath(particle, model["path"]), run_time=4.0, rate_func=linear)
+            self.play(FadeOut(particle), run_time=0.25)
+            return
+        self.play(Create(VGroup(model["base"], model["body"], model["velocity"], model["force"], model["labels"])), run_time=1.4)
+        self.play(Create(model["path"]), model["body"].animate.move_to(model["path"].get_end()), run_time=3.6, rate_func=smooth)
+
+    def _play_step_breakdown(self, spec, model, scene_type):
+        stage_title = cjk_text("第二阶段：分段拆解与数学推导", font_size=24, color=YELLOW)
+        stage_title.move_to(RIGHT * 3.55 + UP * 2.95)
+        self.play(FadeIn(stage_title, shift=DOWN * 0.08), run_time=0.45)
+        sections = self._breakdown_sections(spec, scene_type)
+        for index, section in enumerate(sections, start=1):
+            derivation = self._build_derivation_group(index, section)
+            self.play(FadeIn(derivation, shift=LEFT * 0.12), run_time=0.55)
+            self._play_local_response(model, section.get("focus") or "", scene_type)
+            self.wait(1.35)
+            self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
+        self.play(FadeOut(stage_title), run_time=0.35)
+
+    def _breakdown_sections(self, spec, scene_type):
+        formulas = self._formula_items(spec)
+        if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+            fallback = [
+                {{
+                    "title": "小问一：如何确定入射状态？",
+                    "focus": "points",
+                    "notes": ["标出 P、Q 两点和初速度方向。", "这一步只建立空间关系，不急着计算。"],
+                    "formulas": [r"P(0,a)", r"Q(b,0)", r"\\vec v_0 \\parallel x"],
+                }},
+                {{
+                    "title": "小问二：为什么轨迹是圆弧？",
+                    "focus": "field",
+                    "notes": ["磁场中洛伦兹力始终垂直速度。", "所以它只改变方向，提供向心力。"],
+                    "formulas": [r"qv_0B=\\frac{{mv_0^2}}{{R}}", r"R=\\frac{{mv_0}}{{qB}}"],
+                }},
+                {{
+                    "title": "小问三：怎样求左边界距离？",
+                    "focus": "path",
+                    "notes": ["把圆弧投影拆成水平、竖直两个关系。", "再结合宽度 L 和 Q 点坐标求边界位置。"],
+                    "formulas": [r"a=R(1-\\cos\\theta)", r"\\Delta x=R\\sin\\theta", r"d=b-L+R\\sin\\theta"],
+                }},
+            ]
+        else:
+            fallback = [
+                {{
+                    "title": "小问一：研究对象与初态是什么？",
+                    "focus": "state",
+                    "notes": ["先画出物体、初速度和受力方向。"],
+                    "formulas": [r"x_0,\\ v_0,\\ F"],
+                }},
+                {{
+                    "title": "小问二：运动规律如何建立？",
+                    "focus": "motion",
+                    "notes": ["用受力决定加速度，再连接速度和位移。"],
+                    "formulas": [r"F=ma", r"x=x_0+v_0t+\\frac12at^2"],
+                }},
+                {{
+                    "title": "小问三：题目要求怎样落到答案？",
+                    "focus": "result",
+                    "notes": ["代入边界条件，检查方向、范围和单位。"],
+                    "formulas": [r"\\text{{条件}}\\Rightarrow\\text{{结果}}"],
+                }},
+            ]
+        if formulas:
+            for pos, formula in enumerate(formulas[:6]):
+                fallback[min(pos // 2, len(fallback) - 1)]["formulas"].append(formula)
+        return fallback
+
+    def _build_derivation_group(self, index, section):
+        title = cjk_text(str(index) + ". " + str(section.get("title") or "关键小问"), font_size=22, color=YELLOW)
+        notes = VGroup(*[cjk_text(str(item), font_size=17, color=GREY_A) for item in section.get("notes") or []])
+        if len(notes) > 0:
+            notes.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
+        formula = self._aligned_formula_block(section.get("formulas") or [])
+        group = VGroup(title)
+        if len(notes) > 0:
+            group.add(notes)
+        if formula is not None:
+            group.add(formula)
+        group.arrange(DOWN, aligned_edge=LEFT, buff=0.28)
+        group.move_to(RIGHT * 3.35 + UP * 0.55)
+        if group.width > 5.45:
+            group.scale_to_fit_width(5.45)
+        if group.height > 4.75:
+            group.scale_to_fit_height(4.75)
+        return group
+
+    def _aligned_formula_block(self, formulas):
+        cleaned = []
+        for formula in formulas:
+            value = str(formula).replace("$$", "").replace("$", "").strip()
+            if not value or any("\\u4e00" <= ch <= "\\u9fff" for ch in value):
+                continue
+            if "=" in value and "&=" not in value:
+                value = value.replace("=", "&=", 1)
+            cleaned.append(value)
+        if not cleaned:
+            return None
+        body = r"\\begin{{aligned}}" + r"\\\\".join(cleaned[:5]) + r"\\end{{aligned}}"
+        try:
+            mob = MathTex(body, color=WHITE).scale(0.66)
+        except Exception:
+            mob = VGroup(*[MathTex(item.replace("&", ""), color=WHITE).scale(0.58) for item in cleaned[:4]])
+            mob.arrange(DOWN, aligned_edge=LEFT, buff=0.18)
+        return mob
+
+    def _play_local_response(self, model, focus, scene_type):
+        if model.get("type") == "em":
+            if focus == "points":
+                target = model["points"]
+                self.play(target.animate.set_color(YELLOW), run_time=0.35)
+                self.play(Indicate(target, color=YELLOW, scale_factor=1.04), run_time=1.2)
+                self.play(target.animate.set_color(WHITE), run_time=0.35)
+            elif focus == "field":
+                target = model["field"]
+                self.play(target.animate.set_color(YELLOW), run_time=0.35)
+                self.play(Circumscribe(model["field_box"], color=YELLOW, time_width=0.8), run_time=1.5)
+                self.play(target.animate.set_color(WHITE), run_time=0.35)
+            else:
+                path = model["path"]
+                particle = Dot(model["p"], color=YELLOW, radius=0.07)
+                self.play(path.animate.set_color(YELLOW), run_time=0.30)
+                self.add(particle)
+                self.play(MoveAlongPath(particle, path), run_time=3.2, rate_func=linear)
+                self.play(FadeOut(particle), path.animate.set_color(WHITE), run_time=0.35)
+            return
+        if focus in {{"state", "motion"}}:
+            target = VGroup(model["body"], model["velocity"], model["force"])
+            self.play(target.animate.set_color(YELLOW), run_time=0.35)
+            self.play(Indicate(target, color=YELLOW, scale_factor=1.05), run_time=1.2)
+            self.play(target.animate.set_color(WHITE), run_time=0.35)
+        else:
+            self.play(model["path"].animate.set_color(YELLOW), run_time=0.35)
+            self.wait(1.2)
+            self.play(model["path"].animate.set_color(WHITE), run_time=0.35)
 
     def _draw_blackboard_physics_scene(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics")
@@ -306,7 +567,7 @@ class LearningScene(Scene):
     def _draw_blackboard_header(self, spec):
         params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
         question = str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
-        title = cjk_text("@ Zerror", font_size=30, color=BLUE_B).to_corner(UL, buff=0.36)
+        title = cjk_text("题目区", font_size=26, color=YELLOW).to_corner(UL, buff=0.36)
         self.play(FadeIn(title), run_time=0.5)
         if question:
             question_line = cjk_text(question[:58], font_size=20, color=GREY_A)
