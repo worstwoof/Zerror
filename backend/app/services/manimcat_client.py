@@ -274,7 +274,7 @@ def _download_timeout() -> int:
 
 
 def _job_timeout() -> int:
-    return int(_env("MANIMCAT_JOB_TIMEOUT_SECONDS", "480"))
+    return int(_env("MANIMCAT_JOB_TIMEOUT_SECONDS", "1200"))
 
 
 def _poll_interval() -> float:
