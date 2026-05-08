@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -64,6 +65,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   String? _analysisError;
   bool _isGeneratingPhysicsAnimation = false;
   bool _isPollingManimJob = false;
+  Timer? _manimPollTimer;
+  String? _autoPollingManimJobId;
   String? _physicsAnimationError;
 
   @override
@@ -74,6 +77,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     if (widget.initialAnalysis != null) {
       _applyAnalysisResult(widget.initialAnalysis!);
       _isAiThinking = false;
+      _syncManimPolling();
     } else {
       _generateAiAnalysis();
     }
@@ -81,6 +85,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   @override
   void dispose() {
+    _manimPollTimer?.cancel();
     _questionController.dispose();
     _reflectionController.dispose();
     super.dispose();
@@ -113,6 +118,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _applyAnalysisResult(result);
         _isAiThinking = false;
       });
+      _syncManimPolling();
     } on AiApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -245,6 +251,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               result.reason.trim().isEmpty ? '当前题目暂时无法创建 Manim 视频任务。' : result.reason;
         }
       });
+      _syncManimPolling();
 
       if (result.generated && result.artifact != null && mounted) {
         ScaffoldMessenger.of(
@@ -266,7 +273,47 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     }
   }
 
-  Future<void> _pollManimJob(String jobId) async {
+  void _syncManimPolling() {
+    if (!mounted) {
+      return;
+    }
+    final jobId = _activeManimJobId();
+    if (jobId == null) {
+      _manimPollTimer?.cancel();
+      _manimPollTimer = null;
+      _autoPollingManimJobId = null;
+      return;
+    }
+    if (_autoPollingManimJobId == jobId && _manimPollTimer?.isActive == true) {
+      return;
+    }
+    _manimPollTimer?.cancel();
+    _autoPollingManimJobId = jobId;
+    _pollManimJob(jobId);
+    _manimPollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _pollManimJob(jobId);
+    });
+  }
+
+  String? _activeManimJobId() {
+    for (final artifact in _richArtifacts) {
+      if ((artifact['artifact_type'] ?? '').toString() != 'manim_job') {
+        continue;
+      }
+      final parsed = _tryParseArtifactJson(
+        (artifact['mime_type'] ?? '').toString(),
+        (artifact['content'] ?? '').toString(),
+      );
+      final jobId = (parsed?['job_id'] ?? '').toString();
+      final status = (parsed?['status'] ?? '').toString();
+      if (jobId.isNotEmpty && status != 'succeeded' && status != 'failed') {
+        return jobId;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _pollManimJob(String jobId, {bool showErrors = false}) async {
     if (_isPollingManimJob) {
       return;
     }
@@ -274,20 +321,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       _isPollingManimJob = true;
     });
     try {
-      for (var attempt = 0; attempt < 20; attempt += 1) {
-        final job = await _apiClient.fetchManimJob(jobId);
-        if (!mounted) return;
-        _applyManimJobUpdate(jobId, job);
-        if (job.isFinished) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(seconds: 2));
+      final job = await _apiClient.fetchManimJob(jobId);
+      if (!mounted) return;
+      _applyManimJobUpdate(jobId, job);
+      if (job.isFinished) {
+        _manimPollTimer?.cancel();
+        _manimPollTimer = null;
+        _autoPollingManimJobId = null;
       }
     } on AiApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      if (showErrors) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -341,6 +389,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       }
       _richArtifacts = updatedArtifacts;
     });
+    _syncManimPolling();
   }
 
   Future<void> _saveToArchiveWithUpload() async {
@@ -2113,16 +2162,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final error = (data['error'] ?? '').toString();
     final message = (data['message'] ?? '讲解视频正在等待后台生成。').toString();
     final isFinished = status == 'succeeded' || status == 'failed';
+    final displayProgress = progress.clamp(0, 100);
     return _buildArtifactStatusBox(
       icon: Icons.movie_filter_rounded,
       title: 'Manim 任务：$status',
-      message: error.isNotEmpty ? error : '$message 进度 $progress%',
-      actionLabel: jobId.isEmpty || isFinished
-          ? null
-          : (_isPollingManimJob ? '正在轮询' : '轮询状态'),
+      message: error.isNotEmpty ? error : '$message 进度 $displayProgress%',
+      actionLabel: jobId.isEmpty || isFinished ? null : '$displayProgress%',
       onAction: jobId.isEmpty || isFinished || _isPollingManimJob
           ? null
-          : () => _pollManimJob(jobId),
+          : () => _pollManimJob(jobId, showErrors: true),
     );
   }
 
