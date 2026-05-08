@@ -289,7 +289,8 @@ async function checkUnit(code: string, lineOffset: number): Promise<StaticDiagno
       codeLength: code.length
     })
 
-    const pyCompileResult = await runCommand('python', ['-m', 'py_compile', codeFile], tempDir)
+    const pythonExecutable = process.env.PYTHON_EXECUTABLE || process.env.PYTHON || 'python3'
+    const pyCompileResult = await runCommand(pythonExecutable, ['-m', 'py_compile', codeFile], tempDir)
     if (pyCompileResult.exitCode !== 0) {
       logger.warn('py_compile reported diagnostic', {
         codeFile,

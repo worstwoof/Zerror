@@ -98,6 +98,7 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
     focus_points = _list_text(params.get("focus_points"), limit=6, item_limit=60)
     steps = _list_text(scene_spec.get("steps"), limit=10, item_limit=120)
     formulas = _list_text(scene_spec.get("formula_steps"), limit=8, item_limit=100)
+    storyboard = _build_storyboard_beats(scene_spec, question=question, steps=steps, formulas=formulas)
     title = _plain(scene_spec.get("title") or "数学题 Manim 动画讲解", 80)
     return "\n".join(
         part
@@ -111,9 +112,60 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             f"知识点：{'；'.join(focus_points)}" if focus_points else "",
             "详解步骤：\n" + "\n".join(f"{index + 1}. {step}" for index, step in enumerate(steps)) if steps else "",
             "关键公式：\n" + "\n".join(f"- {formula}" for formula in formulas) if formulas else "",
+            "Zerror video contract:\n"
+            "- Build a fresh Manim scene for this exact problem, not a generic reusable template.\n"
+            "- Start with a clean problem framing, then animate the geometry/algebra relation, then show the conclusion.\n"
+            "- Keep all labels readable on mobile: large fonts, high contrast, no overlapping formulas.\n"
+            "- For conic/geometry problems, verify point coordinates and helper lines before rendering.\n"
+            "- Use one coherent color vocabulary: original objects, derived helpers, moving point, final result.\n"
+            "- Avoid decorative intro slides; the first frame should already show the math object.",
+            "Storyboard beats:\n" + "\n".join(f"{index + 1}. {beat}" for index, beat in enumerate(storyboard))
+            if storyboard
+            else "",
         ]
         if part
     )
+
+
+def _build_storyboard_beats(
+    scene_spec: Dict[str, Any],
+    *,
+    question: str,
+    steps: List[str],
+    formulas: List[str],
+) -> List[str]:
+    scene_type = str(scene_spec.get("scene_type") or "").lower()
+    beats = []
+    if question:
+        beats.append(f"Frame the exact problem statement: {question[:140]}")
+    if scene_type in {"conic", "ellipse", "parabola", "hyperbola"}:
+        beats.extend(
+            [
+                "Draw the coordinate axes, the conic, focal points, and all named points from the problem.",
+                "Animate the line/point movement and keep the invariant relation visible near the object.",
+                "Use dashed helper lines or highlighted chords to connect the visual relation to the algebra.",
+            ]
+        )
+    elif scene_type == "function_graph":
+        beats.extend(
+            [
+                "Draw axes and the function graph with scale marks before any formula manipulation.",
+                "Animate the key point, tangent, intercept, interval, or area that drives the solution.",
+            ]
+        )
+    elif scene_type == "geometry":
+        beats.extend(
+            [
+                "Draw the base figure first, then add auxiliary lines one by one.",
+                "Highlight congruent/similar/angle/length relations only when they are used.",
+            ]
+        )
+    for step in steps[:5]:
+        beats.append(f"Animate reasoning step: {step[:110]}")
+    for formula in formulas[:3]:
+        beats.append(f"Show formula as a short MathTex checkpoint: {formula[:90]}")
+    beats.append("End with a compact recap: condition, transformation, answer.")
+    return beats[:10]
 
 
 def _poll_job(*, base_url: str, api_key: str, remote_job_id: str) -> Dict[str, Any]:

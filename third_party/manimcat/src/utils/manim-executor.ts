@@ -44,15 +44,17 @@ export function executeManimCommand(
   const normalizedOptions = normalizeExecuteOptions(options)
   const args = buildManimArgs(codeFile, normalizedOptions)
 
+  const manimExecutable = process.env.MANIM_EXECUTABLE || 'manim'
+
   logger.info(`Job ${normalizedOptions.jobId}: starting manim process`, {
-    command: `manim ${args.join(' ')}`,
+    command: `${manimExecutable} ${args.join(' ')}`,
     cwd: normalizedOptions.tempDir
   })
 
   return new Promise((resolve) => {
     const startTime = Date.now()
     const state = createExecutionState()
-    const proc = spawn('manim', args, { cwd: normalizedOptions.tempDir })
+    const proc = spawn(manimExecutable, args, { cwd: normalizedOptions.tempDir })
 
     registerManimProcess(normalizedOptions.jobId, proc)
 
