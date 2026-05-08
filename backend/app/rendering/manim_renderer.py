@@ -260,7 +260,7 @@ class LearningScene(Scene):
             value = self._latex_from_question_token(raw)
             if value and value not in found:
                 found.append(value)
-        pattern = r"(?:m|M|v|V|F|a|s|x|t|L|l|\\mu|μ)(?:_?\\d+)?\\s*=\\s*[-+]?\\d+(?:\\.\\d+)?\\s*(?:kg|m/s|m\\cdot s\\^{{-1}}|N|m|s)?"
+        pattern = r"(?:m|M|v|V|F|a|s|x|t|L|l|μ)(?:_?\\d+)?\\s*=\\s*[-+]?\\d+(?:\\.\\d+)?\\s*(?:kg|m/s|N|m|s)?"
         for raw in re.findall(pattern, str(question)):
             value = self._latex_from_question_token(raw)
             if value and value not in found:
