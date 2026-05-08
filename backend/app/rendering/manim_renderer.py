@@ -196,6 +196,18 @@ class LearningScene(Scene):
     def _draw_blackboard_physics_scene(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics")
         self._draw_blackboard_header(spec)
+        self._show_blackboard_explanation(
+            "第一步 读题建模",
+            self._blackboard_step_text(spec, 0, "先把题目里的研究对象、已知量和要求量分开，画图只保留对解题有用的信息。"),
+            color=YELLOW,
+            wait_time=3.1,
+        )
+        self._show_blackboard_explanation(
+            "第二步 建立图像",
+            self._blackboard_step_text(spec, 1, "把坐标轴、关键点、速度方向和作用区域依次标出来，后面的方程都从这张图读出。"),
+            color=WHITE,
+            wait_time=3.0,
+        )
         if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
             self._draw_blackboard_electromagnetism(spec)
         elif scene_type == "optics":
@@ -206,7 +218,90 @@ class LearningScene(Scene):
             self._draw_blackboard_board_block(spec)
         else:
             self._draw_blackboard_mechanics(spec)
+        self._show_blackboard_explanation(
+            "第三步 分析过程",
+            self._blackboard_step_text(spec, 2, "观察运动或光路的变化，找到能把图形条件和物理规律连起来的关键关系。"),
+            color=WHITE,
+            wait_time=3.2,
+        )
+        self._show_blackboard_reasoning_steps(spec)
         self._show_blackboard_formula_steps(spec)
+        self._show_blackboard_explanation(
+            "最后 回到问题",
+            self._blackboard_step_text(spec, 5, "把求出的关系代回题目要求，检查范围、方向和单位，得到最终结论。"),
+            color=YELLOW,
+            wait_time=3.4,
+        )
+
+    def _blackboard_step_text(self, spec, index, fallback):
+        steps = [str(item).strip() for item in spec.get("steps") or [] if str(item).strip()]
+        if index < len(steps):
+            return steps[index]
+        params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
+        focus_points = [str(item).strip() for item in params.get("focus_points") or [] if str(item).strip()]
+        if index < len(focus_points):
+            return focus_points[index]
+        return fallback
+
+    def _show_blackboard_explanation(self, title, body, color=WHITE, wait_time=2.8):
+        title_mob = cjk_text(str(title), font_size=24, color=color)
+        body_text = str(body).strip()
+        if len(body_text) > 68:
+            body_text = body_text[:65] + "..."
+        body_mob = cjk_text(body_text, font_size=18, color=GREY_A)
+        group = VGroup(title_mob, body_mob)
+        group.arrange(DOWN, aligned_edge=LEFT, buff=0.14)
+        group.to_corner(UR, buff=0.44)
+        if group.width > 5.2:
+            group.scale_to_fit_width(5.2)
+        self.play(FadeIn(group, shift=LEFT * 0.16), run_time=0.55)
+        self.wait(wait_time)
+        self.play(FadeOut(group, shift=UP * 0.08), run_time=0.35)
+
+    def _show_blackboard_key_question(self, text, color=YELLOW):
+        value = str(text).strip()
+        if len(value) > 46:
+            value = value[:43] + "..."
+        tag = cjk_text("关键小问", font_size=17, color=color)
+        question = cjk_text(value, font_size=21, color=WHITE)
+        question.next_to(tag, DOWN, aligned_edge=LEFT, buff=0.12)
+        underline = Line(LEFT * 0.05, RIGHT * 3.55, color=color, stroke_width=2)
+        underline.next_to(question, DOWN, aligned_edge=LEFT, buff=0.12)
+        group = VGroup(tag, question, underline)
+        group.to_corner(DL, buff=0.46).shift(UP * 0.34)
+        if group.width > 4.8:
+            group.scale_to_fit_width(4.8)
+        self.play(FadeIn(group, shift=RIGHT * 0.16), run_time=0.38)
+        return group
+
+    def _clear_blackboard_key_question(self, group, wait_time=0.9):
+        self.wait(wait_time)
+        self.play(FadeOut(group, shift=UP * 0.08), run_time=0.25)
+
+    def _show_blackboard_reasoning_steps(self, spec):
+        steps = [str(item).strip() for item in spec.get("steps") or [] if str(item).strip()]
+        if len(steps) <= 3:
+            steps = steps + [
+                "先确定研究对象和初末状态。",
+                "再把力学、电磁学或几何约束写成可计算关系。",
+                "最后把边界条件代入，判断答案的取值范围。",
+            ]
+        visible_steps = steps[:6]
+        heading = cjk_text("解题拆分", font_size=23, color=YELLOW)
+        heading.to_corner(UL, buff=0.48).shift(DOWN * 1.08)
+        self.play(FadeIn(heading, shift=DOWN * 0.10), run_time=0.45)
+        for index, step in enumerate(visible_steps, start=1):
+            line_text = str(index) + ". " + step
+            if len(line_text) > 62:
+                line_text = line_text[:59] + "..."
+            row = cjk_text(line_text, font_size=18, color=WHITE)
+            row.next_to(heading, DOWN, aligned_edge=LEFT, buff=0.22)
+            if row.width > 5.7:
+                row.scale_to_fit_width(5.7)
+            self.play(Write(row), run_time=0.70)
+            self.wait(2.35)
+            self.play(FadeOut(row, shift=UP * 0.05), run_time=0.25)
+        self.play(FadeOut(heading), run_time=0.30)
 
     def _draw_blackboard_header(self, spec):
         params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
@@ -248,11 +343,17 @@ class LearningScene(Scene):
         path_a.set_points_smoothly([p, p + RIGHT * 1.35, field.get_left() + UP * 1.15, field.get_center() + DOWN * 0.10, q + UP * 0.30, q])
         path_b = DashedVMobject(ArcBetweenPoints(field.get_left() + UP * 1.15, field.get_right() + DOWN * 0.48, angle=-PI / 2), num_dashes=18, color=GREY_A)
         particle = Dot(p, color=YELLOW, radius=0.07)
-        self.play(Create(x_axis), Create(y_axis), FadeIn(x_label), FadeIn(y_label), run_time=0.7)
-        self.play(FadeIn(VGroup(p_dot, q_dot, p_label, q_label)), GrowArrow(v_arrow), FadeIn(v_label), run_time=0.7)
-        self.play(Create(field), FadeIn(marks), FadeIn(b_label), GrowFromCenter(l_brace), FadeIn(l_label), run_time=0.9)
-        self.play(Create(path_a), FadeIn(path_b), run_time=1.2)
-        self.play(MoveAlongPath(particle, path_a), run_time=2.8, rate_func=linear)
+        prompt = self._show_blackboard_key_question("P、Q 和初速度方向分别在哪里？")
+        self.play(Create(x_axis), Create(y_axis), FadeIn(x_label), FadeIn(y_label), run_time=1.0)
+        self.play(FadeIn(VGroup(p_dot, q_dot, p_label, q_label)), GrowArrow(v_arrow), FadeIn(v_label), run_time=1.2)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("磁场左右边界和宽度 L 怎么标？")
+        self.play(Create(field), FadeIn(marks), FadeIn(b_label), GrowFromCenter(l_brace), FadeIn(l_label), run_time=1.4)
+        self._clear_blackboard_key_question(prompt, wait_time=1.2)
+        prompt = self._show_blackboard_key_question("进入磁场后为什么走圆弧？")
+        self.play(Create(path_a), FadeIn(path_b), run_time=1.5)
+        self.play(MoveAlongPath(particle, path_a), run_time=4.2, rate_func=linear)
+        self._clear_blackboard_key_question(prompt, wait_time=1.1)
         self.play(FadeOut(particle), run_time=0.2)
 
     def _draw_blackboard_board_block(self, spec):
@@ -262,9 +363,15 @@ class LearningScene(Scene):
         left_arrow = Arrow(block.get_left() + UP * 0.55, block.get_left() + LEFT * 1.2 + UP * 0.55, buff=0, color=WHITE)
         force_arrow = Arrow(block.get_right() + UP * 0.10, block.get_right() + RIGHT * 1.1 + UP * 0.10, buff=0, color=WHITE)
         labels = VGroup(self._label("A", board.get_center(), 24), self._label("B", block.get_center(), 24), MathTex("v_0", color=WHITE).scale(0.62).next_to(left_arrow, UP, buff=0.04), MathTex("F", color=WHITE).scale(0.65).next_to(force_arrow, UP, buff=0.04))
-        self.play(Create(ground), Create(board), Create(block), FadeIn(labels[:2]), run_time=0.8)
-        self.play(GrowArrow(left_arrow), GrowArrow(force_arrow), FadeIn(labels[2:]), run_time=0.8)
-        self.play(VGroup(board, labels[0]).animate.shift(LEFT * 0.7), VGroup(block, labels[1], left_arrow, force_arrow, labels[2], labels[3]).animate.shift(LEFT * 2.0), run_time=2.2, rate_func=smooth)
+        prompt = self._show_blackboard_key_question("研究对象是哪两个物体？")
+        self.play(Create(ground), Create(board), Create(block), FadeIn(labels[:2]), run_time=1.2)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("速度、外力和相对运动方向怎么标？")
+        self.play(GrowArrow(left_arrow), GrowArrow(force_arrow), FadeIn(labels[2:]), run_time=1.3)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("相对位移关系如何从动画中读出？")
+        self.play(VGroup(board, labels[0]).animate.shift(LEFT * 0.7), VGroup(block, labels[1], left_arrow, force_arrow, labels[2], labels[3]).animate.shift(LEFT * 2.0), run_time=3.8, rate_func=smooth)
+        self._clear_blackboard_key_question(prompt, wait_time=1.2)
 
     def _draw_blackboard_mechanics(self, spec):
         base = Line(LEFT * 5.5 + DOWN * 2.0, RIGHT * 5.5 + DOWN * 2.0, color=WHITE, stroke_width=4)
@@ -273,8 +380,12 @@ class LearningScene(Scene):
         path.set_points_smoothly([body.get_center(), LEFT * 1.4 + DOWN * 1.28, RIGHT * 0.9 + DOWN * 1.02, RIGHT * 3.5 + DOWN * 0.82])
         velocity = Arrow(body.get_right(), body.get_right() + RIGHT * 1.0, buff=0, color=WHITE)
         force = Arrow(body.get_top(), body.get_top() + UP * 1.0, buff=0, color=WHITE)
-        self.play(Create(base), Create(body), GrowArrow(velocity), GrowArrow(force), run_time=0.9)
-        self.play(Create(path), body.animate.move_to(path.get_end()), velocity.animate.shift(RIGHT * 6.7 + UP * 0.63), force.animate.shift(RIGHT * 6.7 + UP * 0.63), run_time=2.8, rate_func=smooth)
+        prompt = self._show_blackboard_key_question("物体初态、速度和受力怎么画？")
+        self.play(Create(base), Create(body), GrowArrow(velocity), GrowArrow(force), run_time=1.4)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("轨迹和受力方向如何对应？")
+        self.play(Create(path), body.animate.move_to(path.get_end()), velocity.animate.shift(RIGHT * 6.7 + UP * 0.63), force.animate.shift(RIGHT * 6.7 + UP * 0.63), run_time=4.0, rate_func=smooth)
+        self._clear_blackboard_key_question(prompt, wait_time=1.1)
 
     def _draw_blackboard_optics(self, spec):
         axis = Line(LEFT * 5.4 + DOWN * 1.0, RIGHT * 5.4 + DOWN * 1.0, color=WHITE, stroke_width=3)
@@ -282,33 +393,78 @@ class LearningScene(Scene):
         rays = VGroup(*[Line(LEFT * 5.0 + UP * y, lens.get_center() + UP * y, color=WHITE, stroke_width=3) for y in [-0.90, -0.35, 0.25, 0.80]])
         refracted = VGroup(*[Line(lens.get_center() + UP * y, RIGHT * 4.5 + DOWN * 0.15, color=WHITE, stroke_width=3) for y in [-0.90, -0.35, 0.25, 0.80]])
         focus = Dot(RIGHT * 2.2 + DOWN * 1.0, color=WHITE)
-        self.play(Create(axis), Create(lens), Create(rays), run_time=0.9)
-        self.play(Create(refracted), FadeIn(focus), run_time=1.2)
+        prompt = self._show_blackboard_key_question("主光轴、透镜和入射光线在哪里？")
+        self.play(Create(axis), Create(lens), Create(rays), run_time=1.5)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("折射后光线交在哪里？")
+        self.play(Create(refracted), FadeIn(focus), run_time=1.8)
+        self._clear_blackboard_key_question(prompt, wait_time=1.1)
 
     def _draw_blackboard_wave(self, spec):
         base = Line(LEFT * 5.2 + DOWN * 1.4, RIGHT * 5.2 + DOWN * 1.4, color=WHITE, stroke_width=3)
         wave = ParametricFunction(lambda t: np.array([t, 0.75 * np.sin(2.2 * t) - 1.4, 0]), t_range=[-5.0, 5.0], color=WHITE, stroke_width=4)
         moving = Dot(wave.point_from_proportion(0), color=YELLOW, radius=0.06)
-        self.play(Create(base), Create(wave), run_time=1.1)
-        self.play(MoveAlongPath(moving, wave), run_time=3.0, rate_func=linear)
+        prompt = self._show_blackboard_key_question("平衡位置和波形怎么对应？")
+        self.play(Create(base), Create(wave), run_time=1.5)
+        self._clear_blackboard_key_question(prompt, wait_time=1.0)
+        prompt = self._show_blackboard_key_question("质点运动如何体现周期和波长？")
+        self.play(MoveAlongPath(moving, wave), run_time=4.2, rate_func=linear)
+        self._clear_blackboard_key_question(prompt, wait_time=1.1)
         self.play(FadeOut(moving), run_time=0.2)
 
     def _show_blackboard_formula_steps(self, spec):
         formulas = self._formula_items(spec)
         if not formulas:
-            formulas = [r"R=\\frac{{mv_0}}{{qB}}", r"x=b-L+R\\sin\\theta", r"a=R(1-\\cos\\theta)"]
+            formulas = [r"R=\\frac{{mv_0}}{{qB}}", r"a=R(1-\\cos\\theta)", r"x=b-L+R\\sin\\theta", r"0\\le x\\le L"]
+        notes = self._formula_notes(spec)
+        heading = cjk_text("第四步 列式推导", font_size=24, color=YELLOW)
+        heading.move_to(RIGHT * 1.35 + UP * 2.72)
+        self.play(FadeIn(heading, shift=DOWN * 0.12), run_time=0.45)
         group = VGroup()
-        for formula in formulas[:4]:
+        for formula in formulas[:6]:
             try:
-                mob = MathTex(formula, color=WHITE).scale(0.74)
+                mob = MathTex(formula, color=WHITE).scale(0.68)
             except Exception:
                 mob = cjk_text(str(formula)[:42], font_size=24, color=WHITE)
             group.add(mob)
         group.arrange(DOWN, aligned_edge=LEFT, buff=0.23)
-        group.move_to(RIGHT * 1.25 + UP * 1.45)
-        for item in group:
-            self.play(Write(item), run_time=0.55)
-            self.wait(0.28)
+        group.move_to(RIGHT * 1.35 + UP * 1.38)
+        for index, item in enumerate(group):
+            self.play(Write(item), run_time=1.0)
+            note = notes[index] if index < len(notes) else "这一步把图中的几何量和物理量对应起来。"
+            if len(note) > 54:
+                note = note[:51] + "..."
+            note_mob = cjk_text(str(index + 1) + ". " + note, font_size=18, color=GREY_A)
+            note_mob.next_to(item, DOWN, aligned_edge=LEFT, buff=0.10)
+            if note_mob.width > 5.4:
+                note_mob.scale_to_fit_width(5.4)
+            self.play(FadeIn(note_mob, shift=UP * 0.08), run_time=0.35)
+            self.wait(2.35)
+            self.play(FadeOut(note_mob, shift=UP * 0.04), run_time=0.25)
+        self.wait(1.4)
+
+    def _formula_notes(self, spec):
+        steps = [str(item).strip() for item in spec.get("steps") or [] if str(item).strip()]
+        notes = []
+        for step in steps[2:8]:
+            if step:
+                notes.append(step)
+        if notes:
+            return notes
+        scene_type = str(spec.get("scene_type") or "")
+        if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+            return [
+                "洛伦兹力提供向心力，先得到圆周运动半径。",
+                "入射点到目标点的竖直差对应圆弧的余弦关系。",
+                "水平距离由磁场宽度、边界位置和圆弧投影共同决定。",
+                "左边界必须让粒子在磁场内完成需要的偏转。",
+            ]
+        return [
+            "先写出控制运动的核心物理规律。",
+            "再把题目给出的几何或边界条件代入。",
+            "整理未知量，判断取值范围。",
+            "最后检查结果是否满足题目限制。",
+        ]
 
     def _formula_items(self, spec):
         result = []
