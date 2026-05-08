@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+.cursor/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+.motia/
+
+# Environment
+.env
+.env.local
+
+# Generated files
+public/videos/*
+public/videos/.gitkeep
+media/
+static/videos/
+static/gifs/
+
+# Logs
+*.log
+dump.rdb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+tmp/
+*.tmp
+.studio-workspace/
+.studio/
+.plot_env_smoke*.png
+circle.png
+triangle.png
+
+# AI/Dev tools
+.claude/
+.ruff_cache/
+
+# MD files (except README)
+*.md
+!README.md
+!README.zh-CN.md
+!frontend/README.md
+!static/gifs/README.md
+!LICENSE_POLICY.en.md
+!LICENSE_POLICY.md
+!THIRD_PARTY_NOTICES.md
+!THIRD_PARTY_NOTICES.zh-CN.md
+!DEPLOYMENT.md
+!DEPLOYMENT.zh-CN.md
+!CLA.md
+!CONTRIBUTING.md
+!.github/pull_request_template.md
+!BUILDER_ARCHITECTURE.md
+!src/prompts/templates/**/*.md
+!src/studio-agent/prompts/templates/**/*.md
+!src/studio-agent/skills/catalog/**/*.md
+
+# Flow type files
+*.flow
+
+# Batch scripts
+*.bat
+
+public/images/*
+public/images/.gitkeep
+public/readme-images/*.png
+!public/readme-images/.gitkeep
+
+# Studio / test build artifacts
+dist-tests/
+public/assets/
+public/index.html
+
