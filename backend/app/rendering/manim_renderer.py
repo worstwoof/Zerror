@@ -540,7 +540,7 @@ class LearningScene(Scene):
             if scene_type == "board_block":
                 for formula in formulas[:8]:
                     compact = str(formula).replace(" ", "")
-                    if compact in {{"F=ma", "x=x_0+v_0t+\\frac12at^2"}}:
+                    if compact == "F=ma" or "x=x_0+v_0t" in compact:
                         continue
                     if "f=" in compact and r"\\mu" not in compact and "mu" not in compact:
                         continue
