@@ -112,8 +112,8 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
             job_id,
             status="failed",
             progress=100,
-            error=str(exc),
-            message="Manim is not available on this server yet.",
+            error="动画生成服务暂不可用。",
+            message="动画生成失败，题目详解不受影响，可稍后重试。",
             diagnostics={
                 "renderer_available": False,
                 "output_path_exists": False,
@@ -128,8 +128,8 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
             job_id,
             status="failed",
             progress=100,
-            error=str(exc),
-            message="Manim render failed.",
+            error="动画生成失败，可稍后重试。",
+            message="动画生成失败，题目详解不受影响，可稍后重试。",
             diagnostics={
                 "renderer_available": _renderer_available(),
                 "output_path_exists": False,
