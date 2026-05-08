@@ -14,6 +14,16 @@ class AiApiException implements Exception {
   String toString() => message;
 }
 
+Map<String, dynamic> _asStringMap(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
+  }
+  return const <String, dynamic>{};
+}
+
 class SimilarQuestionItem {
   final String prompt;
   final String answerOutline;
@@ -84,14 +94,13 @@ class AnalysisResult {
               .whereType<Map>()
               .map(
                 (item) => SimilarQuestionItem.fromJson(
-                  item.map((key, value) => MapEntry(key.toString(), value)),
+                  _asStringMap(item),
                 ),
               )
               .toList(),
       richArtifacts: (json['rich_artifacts'] as List<dynamic>? ?? const [])
           .whereType<Map>()
-          .map((item) =>
-              item.map((key, value) => MapEntry(key.toString(), value)))
+          .map(_asStringMap)
           .toList(),
     );
   }
@@ -144,6 +153,9 @@ class ImageAnalysisJob {
       status == 'completed' || status == 'failed' || status == 'need_retry';
   bool get canRetry => status == 'partial_success' || status == 'need_retry';
 
+  // The UI can show partial_success as "OCR is saved, high-quality explanation
+  // is still running". completed is the only state where result should replace
+  // the partial card.
   String get displayMessage {
     if (message.trim().isNotEmpty) {
       return message;
@@ -166,8 +178,8 @@ class ImageAnalysisJob {
   }
 
   factory ImageAnalysisJob.fromJson(Map<String, dynamic> json) {
-    final rawResult = _staticAsMap(json['result']);
-    final rawPartial = _staticAsMap(json['partial_result']);
+    final rawResult = _asStringMap(json['result']);
+    final rawPartial = _asStringMap(json['partial_result']);
     return ImageAnalysisJob(
       jobId: (json['job_id'] ?? '').toString(),
       status: (json['status'] ?? 'pending').toString(),
@@ -182,15 +194,6 @@ class ImageAnalysisJob {
     );
   }
 
-  static Map<String, dynamic> _staticAsMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
-    }
-    return const <String, dynamic>{};
-  }
 }
 
 class PhysicsAnimationPayload {
@@ -241,9 +244,7 @@ class PhysicsAnimationResult {
     if (rawArtifact is Map<String, dynamic>) {
       artifact = rawArtifact;
     } else if (rawArtifact is Map) {
-      artifact = rawArtifact.map(
-        (key, value) => MapEntry(key.toString(), value),
-      );
+      artifact = _asStringMap(rawArtifact);
     }
 
     return PhysicsAnimationResult(
@@ -290,7 +291,7 @@ class ManimRenderJob {
       message: (json['message'] ?? '').toString(),
       error: (json['error'] ?? '').toString(),
       updatedAt: double.tryParse((json['updated_at'] ?? '').toString()),
-      diagnostics: _staticAsMap(json['diagnostics']),
+      diagnostics: _asStringMap(json['diagnostics']),
     );
   }
 
@@ -308,15 +309,6 @@ class ManimRenderJob {
     };
   }
 
-  static Map<String, dynamic> _staticAsMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
-    }
-    return const <String, dynamic>{};
-  }
 }
 
 class AiApiClient {
@@ -429,6 +421,8 @@ class AiApiClient {
     String wrongReasonHint = '',
     bool enableSubjectExtensions = true,
   }) async {
+    // New batch-photo flow: create a server job quickly, then poll
+    // fetchImageAnalysisJob until partial_result/result appears.
     final request = http.MultipartRequest(
       'POST',
       Uri.parse(AppConstants.imageAnalysisJobsEndpoint),
@@ -550,7 +544,7 @@ class AiApiClient {
       }
     }
 
-    final nested = _asMap(payload['data']);
+    final nested = _asStringMap(payload['data']);
     if (nested.isNotEmpty) {
       for (final key in const ['detail', 'message', 'msg', 'error']) {
         final value = nested[key];
@@ -561,16 +555,6 @@ class AiApiClient {
     }
 
     return friendlyError(fallback);
-  }
-
-  Map<String, dynamic> _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
-    }
-    return const <String, dynamic>{};
   }
 
   static String friendlyError(String message) {

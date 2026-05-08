@@ -21,6 +21,9 @@ from backend.app.schemas.card_schema import (
 
 logger = logging.getLogger(__name__)
 
+# Keep the default deliberately low: upstream vision/LLM calls are the slowest
+# part of the product, and a small fixed pool gives batch photo import a clear
+# speedup without turning every retry into a burst of rate-limit failures.
 ANALYSIS_JOB_MAX_WORKERS = 2
 
 _executor = ThreadPoolExecutor(max_workers=ANALYSIS_JOB_MAX_WORKERS)
@@ -71,7 +74,6 @@ def create_image_analysis_job(
         _run_image_analysis_job,
         job_id,
         image_bytes,
-        content_type,
         subject,
         user_answer,
         wrong_reason_hint,
@@ -95,7 +97,12 @@ def retry_image_analysis_job(
     job_id: str,
     diagnostic_service: DiagnosticService,
 ) -> ImageAnalysisJobResponse | None:
-    """Retry only the high-quality stage when OCR text is already available."""
+    """Retry only the high-quality stage when OCR text is already available.
+
+    Users should not need to upload the same photo again just because the
+    second-stage model timed out. OCR is the durable boundary for now; once we
+    have text, retries spend quota only on the explanation stage.
+    """
 
     with _lock:
         job = _jobs.get(job_id)
@@ -133,7 +140,6 @@ def retry_image_analysis_job(
 def _run_image_analysis_job(
     job_id: str,
     image_bytes: bytes,
-    content_type: str,
     subject: str,
     user_answer: str,
     wrong_reason_hint: str,
@@ -161,6 +167,9 @@ def _run_image_analysis_job(
             request_payload=request_payload,
             ocr=ocr,
         )
+        # partial_success means the student has something useful to keep even
+        # if the high-quality model later times out. The final result replaces
+        # this when the quality stage completes.
         _update_job(
             job_id,
             status="partial_success",
@@ -213,6 +222,13 @@ def _run_quality_stage(
     diagnostic_service: DiagnosticService,
     ocr: OCRResponse | None = None,
 ) -> None:
+    """Run the slow, high-quality explanation stage.
+
+    This stage intentionally uses DiagnosticService.analyze_text_quality rather
+    than the quick upload fallback model, because answer quality and LaTeX
+    stability matter more once the request is detached from the mobile upload.
+    """
+
     if not normalized_text.strip():
         _update_job(
             job_id,
@@ -325,6 +341,8 @@ def _to_response(job: Dict[str, Any]) -> ImageAnalysisJobResponse:
 
 
 def _friendly_error(exc: Exception) -> str:
+    """Map infrastructure/model failures to text safe for student-facing UI."""
+
     message = str(exc).lower()
     if "timed out" in message or "timeout" in message:
         return "AI 解析暂时较慢，已保留题目基础信息，可稍后重新生成详解。"
