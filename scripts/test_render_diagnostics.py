@@ -224,6 +224,16 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("MagneticField", source)
         self.assertIn("StandingWave", source)
 
+    def test_physics_manim_uses_blackboard_layout(self) -> None:
+        source = (ROOT / "backend" / "app" / "rendering" / "manim_renderer.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("_draw_blackboard_physics_scene", source)
+        self.assertIn("self.camera.background_color = BLACK", source)
+        self.assertIn("_show_blackboard_formula_steps", source)
+        self.assertIn(r'R=\\frac{{mv_0}}{{qB}}', source)
+
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "geogebra_scene_preview_screen.dart").read_text(
             encoding="utf-8"

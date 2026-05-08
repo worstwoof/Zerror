@@ -137,6 +137,26 @@ class LearningScene(Scene):
     def construct(self):
         spec = json.loads(SCENE_SPEC)
         scene_type = str(spec.get("scene_type") or "generic")
+        is_physics_scene = str(spec.get("subject") or "").lower() == "physics" or scene_type in {{
+            "board_block",
+            "mechanics",
+            "incline",
+            "projectile",
+            "collision",
+            "circuit",
+            "electromagnetism",
+            "charged_particle_magnetic_field",
+            "optics",
+            "wave",
+            "standing_wave",
+            "linear_wave",
+        }}
+        if is_physics_scene:
+            self.camera.background_color = BLACK
+            self._draw_blackboard_physics_scene(spec)
+            self.wait(1.2)
+            return
+
         if spec.get("show_title"):
             title = cjk_text(str(spec.get("title") or spec.get("fallback_text") or "题目讲解"), font_size=32)
             title.to_edge(UP)
@@ -172,6 +192,135 @@ class LearningScene(Scene):
             self.wait(2.2)
             self.play(FadeOut(note))
         self.wait(1.8)
+
+    def _draw_blackboard_physics_scene(self, spec):
+        scene_type = str(spec.get("scene_type") or "mechanics")
+        self._draw_blackboard_header(spec)
+        if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+            self._draw_blackboard_electromagnetism(spec)
+        elif scene_type == "optics":
+            self._draw_blackboard_optics(spec)
+        elif scene_type in {{"wave", "standing_wave", "linear_wave"}}:
+            self._draw_blackboard_wave(spec)
+        elif scene_type == "board_block":
+            self._draw_blackboard_board_block(spec)
+        else:
+            self._draw_blackboard_mechanics(spec)
+        self._show_blackboard_formula_steps(spec)
+
+    def _draw_blackboard_header(self, spec):
+        params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
+        question = str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
+        title = cjk_text("@ Zerror", font_size=30, color=BLUE_B).to_corner(UL, buff=0.36)
+        self.play(FadeIn(title), run_time=0.5)
+        if question:
+            question_line = cjk_text(question[:58], font_size=20, color=GREY_A)
+            question_line.next_to(title, DOWN, aligned_edge=LEFT, buff=0.30)
+            self.play(Write(question_line), run_time=0.8)
+
+    def _label(self, value, point, font_size=26, color=WHITE):
+        return cjk_text(str(value), font_size=font_size, color=color).move_to(point)
+
+    def _draw_blackboard_electromagnetism(self, spec):
+        axes_origin = LEFT * 4.8 + DOWN * 2.15
+        x_axis = Arrow(axes_origin, axes_origin + RIGHT * 8.6, buff=0, color=WHITE, stroke_width=3)
+        y_axis = Arrow(axes_origin, axes_origin + UP * 4.0, buff=0, color=WHITE, stroke_width=3)
+        x_label = self._label("x", x_axis.get_end() + RIGHT * 0.20, 22)
+        y_label = self._label("y", y_axis.get_end() + UP * 0.18, 22)
+        p = axes_origin + UP * 2.25
+        q = axes_origin + RIGHT * 6.6
+        p_dot = Dot(p, color=WHITE, radius=0.045)
+        q_dot = Dot(q, color=WHITE, radius=0.045)
+        p_label = self._label("P", p + LEFT * 0.28 + UP * 0.08, 24)
+        q_label = self._label("Q", q + DOWN * 0.26, 24)
+        v_arrow = Arrow(p + RIGHT * 0.08, p + RIGHT * 0.9, buff=0, color=WHITE, stroke_width=3)
+        v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.04)
+        field = Rectangle(width=2.25, height=3.10, color=WHITE, stroke_width=2)
+        field.move_to(axes_origin + RIGHT * 4.27 + UP * 1.48)
+        marks = VGroup()
+        for x in [-0.75, -0.25, 0.25, 0.75]:
+            for y in [-0.95, -0.35, 0.25, 0.85]:
+                marks.add(cjk_text("x", font_size=18, color=GREY_B).move_to(field.get_center() + RIGHT * x + UP * y))
+        b_label = MathTex("B", color=WHITE).scale(0.7).next_to(field, UP, buff=0.10)
+        l_brace = Brace(field, DOWN, color=WHITE)
+        l_label = MathTex("L", color=WHITE).scale(0.66).next_to(l_brace, DOWN, buff=0.05)
+        path_a = VMobject(color=WHITE, stroke_width=4)
+        path_a.set_points_smoothly([p, p + RIGHT * 1.35, field.get_left() + UP * 1.15, field.get_center() + DOWN * 0.10, q + UP * 0.30, q])
+        path_b = DashedVMobject(ArcBetweenPoints(field.get_left() + UP * 1.15, field.get_right() + DOWN * 0.48, angle=-PI / 2), num_dashes=18, color=GREY_A)
+        particle = Dot(p, color=YELLOW, radius=0.07)
+        self.play(Create(x_axis), Create(y_axis), FadeIn(x_label), FadeIn(y_label), run_time=0.7)
+        self.play(FadeIn(VGroup(p_dot, q_dot, p_label, q_label)), GrowArrow(v_arrow), FadeIn(v_label), run_time=0.7)
+        self.play(Create(field), FadeIn(marks), FadeIn(b_label), GrowFromCenter(l_brace), FadeIn(l_label), run_time=0.9)
+        self.play(Create(path_a), FadeIn(path_b), run_time=1.2)
+        self.play(MoveAlongPath(particle, path_a), run_time=2.8, rate_func=linear)
+        self.play(FadeOut(particle), run_time=0.2)
+
+    def _draw_blackboard_board_block(self, spec):
+        ground = Line(LEFT * 5.8 + DOWN * 1.75, RIGHT * 5.8 + DOWN * 1.75, color=WHITE, stroke_width=4)
+        board = Rectangle(width=5.4, height=0.34, color=WHITE, stroke_width=4).shift(DOWN * 1.25)
+        block = Square(side_length=0.72, color=WHITE, stroke_width=4).next_to(board, UP, buff=0).shift(RIGHT * 1.65)
+        left_arrow = Arrow(block.get_left() + UP * 0.55, block.get_left() + LEFT * 1.2 + UP * 0.55, buff=0, color=WHITE)
+        force_arrow = Arrow(block.get_right() + UP * 0.10, block.get_right() + RIGHT * 1.1 + UP * 0.10, buff=0, color=WHITE)
+        labels = VGroup(self._label("A", board.get_center(), 24), self._label("B", block.get_center(), 24), MathTex("v_0", color=WHITE).scale(0.62).next_to(left_arrow, UP, buff=0.04), MathTex("F", color=WHITE).scale(0.65).next_to(force_arrow, UP, buff=0.04))
+        self.play(Create(ground), Create(board), Create(block), FadeIn(labels[:2]), run_time=0.8)
+        self.play(GrowArrow(left_arrow), GrowArrow(force_arrow), FadeIn(labels[2:]), run_time=0.8)
+        self.play(VGroup(board, labels[0]).animate.shift(LEFT * 0.7), VGroup(block, labels[1], left_arrow, force_arrow, labels[2], labels[3]).animate.shift(LEFT * 2.0), run_time=2.2, rate_func=smooth)
+
+    def _draw_blackboard_mechanics(self, spec):
+        base = Line(LEFT * 5.5 + DOWN * 2.0, RIGHT * 5.5 + DOWN * 2.0, color=WHITE, stroke_width=4)
+        body = Square(side_length=0.9, color=WHITE, stroke_width=4).shift(LEFT * 3.2 + DOWN * 1.45)
+        path = VMobject(color=WHITE, stroke_width=4)
+        path.set_points_smoothly([body.get_center(), LEFT * 1.4 + DOWN * 1.28, RIGHT * 0.9 + DOWN * 1.02, RIGHT * 3.5 + DOWN * 0.82])
+        velocity = Arrow(body.get_right(), body.get_right() + RIGHT * 1.0, buff=0, color=WHITE)
+        force = Arrow(body.get_top(), body.get_top() + UP * 1.0, buff=0, color=WHITE)
+        self.play(Create(base), Create(body), GrowArrow(velocity), GrowArrow(force), run_time=0.9)
+        self.play(Create(path), body.animate.move_to(path.get_end()), velocity.animate.shift(RIGHT * 6.7 + UP * 0.63), force.animate.shift(RIGHT * 6.7 + UP * 0.63), run_time=2.8, rate_func=smooth)
+
+    def _draw_blackboard_optics(self, spec):
+        axis = Line(LEFT * 5.4 + DOWN * 1.0, RIGHT * 5.4 + DOWN * 1.0, color=WHITE, stroke_width=3)
+        lens = Ellipse(width=0.50, height=3.1, color=WHITE, stroke_width=4).shift(DOWN * 1.0)
+        rays = VGroup(*[Line(LEFT * 5.0 + UP * y, lens.get_center() + UP * y, color=WHITE, stroke_width=3) for y in [-0.90, -0.35, 0.25, 0.80]])
+        refracted = VGroup(*[Line(lens.get_center() + UP * y, RIGHT * 4.5 + DOWN * 0.15, color=WHITE, stroke_width=3) for y in [-0.90, -0.35, 0.25, 0.80]])
+        focus = Dot(RIGHT * 2.2 + DOWN * 1.0, color=WHITE)
+        self.play(Create(axis), Create(lens), Create(rays), run_time=0.9)
+        self.play(Create(refracted), FadeIn(focus), run_time=1.2)
+
+    def _draw_blackboard_wave(self, spec):
+        base = Line(LEFT * 5.2 + DOWN * 1.4, RIGHT * 5.2 + DOWN * 1.4, color=WHITE, stroke_width=3)
+        wave = ParametricFunction(lambda t: np.array([t, 0.75 * np.sin(2.2 * t) - 1.4, 0]), t_range=[-5.0, 5.0], color=WHITE, stroke_width=4)
+        moving = Dot(wave.point_from_proportion(0), color=YELLOW, radius=0.06)
+        self.play(Create(base), Create(wave), run_time=1.1)
+        self.play(MoveAlongPath(moving, wave), run_time=3.0, rate_func=linear)
+        self.play(FadeOut(moving), run_time=0.2)
+
+    def _show_blackboard_formula_steps(self, spec):
+        formulas = self._formula_items(spec)
+        if not formulas:
+            formulas = [r"R=\\frac{{mv_0}}{{qB}}", r"x=b-L+R\\sin\\theta", r"a=R(1-\\cos\\theta)"]
+        group = VGroup()
+        for formula in formulas[:4]:
+            try:
+                mob = MathTex(formula, color=WHITE).scale(0.74)
+            except Exception:
+                mob = cjk_text(str(formula)[:42], font_size=24, color=WHITE)
+            group.add(mob)
+        group.arrange(DOWN, aligned_edge=LEFT, buff=0.23)
+        group.move_to(RIGHT * 1.25 + UP * 1.45)
+        for item in group:
+            self.play(Write(item), run_time=0.55)
+            self.wait(0.28)
+
+    def _formula_items(self, spec):
+        result = []
+        for item in spec.get("formula_steps") or []:
+            if isinstance(item, dict):
+                value = str(item.get("formula") or item.get("latex") or "").strip()
+            else:
+                value = str(item).strip()
+            value = value.replace("$$", "").replace("$", "").strip()
+            if value and not any("\\u4e00" <= ch <= "\\u9fff" for ch in value):
+                result.append(value)
+        return result
 
     def _show_intro_panel(self, spec):
         params = spec.get("parameters") or {{}}
