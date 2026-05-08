@@ -534,7 +534,12 @@ class LearningScene(Scene):
             MathTex("m_B g", color=BLUE_B).scale(0.52).next_to(g_arrow, RIGHT, buff=0.03),
         )
         forces = VGroup(f_on_b, f_on_a, n_arrow, g_arrow, force_labels)
-        relative_arrow = DoubleArrow(block.get_left() + preview_block_shift + UP * 0.26, board.get_left() + preview_board_shift + UP * 0.26, buff=0.05, color=YELLOW, stroke_width=3)
+        relative_y = board.get_top()[1] + 0.58
+        relative_right = block.get_left() + preview_block_shift
+        relative_left = board.get_left() + preview_board_shift
+        relative_right[1] = relative_y
+        relative_left[1] = relative_y
+        relative_arrow = DoubleArrow(relative_right, relative_left, buff=0.05, color=YELLOW, stroke_width=3)
         relative_label = MathTex("s_{{rel}}", color=YELLOW).scale(0.54).next_to(relative_arrow, UP, buff=0.03)
         relative = VGroup(relative_arrow, relative_label)
         board_group = VGroup(board, board_label)
@@ -593,7 +598,7 @@ class LearningScene(Scene):
             return
         if model.get("type") == "board_block":
             self.play(Create(model["ground"]), FadeIn(model["board_group"]), FadeIn(model["block_group"]), run_time=1.2)
-            start_ghost = VGroup(model["board_group"].copy(), model["block_group"].copy())
+            start_ghost = VGroup(model["board"].copy(), model["block"].copy())
             start_ghost.set_opacity(0.20)
             start_ghost.set_color(GREY_B)
             self.add(start_ghost)
