@@ -331,6 +331,16 @@ async function checkUnit(code: string, lineOffset: number): Promise<StaticDiagno
     }
 
     if (mypyResult.exitCode !== 0 && mypyDiagnostics.length === 0) {
+      const missingMypy = [mypyResult.stderr, mypyResult.stdout]
+        .join('\n')
+        .toLowerCase()
+        .includes('no module named mypy')
+      if (missingMypy) {
+        logger.warn('mypy is not installed, skip mypy static checks', {
+          command: mypyCommand.displayName
+        })
+        return []
+      }
       throw new Error(
         mypyResult.stderr.trim() ||
           mypyResult.stdout.trim() ||
