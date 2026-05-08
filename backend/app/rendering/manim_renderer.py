@@ -520,20 +520,25 @@ class LearningScene(Scene):
             cjk_text("A 的运动趋势", font_size=13, color=GREY_A).next_to(board_motion, DOWN, buff=0.04),
             cjk_text("B 的相对滑动", font_size=13, color=GREY_A).next_to(block_motion, UP, buff=0.04),
         )
-        preview_board_shift = LEFT * 0.63
-        preview_block_shift = LEFT * 1.58
-        contact = block.get_bottom() + preview_block_shift + DOWN * 0.03
-        f_on_b = Arrow(contact + LEFT * 0.34, contact + RIGHT * 0.62, buff=0, color=YELLOW, stroke_width=3)
-        f_on_a = Arrow(contact + DOWN * 0.16 + RIGHT * 0.42, contact + DOWN * 0.16 + LEFT * 0.60, buff=0, color=YELLOW, stroke_width=3)
-        n_arrow = Arrow(block.get_bottom() + preview_block_shift + UP * 0.03, block.get_bottom() + preview_block_shift + UP * 0.86, buff=0, color=BLUE_B, stroke_width=3)
-        g_arrow = Arrow(block.get_center() + preview_block_shift, block.get_center() + preview_block_shift + DOWN * 0.92, buff=0, color=BLUE_B, stroke_width=3)
+        preview_board_shift = LEFT * 0.88
+        preview_block_shift = LEFT * 2.05
+        board_final_center = board.get_center() + preview_board_shift
+        block_final_center = block.get_center() + preview_block_shift
+        b_fbd_dot = Dot(block_final_center, color=YELLOW, radius=0.045)
+        a_fbd_dot = Dot(board_final_center, color=YELLOW, radius=0.045)
+        force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.08 + UP * 0.16, buff=0, color=WHITE, stroke_width=3)
+        f_on_b = Arrow(block_final_center, block_final_center + RIGHT * 0.90 + DOWN * 0.18, buff=0, color=YELLOW, stroke_width=3)
+        n_arrow = Arrow(block_final_center, block_final_center + UP * 1.05, buff=0, color=BLUE_B, stroke_width=3)
+        g_arrow = Arrow(block_final_center, block_final_center + DOWN * 1.05, buff=0, color=BLUE_B, stroke_width=3)
+        f_on_a = Arrow(board_final_center, board_final_center + LEFT * 0.95, buff=0, color=YELLOW, stroke_width=3)
         force_labels = VGroup(
-            MathTex("f", color=YELLOW).scale(0.52).next_to(f_on_b, DOWN, buff=0.03),
-            MathTex("f", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.03),
+            MathTex(f_formula, color=WHITE).scale(0.48).next_to(force_arrow_centered, UP, buff=0.03),
+            MathTex("f_B", color=YELLOW).scale(0.52).next_to(f_on_b, DOWN, buff=0.03),
             MathTex("N", color=BLUE_B).scale(0.52).next_to(n_arrow, RIGHT, buff=0.03),
             MathTex("m_B g", color=BLUE_B).scale(0.52).next_to(g_arrow, RIGHT, buff=0.03),
+            MathTex("f_A", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.03),
         )
-        forces = VGroup(f_on_b, f_on_a, n_arrow, g_arrow, force_labels)
+        forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
         relative_y = board.get_top()[1] + 0.58
         relative_right = block.get_left() + preview_block_shift
         relative_left = board.get_left() + preview_board_shift
@@ -604,16 +609,18 @@ class LearningScene(Scene):
             self.add(start_ghost)
             self.play(FadeIn(model["motion"]), run_time=0.65)
             self.play(
-                model["board_group"].animate.shift(LEFT * 0.35),
-                model["block_group"].animate.shift(LEFT * 1.30),
-                model["motion"].animate.shift(LEFT * 0.30),
-                run_time=4.8,
-                rate_func=smooth,
+                model["board_group"].animate.shift(LEFT * 0.42),
+                model["block_group"].animate.shift(LEFT * 1.48),
+                model["motion"].animate.shift(LEFT * 0.44),
+                run_time=5.4,
+                rate_func=linear,
             )
             self.play(
-                VGroup(model["board_group"], model["block_group"], model["motion"]).animate.shift(LEFT * 0.28),
+                model["board_group"].animate.shift(LEFT * 0.46),
+                model["block_group"].animate.shift(LEFT * 0.57),
+                model["motion"].animate.shift(LEFT * 0.44),
                 FadeOut(start_ghost),
-                run_time=1.35,
+                run_time=1.8,
                 rate_func=linear,
             )
             model["moving"].save_state()
