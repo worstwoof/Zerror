@@ -115,6 +115,46 @@
 }
 ```
 
+### `POST /api/v1/analysis/image/jobs`
+
+推荐给移动端批量拍题使用的双阶段接口。它会立即创建后台任务并返回 `job_id`，避免手机端长时间等待同一个 HTTP 连接。
+
+`multipart/form-data` 字段与 `analysis/image` 相同。
+
+返回：
+
+```json
+{
+  "job_id": "24位任务ID",
+  "status": "pending",
+  "progress": 0,
+  "message": "已加入后台解析队列。",
+  "error": "",
+  "created_at": 1778170000.0,
+  "updated_at": 1778170000.0,
+  "ocr": null,
+  "partial_result": null,
+  "result": null
+}
+```
+
+状态约定：
+
+- `pending`: 待解析
+- `processing`: OCR 或高质量详解生成中
+- `partial_success`: 已有 OCR/基础结果，高质量详解仍在生成或可重试
+- `completed`: 高质量详解完成
+- `failed`: 任务失败且没有可用结果
+- `need_retry`: 需要用户稍后重试
+
+### `GET /api/v1/analysis/image/jobs/{job_id}`
+
+查询后台解析任务。前端建议每 2-4 秒轮询一次；拿到 `partial_result` 时即可先展示“已识别题目，正在生成高质量详解”，拿到 `result` 后替换为完整详解。
+
+### `POST /api/v1/analysis/image/jobs/{job_id}/retry`
+
+当任务已有 OCR 结果但高质量详解失败时，重新生成详解。该接口只重跑第二阶段，不要求用户重新上传图片。
+
 ## `rich_artifacts` 扩展约定
 
 为了支持不同学科的高表现力展示内容，`rich_artifacts` 统一设计为数组，便于后续按学科扩展：
