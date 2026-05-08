@@ -11,6 +11,7 @@ RUN apt-get update \
         build-essential \
         dvisvgm \
         ffmpeg \
+        fonts-noto-cjk \
         libcairo2 \
         libcairo2-dev \
         libpango-1.0-0 \
