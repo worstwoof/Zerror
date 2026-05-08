@@ -341,7 +341,7 @@ class DiagnosticService:
             return []
 
         existing_types = {artifact.artifact_type for artifact in existing_artifacts}
-        subject_hint = str(subject or request.subject or "").lower()
+        subject_hint = str(subject or "").lower()
         requested_math = "math" in subject_hint or "\u6570\u5b66" in subject_hint
         requested_physics = "physics" in subject_hint or "\u7269\u7406" in subject_hint
         looks_like_math = self._looks_like_math_scene_context(normalized_context)
