@@ -242,6 +242,8 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("f_on_b = Arrow(block_final_center", source)
         self.assertIn("n_arrow = Arrow(block_final_center", source)
         self.assertIn("g_arrow = Arrow(block_final_center", source)
+        self.assertIn('"initial_vectors": VGroup(v_arrow, v_label, force_arrow, force_label)', source)
+        self.assertIn('FadeOut(model["initial_vectors"])', source)
         self.assertIn("_play_local_response", source)
         self.assertIn("_aligned_formula_block", source)
         self.assertIn("FadeOut(derivation", source)

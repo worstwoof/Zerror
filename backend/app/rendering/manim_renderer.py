@@ -563,11 +563,13 @@ class LearningScene(Scene):
             "motion": motion,
             "moving": moving,
             "forces": forces,
+            "initial_vectors": VGroup(v_arrow, v_label, force_arrow, force_label),
             "force_arrow": VGroup(force_arrow, force_label),
             "relative": relative,
             "full_group": full_group,
             "board_data": board_data,
             "forces_shown": False,
+            "vectors_hidden": False,
             "relative_shown": False,
         }}
 
@@ -849,17 +851,26 @@ class LearningScene(Scene):
                     rate_func=there_and_back,
                     run_time=1.7,
                 )
-                self.play(Indicate(model["force_arrow"], color=YELLOW, scale_factor=1.05), run_time=1.0)
+                self.play(Indicate(model["initial_vectors"], color=YELLOW, scale_factor=1.05), run_time=1.0)
             elif focus == "forces":
+                if not model.get("vectors_hidden"):
+                    self.play(FadeOut(model["initial_vectors"]), FadeOut(model["motion"]), run_time=0.45)
+                    model["vectors_hidden"] = True
                 if not model.get("forces_shown"):
                     self.play(FadeIn(model["forces"]), run_time=0.9)
                     model["forces_shown"] = True
                 self.play(
                     Circumscribe(model["block"], color=YELLOW, time_width=0.55),
-                    Indicate(VGroup(model["forces"], model["force_arrow"]), color=YELLOW, scale_factor=1.03),
+                    Indicate(model["forces"], color=YELLOW, scale_factor=1.03),
                     run_time=2.0,
                 )
             else:
+                if model.get("forces_shown"):
+                    self.play(FadeOut(model["forces"]), run_time=0.45)
+                    model["forces_shown"] = False
+                if model.get("vectors_hidden"):
+                    self.play(FadeIn(model["motion"]), run_time=0.35)
+                    model["vectors_hidden"] = False
                 if not model.get("relative_shown"):
                     self.play(FadeIn(model["relative"]), run_time=0.65)
                     model["relative_shown"] = True
