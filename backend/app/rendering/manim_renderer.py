@@ -196,13 +196,14 @@ class LearningScene(Scene):
 
     def _draw_professional_physics_scene(self, spec):
         scene_type = self._professional_scene_type(spec)
+        board_data = self._board_block_data(spec) if scene_type == "board_block" else None
         self.camera.background_color = BLACK
-        question_block = self._build_question_block(spec, compact=False)
+        question_block = self._build_question_block(spec, compact=False, board_data=board_data)
         self.play(FadeIn(question_block, shift=DOWN * 0.12), run_time=0.65)
         if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
             model = self._build_em_teaching_model()
         elif scene_type == "board_block":
-            model = self._build_board_block_teaching_model()
+            model = self._build_board_block_teaching_model(board_data)
         else:
             model = self._build_generic_teaching_model(scene_type)
         preview_title = cjk_text("第一阶段：全局物理过程预览", font_size=25, color=YELLOW)
@@ -213,7 +214,7 @@ class LearningScene(Scene):
         self._play_global_physics_preview(model, scene_type)
         self.wait(2.0)
         self.play(FadeOut(VGroup(preview_title, preview_note)), question_block.animate.scale(0.86).to_corner(UL, buff=0.28), run_time=0.7)
-        self._play_step_breakdown(spec, model, scene_type)
+        self._play_step_breakdown(spec, model, scene_type, board_data=board_data)
 
     def _professional_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics").strip().lower()
@@ -237,6 +238,96 @@ class LearningScene(Scene):
     def _question_text(self, spec):
         params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
         return str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
+
+    def _board_block_data(self, spec):
+        question = self._question_text(spec)
+        joined = " ".join([
+            str(spec.get("title") or ""),
+            str(spec.get("fallback_text") or ""),
+            question,
+        ])
+        data = {{
+            "question": question,
+            "m_A": self._find_board_number(joined, [r"m_?1\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)", r"m_A\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"]),
+            "m_B": self._find_board_number(joined, [r"m_?2\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)", r"m_B\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"]),
+            "v0": self._find_board_number(joined, [r"v_?0\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"]),
+            "F": self._find_board_number(joined, [r"F\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"]),
+            "mu": self._find_board_number(joined, [
+                r"(?:μ|µ|mu|\\\\mu)\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)",
+                r"(?:动摩擦因数|摩擦因数)[^0-9]*([-+]?\\d+(?:\\.\\d+)?)",
+            ]),
+            "g": 10.0,
+            "block_initial_position": "right_end" if "右端" in joined else "right_end",
+            "questions": self._extract_board_questions(question),
+            "missing": [],
+        }}
+        for key in ["m_A", "m_B", "v0", "F", "mu"]:
+            if data[key] is None:
+                data["missing"].append(key)
+        if self._find_board_number(joined, [r"g\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"]) is not None:
+            data["g"] = self._find_board_number(joined, [r"g\\s*=\\s*([-+]?\\d+(?:\\.\\d+)?)"])
+        if all(data[key] is not None for key in ["m_A", "m_B", "v0", "F", "mu"]):
+            f = data["mu"] * data["m_B"] * data["g"]
+            a_a = -f / data["m_A"]
+            a_b = (data["F"] + f) / data["m_B"]
+            a_rel = a_b - a_a
+            data.update({{
+                "f": f,
+                "a_A": a_a,
+                "a_B": a_b,
+                "a_rel": a_rel,
+                "t_common": data["v0"] / a_rel if a_rel > 0 else None,
+                "s_rel_abs": data["v0"] * data["v0"] / (2 * a_rel) if a_rel > 0 else None,
+            }})
+        return data
+
+    def _find_board_number(self, text, patterns):
+        source = str(text).replace("＝", "=").replace("，", ",").replace("。", ".")
+        for pattern in patterns:
+            match = re.search(pattern, source, flags=re.IGNORECASE)
+            if match:
+                try:
+                    return float(match.group(1))
+                except Exception:
+                    return None
+        return None
+
+    def _extract_board_questions(self, question):
+        text = str(question)
+        matches = []
+        for match in re.finditer(r"(?:\\(|（)?([123一二三])(?:\\)|）|、|\\.)?\\s*([^。；;？?]{4,46}[？?]?)", text):
+            value = match.group(2).strip()
+            if value and value not in matches:
+                matches.append(value)
+        if matches:
+            return matches[:3]
+        return ["求共速前的运动过程", "分析 A、B 受力和加速度", "判断相对位移与是否滑离"]
+
+    def _fmt_num(self, value):
+        if value is None:
+            return "?"
+        number = float(value)
+        if abs(number - round(number)) < 1e-8:
+            return str(int(round(number)))
+        return f"{{number:.3g}}"
+
+    def _value_formula(self, name, value, unit=""):
+        if value is None:
+            return name
+        suffix = ""
+        if unit == "kg":
+            suffix = r"\\mathrm{{kg}}"
+        elif unit == "N":
+            suffix = r"\\mathrm{{N}}"
+        elif unit == "m/s":
+            suffix = r"\\mathrm{{m/s}}"
+        elif unit == "m/s^2":
+            suffix = r"\\mathrm{{m/s^2}}"
+        elif unit == "s":
+            suffix = r"\\mathrm{{s}}"
+        elif unit == "m":
+            suffix = r"\\mathrm{{m}}"
+        return name + "=" + self._fmt_num(value) + suffix
 
     def _wrap_cjk_lines(self, text, max_chars=24):
         cleaned = " ".join(str(text).replace("\\n", " ").split())
@@ -279,7 +370,9 @@ class LearningScene(Scene):
         value = value.replace("N", r"\\mathrm{{N}}")
         return value
 
-    def _build_question_block(self, spec, compact=False):
+    def _build_question_block(self, spec, compact=False, board_data=None):
+        if board_data is not None:
+            return self._build_board_question_block(board_data, compact=compact)
         question = self._question_text(spec)
         title = cjk_text("题目要点", font_size=21 if not compact else 17, color=YELLOW)
         max_lines = 5 if not compact else 3
@@ -306,6 +399,47 @@ class LearningScene(Scene):
         group.to_corner(UL, buff=0.32)
         if group.width > 5.95:
             group.scale_to_fit_width(5.95)
+        return group
+
+    def _build_board_question_block(self, board, compact=False):
+        title = cjk_text("题目区", font_size=20 if not compact else 16, color=YELLOW)
+        summary_title = cjk_text("情景摘要", font_size=14 if not compact else 12, color=BLUE_B)
+        summary = VGroup(
+            cjk_text("光滑水平面：长木板 A，物块 B 在右端。", font_size=12 if not compact else 10, color=WHITE),
+            cjk_text("B 初速度向左，恒力 F 水平向右。", font_size=12 if not compact else 10, color=WHITE),
+        )
+        summary.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
+        known_title = cjk_text("已知条件", font_size=14 if not compact else 12, color=BLUE_B)
+        known = VGroup()
+        known_items = [
+            self._value_formula("m_A", board.get("m_A"), "kg"),
+            self._value_formula("m_B", board.get("m_B"), "kg"),
+            self._value_formula("v_0", board.get("v0"), "m/s"),
+            self._value_formula("F", board.get("F"), "N"),
+            self._value_formula(r"\\mu", board.get("mu")),
+            self._value_formula("g", board.get("g"), "m/s^2"),
+        ]
+        for item in known_items:
+            if "?" not in item:
+                try:
+                    known.add(MathTex(item, color=WHITE).scale(0.36 if not compact else 0.30))
+                except Exception:
+                    known.add(cjk_text(item[:16], font_size=11 if not compact else 9, color=WHITE))
+        known.arrange_in_grid(cols=3 if not compact else 2, buff=(0.16, 0.10), cell_alignment=LEFT)
+        q_title = cjk_text("小问列表", font_size=14 if not compact else 12, color=BLUE_B)
+        q_lines = []
+        for index, item in enumerate(board.get("questions") or [], start=1):
+            q_lines.append(cjk_text(str(index) + ". " + str(item)[:20], font_size=11 if not compact else 9, color=GREY_A))
+        questions = VGroup(*q_lines)
+        if len(questions) > 0:
+            questions.arrange(DOWN, aligned_edge=LEFT, buff=0.04)
+        group = VGroup(title, summary_title, summary, known_title, known, q_title, questions)
+        group.arrange(DOWN, aligned_edge=LEFT, buff=0.08 if not compact else 0.05)
+        group.to_corner(UL, buff=0.24)
+        if group.width > 6.0:
+            group.scale_to_fit_width(6.0)
+        if group.height > 2.78:
+            group.scale_to_fit_height(2.78)
         return group
 
     def _build_em_teaching_model(self):
@@ -355,17 +489,21 @@ class LearningScene(Scene):
             "q": q,
         }}
 
-    def _build_board_block_teaching_model(self):
+    def _build_board_block_teaching_model(self, board_data=None):
+        board_data = board_data or {{}}
         ground = Line(LEFT * 6.05 + DOWN * 2.35, LEFT * 0.40 + DOWN * 2.35, color=WHITE, stroke_width=3)
         board = Rectangle(width=4.25, height=0.34, color=WHITE, stroke_width=4)
         board.move_to(LEFT * 3.25 + DOWN * 2.06)
         block = Square(side_length=0.68, color=WHITE, stroke_width=4)
-        block.next_to(board, UP, buff=0).shift(RIGHT * 0.72)
+        block.move_to(board.get_right() + LEFT * 0.50 + UP * 0.51)
         board_label = self._label("A", board.get_center(), 24)
         block_label = self._label("B", block.get_center(), 24)
         v_arrow = Arrow(block.get_top() + UP * 0.30 + RIGHT * 0.18, block.get_top() + UP * 0.30 + LEFT * 1.05, buff=0, color=WHITE, stroke_width=3)
         v_label = MathTex("v_0", color=WHITE).scale(0.55).next_to(v_arrow, UP, buff=0.03)
-        board_motion = Arrow(board.get_center() + DOWN * 0.46, board.get_center() + RIGHT * 0.95 + DOWN * 0.46, buff=0, color=GREY_A, stroke_width=2)
+        f_formula = self._value_formula("F", board_data.get("F"), "N")
+        force_arrow = Arrow(block.get_right() + UP * 0.18, block.get_right() + RIGHT * 1.05 + UP * 0.18, buff=0, color=WHITE, stroke_width=3)
+        force_label = MathTex(f_formula, color=WHITE).scale(0.48).next_to(force_arrow, UP, buff=0.03)
+        board_motion = Arrow(board.get_center() + DOWN * 0.46, board.get_center() + LEFT * 0.95 + DOWN * 0.46, buff=0, color=GREY_A, stroke_width=2)
         block_motion = Arrow(block.get_center() + UP * 0.64, block.get_center() + LEFT * 1.10 + UP * 0.64, buff=0, color=GREY_A, stroke_width=2)
         motion_labels = VGroup(
             cjk_text("A 的运动趋势", font_size=13, color=GREY_A).next_to(board_motion, DOWN, buff=0.04),
@@ -386,7 +524,7 @@ class LearningScene(Scene):
         relative_label = MathTex("s_{{rel}}", color=YELLOW).scale(0.54).next_to(relative_arrow, UP, buff=0.03)
         relative = VGroup(relative_arrow, relative_label)
         board_group = VGroup(board, board_label)
-        block_group = VGroup(block, block_label, v_arrow, v_label)
+        block_group = VGroup(block, block_label, v_arrow, v_label, force_arrow, force_label)
         motion = VGroup(board_motion, block_motion, motion_labels)
         full_group = VGroup(ground, board_group, block_group)
         moving = VGroup(board_group, block_group, motion)
@@ -401,8 +539,10 @@ class LearningScene(Scene):
             "motion": motion,
             "moving": moving,
             "forces": forces,
+            "force_arrow": VGroup(force_arrow, force_label),
             "relative": relative,
             "full_group": full_group,
+            "board_data": board_data,
             "forces_shown": False,
             "relative_shown": False,
         }}
@@ -441,23 +581,24 @@ class LearningScene(Scene):
             self.play(Create(model["ground"]), FadeIn(model["board_group"]), FadeIn(model["block_group"]), run_time=1.2)
             self.play(FadeIn(model["motion"]), run_time=0.65)
             self.play(
-                model["board_group"].animate.shift(RIGHT * 0.42),
-                model["block_group"].animate.shift(LEFT * 1.05),
+                model["board_group"].animate.shift(LEFT * 0.45),
+                model["block_group"].animate.shift(LEFT * 1.35),
                 model["motion"].animate.shift(LEFT * 0.20),
                 run_time=3.8,
                 rate_func=smooth,
             )
+            self.play(VGroup(model["board_group"], model["block_group"], model["motion"]).animate.shift(LEFT * 0.34), run_time=1.2, rate_func=linear)
             self.wait(0.55)
             self.play(Restore(model["moving"]), run_time=0.8)
             return
         self.play(Create(VGroup(model["base"], model["body"], model["velocity"], model["force"], model["labels"])), run_time=1.4)
         self.play(Create(model["path"]), model["body"].animate.move_to(model["path"].get_end()), run_time=3.6, rate_func=smooth)
 
-    def _play_step_breakdown(self, spec, model, scene_type):
+    def _play_step_breakdown(self, spec, model, scene_type, board_data=None):
         stage_title = cjk_text("第二阶段：分段拆解与数学推导", font_size=24, color=YELLOW)
         stage_title.move_to(RIGHT * 3.55 + UP * 3.15)
         self.play(FadeIn(stage_title, shift=DOWN * 0.08), run_time=0.45)
-        sections = self._breakdown_sections(spec, scene_type)
+        sections = self._breakdown_sections(spec, scene_type, board_data=board_data)
         for index, section in enumerate(sections, start=1):
             derivation = self._build_derivation_group(index, section)
             self.play(FadeIn(derivation, shift=LEFT * 0.12), run_time=0.55)
@@ -467,33 +608,72 @@ class LearningScene(Scene):
             self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
         self.play(FadeOut(stage_title), run_time=0.35)
 
-    def _breakdown_sections(self, spec, scene_type):
+    def _board_block_sections(self, board):
+        questions = board.get("questions") or []
+        first_question = questions[0] if len(questions) > 0 else "确认板块模型和初始状态"
+        second_question = questions[1] if len(questions) > 1 else "求 A、B 的受力和加速度"
+        third_question = questions[2] if len(questions) > 2 else "求共速时间和相对位移"
+        known_formulas = [
+            self._value_formula("m_A", board.get("m_A"), "kg"),
+            self._value_formula("m_B", board.get("m_B"), "kg"),
+            self._value_formula("v_0", board.get("v0"), "m/s"),
+            self._value_formula("F", board.get("F"), "N"),
+            self._value_formula(r"\\mu", board.get("mu")),
+        ]
+        known_formulas = [item for item in known_formulas if "?" not in item]
+        complete = not board.get("missing")
+        if complete:
+            f = board.get("f")
+            a_a = board.get("a_A")
+            a_b = board.get("a_B")
+            a_rel = board.get("a_rel")
+            t_common = board.get("t_common")
+            s_rel_abs = board.get("s_rel_abs")
+            force_formulas = [
+                "N_B=m_Bg=" + self._fmt_num(board.get("m_B")) + "\\\\times" + self._fmt_num(board.get("g")) + "=" + self._fmt_num(board.get("m_B") * board.get("g")) + r"\\mathrm{{N}}",
+                "f=\\\\mu m_Bg=" + self._fmt_num(board.get("mu")) + "\\\\times" + self._fmt_num(board.get("m_B")) + "\\\\times" + self._fmt_num(board.get("g")) + "=" + self._fmt_num(f) + r"\\mathrm{{N}}",
+                "a_A=-\\\\frac{{f}}{{m_A}}=-" + self._fmt_num(f) + "/" + self._fmt_num(board.get("m_A")) + "=" + self._fmt_num(a_a) + r"\\mathrm{{m/s^2}}",
+                "a_B=\\\\frac{{F+f}}{{m_B}}=\\\\frac{{" + self._fmt_num(board.get("F")) + "+" + self._fmt_num(f) + "}}{{" + self._fmt_num(board.get("m_B")) + "}}=" + self._fmt_num(a_b) + r"\\mathrm{{m/s^2}}",
+            ]
+            relative_formulas = [
+                "a_{{rel}}=a_B-a_A=" + self._fmt_num(a_rel) + r"\\mathrm{{m/s^2}}",
+                "v_{{rel}}=-v_0+a_{{rel}}t",
+                "t=\\\\frac{{v_0}}{{a_{{rel}}}}=" + self._fmt_num(t_common) + r"\\mathrm{{s}}",
+                "|s_{{rel}}|=\\\\frac{{v_0^2}}{{2a_{{rel}}}}=" + self._fmt_num(s_rel_abs) + r"\\mathrm{{m}}",
+            ]
+            force_notes = ["水平面光滑，所以地面对 A 没有水平摩擦。", "B 同时受向右恒力 F 和向右摩擦力 f。"]
+            relative_notes = ["以向右为正，B 初速度为 -v0。", "当相对速度变为 0 时，A、B 达到共速。"]
+        else:
+            missing = "、".join(board.get("missing") or [])
+            force_formulas = [r"N_B=m_Bg", r"f=\\mu m_Bg", r"a_A=-\\frac{{f}}{{m_A}}", r"a_B=\\frac{{F+f}}{{m_B}}"]
+            relative_formulas = [r"a_{{rel}}=a_B-a_A", r"v_{{rel}}=-v_0+a_{{rel}}t", r"s_{{rel}}=-v_0t+\\frac12a_{{rel}}t^2"]
+            force_notes = ["题干条件缺失：" + missing + "；这里只保留符号推导。", "不会用 LLM 公式覆盖题干真实条件。"]
+            relative_notes = ["条件齐全后再代入数值求共速时间和相对位移。"]
+        return [
+            {{
+                "title": "小问一：" + str(first_question)[:22],
+                "focus": "objects",
+                "notes": ["B 初始位于木板 A 的右端。", "v0 向左，恒力 F 向右，先把初态画对。"],
+                "formulas": [r"v_B(0)=-v_0", r"F\\rightarrow"] + known_formulas[:5],
+            }},
+            {{
+                "title": "小问二：" + str(second_question)[:22],
+                "focus": "forces",
+                "notes": force_notes,
+                "formulas": force_formulas,
+            }},
+            {{
+                "title": "小问三：" + str(third_question)[:22],
+                "focus": "relative",
+                "notes": relative_notes,
+                "formulas": relative_formulas,
+            }},
+        ]
+
+    def _breakdown_sections(self, spec, scene_type, board_data=None):
         formulas = self._formula_items(spec)
         if scene_type == "board_block":
-            fallback = [
-                {{
-                    "title": "小问一：板块模型到底画什么？",
-                    "focus": "objects",
-                    "notes": ["光滑水平面上是长木板 A，物块 B 放在 A 上。", "先确认 A、B、初速度和相对滑动方向，不能画成斜面。"],
-                    "formulas": [r"A", r"B", r"v_0"],
-                }},
-                {{
-                    "title": "小问二：摩擦力和加速度怎么写？",
-                    "focus": "forces",
-                    "notes": ["水平面光滑表示地面对 A 无摩擦。", "A、B 之间的滑动摩擦必须带动摩擦因数。"],
-                    "formulas": [r"N_B=m_Bg", r"f=\\mu N_B=\\mu m_Bg", r"a_A=\\frac{{f}}{{m_A}}", r"a_B=-\\frac{{f}}{{m_B}}"],
-                }},
-                {{
-                    "title": "小问三：相对运动条件怎么用？",
-                    "focus": "relative",
-                    "notes": ["真正决定是否滑离的是 B 相对 A 的位移。", "把两者位移相减，再与板长或边界条件比较。"],
-                    "formulas": [r"a_{{rel}}=a_B-a_A", r"s_{{rel}}=v_0t+\\frac12a_{{rel}}t^2", r"s_{{rel}}\\le L"],
-                }},
-            ]
-            known = self._question_formula_items(self._question_text(spec), limit=5)
-            for item in known:
-                if item not in fallback[0]["formulas"]:
-                    fallback[0]["formulas"].append(item)
+            return self._board_block_sections(board_data or self._board_block_data(spec))
         elif scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
             fallback = [
                 {{
@@ -636,7 +816,7 @@ class LearningScene(Scene):
                 if not model.get("forces_shown"):
                     self.play(FadeIn(model["forces"]), run_time=0.9)
                     model["forces_shown"] = True
-                self.play(Indicate(model["forces"], color=YELLOW, scale_factor=1.03), run_time=2.0)
+                self.play(Indicate(VGroup(model["forces"], model["force_arrow"]), color=YELLOW, scale_factor=1.03), run_time=2.0)
             else:
                 if not model.get("relative_shown"):
                     self.play(FadeIn(model["relative"]), run_time=0.65)

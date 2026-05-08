@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
-from backend.app.rendering.manim_renderer import ManimUnavailable
+from backend.app.rendering.manim_renderer import ManimUnavailable, build_manim_script
 from backend.app.services import manimcat_client
 from backend.app.services import render_jobs
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
@@ -239,8 +239,39 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("FadeOut(derivation", source)
         self.assertNotIn("@ Zerror", source)
         self.assertIn("self.camera.background_color = BLACK", source)
-        self.assertIn(r"f=\\mu N_B=\\mu m_Bg", source)
+        self.assertIn(r"f=\\mu m_Bg", source)
         self.assertIn(r'R=\\frac{{mv_0}}{{qB}}', source)
+
+    def test_board_block_manim_uses_extracted_force_and_mu(self) -> None:
+        question = (
+            "如图所示，光滑水平面上有长木板 A，物块 B 放在木板 A 的右端。"
+            "m1=4kg，m2=2kg，v0=12m/s，对 B 施加 F=12N 水平向右恒力，"
+            "A、B 间动摩擦因数 μ=0.4。"
+        )
+        script = build_manim_script(
+            {
+                "subject": "physics",
+                "scene_type": "board_block",
+                "fallback_text": question,
+                "parameters": {"question_excerpt": question},
+                "formula_steps": [r"f=m_2g", r"F=ma", r"x=x_0+v_0t+\frac12at^2"],
+            }
+        )
+
+        board_section = script[
+            script.index("def _board_block_sections") : script.index("def _breakdown_sections")
+        ]
+
+        self.assertIn("_board_block_data", script)
+        self.assertIn('"block_initial_position": "right_end"', script)
+        self.assertIn('self._value_formula("F", board_data.get("F"), "N")', script)
+        self.assertIn(r"a_B=\\frac{F+f}{m_B}", board_section)
+        self.assertIn(r"f=\\mu m_Bg", board_section)
+        self.assertIn(r"a_{rel}=a_B-a_A", board_section)
+        self.assertIn("rightarrow", board_section)
+        self.assertNotIn(r"a_B=-\\frac{f}{m_B}", board_section)
+        self.assertNotIn(r"f=m_2g", board_section)
+        self.assertNotIn(r"\mu=0.2", board_section)
 
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "geogebra_scene_preview_screen.dart").read_text(
