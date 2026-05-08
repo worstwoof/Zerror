@@ -230,6 +230,8 @@ class RenderDiagnosticsTest(unittest.TestCase):
         )
 
         self.assertIn("_draw_professional_physics_scene", source)
+        self.assertIn("_build_board_block_teaching_model", source)
+        self.assertIn("_professional_scene_type", source)
         self.assertIn("第一阶段：全局物理过程预览", source)
         self.assertIn("第二阶段：分段拆解与数学推导", source)
         self.assertIn("_play_local_response", source)
@@ -237,6 +239,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("FadeOut(derivation", source)
         self.assertNotIn("@ Zerror", source)
         self.assertIn("self.camera.background_color = BLACK", source)
+        self.assertIn(r"f=\\mu N_B=\\mu m_Bg", source)
         self.assertIn(r'R=\\frac{{mv_0}}{{qB}}', source)
 
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
