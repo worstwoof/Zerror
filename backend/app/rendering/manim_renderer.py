@@ -326,7 +326,7 @@ class LearningScene(Scene):
 
     def _play_step_breakdown(self, spec, model, scene_type):
         stage_title = cjk_text("第二阶段：分段拆解与数学推导", font_size=24, color=YELLOW)
-        stage_title.move_to(RIGHT * 3.55 + UP * 2.95)
+        stage_title.move_to(RIGHT * 3.55 + UP * 3.15)
         self.play(FadeIn(stage_title, shift=DOWN * 0.08), run_time=0.45)
         sections = self._breakdown_sections(spec, scene_type)
         for index, section in enumerate(sections, start=1):
@@ -398,11 +398,11 @@ class LearningScene(Scene):
         if formula is not None:
             group.add(formula)
         group.arrange(DOWN, aligned_edge=LEFT, buff=0.28)
-        group.move_to(RIGHT * 3.35 + UP * 0.55)
+        group.move_to(RIGHT * 3.35 + DOWN * 0.18)
         if group.width > 5.45:
             group.scale_to_fit_width(5.45)
-        if group.height > 4.75:
-            group.scale_to_fit_height(4.75)
+        if group.height > 4.25:
+            group.scale_to_fit_height(4.25)
         return group
 
     def _aligned_formula_block(self, formulas):
@@ -1178,6 +1178,44 @@ def _manim_command(script_path: Path, output_dir: Path) -> List[str]:
     ]
 
 
+_LATEX_COMMANDS = (
+    "frac",
+    "sqrt",
+    "sin",
+    "cos",
+    "tan",
+    "theta",
+    "alpha",
+    "beta",
+    "gamma",
+    "Delta",
+    "vec",
+    "parallel",
+    "le",
+    "ge",
+    "text",
+    "Rightarrow",
+)
+
+
+def _normalize_latex_escapes(value: Any) -> str:
+    text = str(value)
+    for _ in range(4):
+        for command in _LATEX_COMMANDS:
+            text = text.replace("\\\\" + command, "\\" + command)
+    return text
+
+
+def _safe_formula_step(item: Any) -> Any:
+    if isinstance(item, dict):
+        safe_item = dict(item)
+        for key in ("formula", "latex", "value"):
+            if key in safe_item:
+                safe_item[key] = _normalize_latex_escapes(safe_item[key])
+        return safe_item
+    return _normalize_latex_escapes(item)
+
+
 def _safe_scene_spec(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     safe = dict(scene_spec or {})
     safe["objects"] = [
@@ -1190,6 +1228,7 @@ def _safe_scene_spec(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
         for item in safe.get("relations", [])
         if isinstance(item, dict) and str(item.get("type") or "") in {"segment", "circle", "arrow"}
     ][:20]
+    safe["formula_steps"] = [_safe_formula_step(item) for item in safe.get("formula_steps", [])][:16]
     safe.pop("code", None)
     safe.pop("script", None)
     return safe
