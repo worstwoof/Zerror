@@ -147,6 +147,7 @@ class DiagnosticService:
                 cleaned_question=cleaned_question,
                 knowledge_points=knowledge_points,
                 solution_summary=solution_summary,
+                subject=subject,
             )
         logger.info(
             "analysis response scene_brief source=%s len=%s preview=%r",
@@ -340,41 +341,18 @@ class DiagnosticService:
             return []
 
         existing_types = {artifact.artifact_type for artifact in existing_artifacts}
-        looks_like_math = any(
-            marker in normalized_context
-            for marker in [
-                "数学",
-                "解析几何",
-                "圆锥曲线",
-                "椭圆",
-                "抛物线",
-                "双曲线",
-                "焦点",
-                "x^2",
-                "y^2",
-                "鏁板",
-                "math",
-                "ellipse",
-                "parabola",
-                "hyperbola",
-                "conic",
-            ]
+        subject_hint = str(subject or request.subject or "").lower()
+        requested_math = "math" in subject_hint or "\u6570\u5b66" in subject_hint
+        requested_physics = "physics" in subject_hint or "\u7269\u7406" in subject_hint
+        looks_like_math = self._looks_like_math_scene_context(normalized_context)
+        looks_like_physics = self._looks_like_physics_scene_context(normalized_context)
+        scene_subject = (
+            "math"
+            if requested_math or (looks_like_math and not requested_physics)
+            else "physics"
+            if requested_physics or looks_like_physics
+            else "math"
         )
-        looks_like_physics = any(
-            marker in normalized_context
-            for marker in [
-                "物理",
-                "磁场",
-                "电场",
-                "洛伦兹",
-                "带电粒子",
-                "受力",
-                "速度",
-                "鐗╃悊",
-                "physics",
-            ]
-        )
-        scene_subject = "math" if looks_like_math and not looks_like_physics else "physics"
         if scene_subject == "physics":
             if "manim_job" in existing_types or "manim_video" in existing_types:
                 return []
@@ -1704,13 +1682,102 @@ class DiagnosticService:
         )
         return _physics_scene_type(scene_source)
 
+    def _looks_like_math_scene_context(self, text: str) -> bool:
+        normalized = str(text or "").lower().replace(" ", "")
+        return any(
+            marker in normalized
+            for marker in [
+                "数学",
+                "解析几何",
+                "圆锥曲线",
+                "椭圆",
+                "抛物线",
+                "双曲线",
+                "焦点",
+                "切线长",
+                "轨迹方程",
+                "阿波罗尼斯",
+                "坐标",
+                "方程",
+                "x^2",
+                "y^2",
+                "x²",
+                "y²",
+                "math",
+                "ellipse",
+                "parabola",
+                "hyperbola",
+                "conic",
+                "鏁板",
+                "妞渾",
+                "鐒︾偣",
+            ]
+        )
+
+    def _looks_like_physics_scene_context(self, text: str) -> bool:
+        normalized = str(text or "").lower().replace(" ", "")
+        return any(
+            marker in normalized
+            for marker in [
+                "物理",
+                "磁场",
+                "电场",
+                "洛伦兹",
+                "带电粒子",
+                "受力",
+                "速度方向",
+                "加速度",
+                "physics",
+                "鐗╃悊",
+                "纾佸満",
+                "鐢靛満",
+            ]
+        )
+
     def _fallback_scene_brief(
         self,
         *,
         cleaned_question: str,
         knowledge_points: List[str],
         solution_summary: str,
+        subject: str = "",
     ) -> str:
+        combined = " ".join(
+            part.strip()
+            for part in [
+                subject,
+                cleaned_question,
+                " ".join(knowledge_points),
+                solution_summary,
+            ]
+            if part and part.strip()
+        )
+        subject_hint = subject.lower()
+        if (
+            "math" in subject_hint
+            or "数学" in subject
+            or "鏁板" in subject
+            or self._looks_like_math_scene_context(combined)
+        ) and not (
+            ("physics" in subject_hint or "物理" in subject or "鐗╃悊" in subject)
+            and not self._looks_like_math_scene_context(combined)
+        ):
+            question_excerpt = self._display_plain_text(cleaned_question, limit=72)
+            focus_points = [
+                self._display_plain_text(item, limit=14)
+                for item in knowledge_points[:3]
+                if str(item).strip()
+            ]
+            focus_text = "、".join(item for item in focus_points if item)
+            summary_excerpt = self._display_plain_text(solution_summary, limit=48)
+            parts = ["画面重点放在坐标系、曲线、动点、距离关系和轨迹方程推导。"]
+            if question_excerpt:
+                parts.append(f"题目片段：{question_excerpt}")
+            if focus_text:
+                parts.append(f"关注：{focus_text}")
+            if summary_excerpt:
+                parts.append(f"解析提示：{summary_excerpt}")
+            return " ".join(parts)
         scene_type = _physics_scene_type(
             " ".join(
                 part.strip()
