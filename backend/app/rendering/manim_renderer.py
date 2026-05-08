@@ -208,7 +208,7 @@ class LearningScene(Scene):
         preview_note.next_to(preview_title, DOWN, aligned_edge=LEFT, buff=0.18)
         self.play(FadeIn(preview_title), FadeIn(preview_note), run_time=0.45)
         self._play_global_physics_preview(model, scene_type)
-        self.wait(1.0)
+        self.wait(2.0)
         self.play(FadeOut(VGroup(preview_title, preview_note)), question_block.animate.scale(0.86).to_corner(UL, buff=0.28), run_time=0.7)
         self._play_step_breakdown(spec, model, scene_type)
 
@@ -332,8 +332,9 @@ class LearningScene(Scene):
         for index, section in enumerate(sections, start=1):
             derivation = self._build_derivation_group(index, section)
             self.play(FadeIn(derivation, shift=LEFT * 0.12), run_time=0.55)
+            self.wait(1.10)
             self._play_local_response(model, section.get("focus") or "", scene_type)
-            self.wait(1.35)
+            self.wait(3.10)
             self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
         self.play(FadeOut(stage_title), run_time=0.35)
 
@@ -441,29 +442,29 @@ class LearningScene(Scene):
             if focus == "points":
                 target = model["points"]
                 self.play(target.animate.set_color(YELLOW), run_time=0.35)
-                self.play(Indicate(target, color=YELLOW, scale_factor=1.04), run_time=1.2)
+                self.play(Indicate(target, color=YELLOW, scale_factor=1.04), run_time=1.8)
                 self.play(target.animate.set_color(WHITE), run_time=0.35)
             elif focus == "field":
                 target = model["field"]
                 self.play(target.animate.set_color(YELLOW), run_time=0.35)
-                self.play(Circumscribe(model["field_box"], color=YELLOW, time_width=0.8), run_time=1.5)
+                self.play(Circumscribe(model["field_box"], color=YELLOW, time_width=0.8), run_time=2.2)
                 self.play(target.animate.set_color(WHITE), run_time=0.35)
             else:
                 path = model["path"]
                 particle = Dot(model["p"], color=YELLOW, radius=0.07)
                 self.play(path.animate.set_color(YELLOW), run_time=0.30)
                 self.add(particle)
-                self.play(MoveAlongPath(particle, path), run_time=3.2, rate_func=linear)
+                self.play(MoveAlongPath(particle, path), run_time=4.2, rate_func=linear)
                 self.play(FadeOut(particle), path.animate.set_color(WHITE), run_time=0.35)
             return
         if focus in {{"state", "motion"}}:
             target = VGroup(model["body"], model["velocity"], model["force"])
             self.play(target.animate.set_color(YELLOW), run_time=0.35)
-            self.play(Indicate(target, color=YELLOW, scale_factor=1.05), run_time=1.2)
+            self.play(Indicate(target, color=YELLOW, scale_factor=1.05), run_time=1.8)
             self.play(target.animate.set_color(WHITE), run_time=0.35)
         else:
             self.play(model["path"].animate.set_color(YELLOW), run_time=0.35)
-            self.wait(1.2)
+            self.wait(2.0)
             self.play(model["path"].animate.set_color(WHITE), run_time=0.35)
 
     def _draw_blackboard_physics_scene(self, spec):
