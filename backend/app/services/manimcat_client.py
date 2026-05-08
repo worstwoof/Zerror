@@ -274,7 +274,11 @@ def _download_timeout() -> int:
 
 
 def _job_timeout() -> int:
-    return int(_env("MANIMCAT_JOB_TIMEOUT_SECONDS", "1200"))
+    configured = int(_env("MANIMCAT_JOB_TIMEOUT_SECONDS", "1200"))
+    # Math videos can spend several minutes in AI repair plus Manim/LaTeX
+    # rendering. Keep the app-side wait aligned with that high-quality path
+    # even if an older deployment env still contains the previous 8-minute cap.
+    return max(configured, 1200)
 
 
 def _poll_interval() -> float:
