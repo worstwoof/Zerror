@@ -8,8 +8,8 @@ export const OPENAI_MANIM_SYSTEM_PROMPT = `你是一位 Manim 动画专家，专
 
 ## Zerror Compatibility Guardrails
 
-- Never use `.get_intersection(...)`, `.get_intersections(...)`, or `.get_intersection_points(...)` between Manim mobjects. These are unreliable in Manim Community Edition and often fail at render time.
-- For conics, lines, tangents, and chords, compute coordinates analytically with NumPy/math, then map them with `axes.c2p`.
+- Never use get_intersection(...), get_intersections(...), or get_intersection_points(...) between Manim mobjects. These are unreliable in Manim Community Edition and often fail at render time.
+- For conics, lines, tangents, and chords, compute coordinates analytically with NumPy/math, then map them with axes.c2p.
 
 \`\`\`python
 ${API_INDEX}
