@@ -12,11 +12,17 @@ from backend.app.core.config import settings
 from backend.app.schemas.card_schema import (
     AnalysisRequest,
     AnalysisResponse,
+    ImageAnalysisJobResponse,
     ImageAnalysisResponse,
     OCRResponse,
     PhysicsAnimationRequest,
     PhysicsAnimationResponse,
     ReviewPlan,
+)
+from backend.app.services.analysis_jobs import (
+    create_image_analysis_job,
+    get_image_analysis_job,
+    retry_image_analysis_job,
 )
 
 
@@ -193,6 +199,51 @@ async def analyze_image(
         )
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/analysis/image/jobs", response_model=ImageAnalysisJobResponse)
+async def create_analysis_image_job(
+    image: UploadFile = File(...),
+    subject: str = Form("通用"),
+    user_answer: str = Form(""),
+    wrong_reason_hint: str = Form(""),
+    enable_subject_extensions: bool = Form(True),
+) -> ImageAnalysisJobResponse:
+    _ensure_credentials()
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="上传图片为空。")
+    return create_image_analysis_job(
+        image_bytes=image_bytes,
+        filename=image.filename or "",
+        content_type=image.content_type or "image/png",
+        subject=subject,
+        user_answer=user_answer,
+        wrong_reason_hint=wrong_reason_hint,
+        enable_subject_extensions=enable_subject_extensions,
+        diagnostic_service=diagnostic_service,
+        vivo_client=vivo_client,
+    )
+
+
+@router.get("/analysis/image/jobs/{job_id}", response_model=ImageAnalysisJobResponse)
+def get_analysis_image_job(job_id: str) -> ImageAnalysisJobResponse:
+    job = get_image_analysis_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="解析任务不存在。")
+    return job
+
+
+@router.post("/analysis/image/jobs/{job_id}/retry", response_model=ImageAnalysisJobResponse)
+def retry_analysis_image_job(job_id: str) -> ImageAnalysisJobResponse:
+    _ensure_credentials()
+    job = retry_image_analysis_job(
+        job_id=job_id,
+        diagnostic_service=diagnostic_service,
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="解析任务不存在或尚无 OCR 结果。")
+    return job
 
 
 @router.post("/analysis/physics-animation", response_model=PhysicsAnimationResponse)

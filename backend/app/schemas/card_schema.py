@@ -73,6 +73,29 @@ class ImageAnalysisResponse(AnalysisResponse):
     ocr: OCRResponse
 
 
+AnalysisJobStatus = Literal[
+    "pending",
+    "processing",
+    "partial_success",
+    "completed",
+    "failed",
+    "need_retry",
+]
+
+
+class ImageAnalysisJobResponse(BaseModel):
+    job_id: str
+    status: AnalysisJobStatus
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = ""
+    error: str = ""
+    created_at: float
+    updated_at: float
+    ocr: Optional[OCRResponse] = None
+    result: Optional[ImageAnalysisResponse] = None
+    partial_result: Optional[ImageAnalysisResponse] = None
+
+
 class PhysicsAnimationRequest(BaseModel):
     cleaned_question: str = Field(..., min_length=1)
     scene_brief: str = ""

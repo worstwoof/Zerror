@@ -244,6 +244,45 @@ class DiagnosticService:
         )
         return response
 
+    def analyze_text_quality(self, request: AnalysisRequest) -> AnalysisResponse:
+        """Generate the second-stage explanation with the quality model.
+
+        The upload path can use a faster model or OCR-only fallback to avoid
+        mobile request timeouts. This method is intentionally reserved for
+        background jobs where we can spend more time to recover formula quality.
+        """
+
+        started_at = time.perf_counter()
+        cleaned_question = normalize_ocr_text(request.question_text)
+        prompt = self._build_text_prompt(request, cleaned_question)
+        model_started_at = time.perf_counter()
+        raw_output = self.client.chat_completion(
+            prompt,
+            model_name=self.client.settings.vivo_quality_text_model,
+            thinking_mode=self.client.settings.vivo_quality_text_thinking_mode,
+            reasoning_effort=self.client.settings.vivo_quality_text_reasoning_effort,
+            max_tokens=self.client.settings.vivo_quality_max_tokens,
+            timeout_seconds=self.client.settings.vivo_quality_timeout_seconds,
+        )
+        logger.info(
+            "analysis text quality model=%s subject=%s elapsed=%.2fs",
+            self.client.settings.vivo_quality_text_model,
+            request.subject,
+            time.perf_counter() - model_started_at,
+        )
+        response = self._build_response(
+            request=request,
+            raw_output=raw_output,
+            default_cleaned_question=cleaned_question,
+            source="text",
+        )
+        logger.info(
+            "analysis text quality total subject=%s elapsed=%.2fs",
+            response.subject,
+            time.perf_counter() - started_at,
+        )
+        return response
+
     def _build_structured_render_artifacts(
         self,
         *,
@@ -1670,9 +1709,12 @@ class DiagnosticService:
 9. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
 10. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
 11. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
-12. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-13. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-14. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
+12. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+13. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+14. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+15. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+16. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+17. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
 """.strip()
 
     def _build_vision_prompt(self, request: AnalysisRequest, cleaned_ocr_draft: str) -> str:
@@ -1741,9 +1783,12 @@ class DiagnosticService:
 10. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
 11. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
 12. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-13. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-14. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-15. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
+13. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+14. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+15. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+16. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+17. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+18. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
 """.strip()
 
     def _parse_json(self, raw_output: str) -> dict:
@@ -4760,16 +4805,55 @@ class DiagnosticService:
         if not text.strip():
             return text
 
+        text = self._repair_latex_backslashes(text)
         parts = re.split(r"(\$\$.*?\$\$|\$.*?\$)", text, flags=re.DOTALL)
         converted: List[str] = []
         for part in parts:
             if not part:
                 continue
             if part.startswith("$$") or part.startswith("$"):
-                converted.append(part)
+                converted.append(self._repair_latex_backslashes(part, inside_math=True))
                 continue
             converted.append(self._wrap_math_segments(part))
         return "".join(converted)
+
+    def _repair_latex_backslashes(self, text: str, *, inside_math: bool = False) -> str:
+        """Conservatively repair common LaTeX escapes lost by JSON/model output.
+
+        We only fix command names where the intended LaTeX command is unambiguous.
+        Compact fragments such as ``racmv_0eB`` are left untouched because guessing
+        the fraction boundary would risk creating a wrong answer.
+        """
+
+        repaired = text
+        repaired = re.sub(r"(?<!\\)\brac\s*\{", r"\\frac{", repaired)
+        repaired = re.sub(r"(?<!\\)\bfrac\s*\{", r"\\frac{", repaired)
+        command_names = [
+            "theta",
+            "alpha",
+            "beta",
+            "gamma",
+            "lambda",
+            "mu",
+            "omega",
+            "Delta",
+            "pi",
+            "sqrt",
+            "sin",
+            "cos",
+            "tan",
+            "ln",
+            "log",
+        ]
+        for command in command_names:
+            repaired = re.sub(
+                rf"(?<![\\A-Za-z]){command}\b",
+                rf"\\{command}",
+                repaired,
+            )
+        if inside_math:
+            repaired = repaired.replace("\\\\frac", "\\frac")
+        return repaired
 
     def _wrap_math_segments(self, text: str) -> str:
         pattern = re.compile(r"[A-Za-z0-9π∞α-ωΑ-Ω∫∑√≤≥≠≈±×÷·\-\+\=\^\(\)\[\]\{\}/\\|_,.:%]+")

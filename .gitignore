@@ -64,3 +64,6 @@ x86/
 
 # Bundles / archives generated locally
 *.bundle
+
+# Local syntax-check scratch files
+.compile_check/

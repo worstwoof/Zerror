@@ -58,6 +58,11 @@ class Settings:
     vivo_vision_thinking_mode: str
     vivo_text_reasoning_effort: str
     vivo_vision_reasoning_effort: str
+    vivo_quality_text_model: str
+    vivo_quality_text_thinking_mode: str
+    vivo_quality_text_reasoning_effort: str
+    vivo_quality_timeout_seconds: int
+    vivo_quality_max_tokens: int
     vivo_animation_model: str
     vivo_animation_thinking_mode: str
     vivo_animation_reasoning_effort: str
@@ -110,6 +115,35 @@ def get_settings() -> Settings:
         vivo_vision_thinking_mode=_get_setting("VIVO_VISION_THINKING_MODE", file_values, "auto"),
         vivo_text_reasoning_effort=_get_setting("VIVO_TEXT_REASONING_EFFORT", file_values, "auto"),
         vivo_vision_reasoning_effort=_get_setting("VIVO_VISION_REASONING_EFFORT", file_values, "auto"),
+        vivo_quality_text_model=_get_setting(
+            "VIVO_QUALITY_TEXT_MODEL",
+            file_values,
+            "qwen3.5-plus",
+        ),
+        vivo_quality_text_thinking_mode=_get_setting(
+            "VIVO_QUALITY_TEXT_THINKING_MODE",
+            file_values,
+            _get_setting("VIVO_TEXT_THINKING_MODE", file_values, "auto"),
+        ),
+        vivo_quality_text_reasoning_effort=_get_setting(
+            "VIVO_QUALITY_TEXT_REASONING_EFFORT",
+            file_values,
+            "medium",
+        ),
+        vivo_quality_timeout_seconds=int(
+            _get_setting(
+                "VIVO_QUALITY_TIMEOUT_SECONDS",
+                file_values,
+                _get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120"),
+            )
+        ),
+        vivo_quality_max_tokens=int(
+            _get_setting(
+                "VIVO_QUALITY_MAX_TOKENS",
+                file_values,
+                _get_setting("VIVO_MAX_TOKENS", file_values, "4096"),
+            )
+        ),
         vivo_animation_model=_get_setting(
             "VIVO_ANIMATION_MODEL",
             file_values,
