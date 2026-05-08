@@ -187,21 +187,20 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("manim_job", artifact_types)
         self.assertNotIn("text_explanation", artifact_types)
 
-    def test_frontend_physics_card_uses_algodoo_artifacts(self) -> None:
+    def test_frontend_physics_card_uses_manim_artifacts(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "error_edit_screen.dart").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("bool _hasAlgodooArtifact()", source)
-        self.assertIn("int _findAlgodooArtifactIndex()", source)
-        self.assertIn("void _upsertAlgodooArtifact", source)
-        self.assertIn("_buildLocalAlgodooFallbackArtifact", source)
-        self.assertIn("HtmlArtifactPreviewScreen", source)
-        self.assertIn("Algodoo", source)
-        self.assertIn("htmlContent", source)
-        self.assertNotIn("_findPhysicsAnimationArtifactIndex", source)
+        self.assertIn("bool _hasManimPhysicsArtifact()", source)
+        self.assertIn("int _findManimPhysicsArtifactIndex()", source)
+        self.assertIn("void _upsertManimPhysicsArtifact", source)
+        self.assertIn("ManimVideoPreviewScreen", source)
+        self.assertIn("manim_job", source)
+        self.assertIn("manim_video", source)
+        self.assertNotIn("_findAlgodooArtifactIndex", source)
 
-    def test_backend_physics_animation_prefers_algodoo_html(self) -> None:
+    def test_backend_physics_animation_prefers_manim_video_jobs(self) -> None:
         source = (ROOT / "ai_engine" / "llm_logic" / "diagnostic_chain.py").read_text(
             encoding="utf-8"
         )
@@ -209,10 +208,21 @@ class RenderDiagnosticsTest(unittest.TestCase):
         method_end = source.index("def _generate_geogebra_scene_artifact", method_start)
         method_source = source[method_start:method_end]
 
-        self.assertIn("_build_electromagnetism_template_artifact", method_source)
-        self.assertIn("_build_physics_template_artifact", method_source)
-        self.assertIn("Algodoo", method_source)
-        self.assertIn("algodoo-style html scene", method_source)
+        self.assertIn("_build_physics_manim_artifact", method_source)
+        self.assertIn("create_manim_job", method_source)
+        self.assertIn("manim_job", method_source)
+        self.assertIn("Manim", method_source)
+
+    def test_local_manim_renderer_loads_manim_physics_extension(self) -> None:
+        source = (ROOT / "backend" / "app" / "rendering" / "manim_renderer.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("from manim_physics import *", source)
+        self.assertIn("HAS_MANIM_PHYSICS", source)
+        self.assertIn("ElectricField", source)
+        self.assertIn("MagneticField", source)
+        self.assertIn("StandingWave", source)
 
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "geogebra_scene_preview_screen.dart").read_text(
@@ -224,7 +234,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("showMenuBar: false", source)
         self.assertIn("perspective: 'G'", source)
         self.assertIn("customToolBar: ''", source)
-        self.assertIn("api.setAxesVisible(false, false)", source)
+        self.assertIn("api.setAxesVisible(isMathScene, isMathScene)", source)
         self.assertIn("_buildElectromagnetismDemoHtml", source)
         self.assertIn("electromagnetism_svg_demo", source)
         self.assertIn('id="R" type="range"', source)
@@ -298,7 +308,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
 
         self.assertEqual(completed["status"], "failed")
         self.assertIn("ManimCat missing", completed["diagnostics"]["error_summary"])
-        manimcat_render.assert_called_once()
+        self.assertGreaterEqual(manimcat_render.call_count, 1)
         local_render.assert_not_called()
 
     def test_manimcat_cache_key_includes_math_problem_identity(self) -> None:

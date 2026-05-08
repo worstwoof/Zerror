@@ -29,6 +29,7 @@ RUN pip install --upgrade pip \
 
 COPY backend /app/backend
 COPY ai_engine /app/ai_engine
+COPY third_party/manim-physics/manim_physics /app/manim_physics
 
 EXPOSE 8000
 

@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
+from backend.app.core.config import PROJECT_ROOT
+
 
 class ManimUnavailable(RuntimeError):
     pass
@@ -67,9 +69,21 @@ def render_manim_video(
 def build_manim_script(scene_spec: Dict[str, Any]) -> str:
     safe_spec = _safe_scene_spec(scene_spec)
     spec_json = json.dumps(safe_spec, ensure_ascii=False)
+    manim_physics_source = PROJECT_ROOT / "third_party" / "manim-physics"
     return f'''
 import json
+import sys
 from manim import *
+
+for _candidate_path in [{str(manim_physics_source)!r}, {str(PROJECT_ROOT)!r}]:
+    if _candidate_path and _candidate_path not in sys.path:
+        sys.path.insert(0, _candidate_path)
+
+try:
+    from manim_physics import *
+    HAS_MANIM_PHYSICS = True
+except Exception:
+    HAS_MANIM_PHYSICS = False
 
 SCENE_SPEC = {spec_json!r}
 TEXT_FONT_CANDIDATES = [
@@ -134,7 +148,11 @@ class LearningScene(Scene):
             self._draw_board_block_scene(spec)
         elif scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
             self._draw_electromagnetism_scene(spec)
-        elif scene_type in {{"mechanics", "incline", "projectile", "collision", "circuit", "optics"}}:
+        elif scene_type == "optics":
+            self._draw_optics_scene(spec)
+        elif scene_type in {{"wave", "standing_wave", "linear_wave"}}:
+            self._draw_wave_scene(spec)
+        elif scene_type in {{"mechanics", "incline", "projectile", "collision", "circuit"}}:
             self._draw_physics_motion_scene(spec)
         elif scene_type in {{"function_graph", "conic", "geometry", "generic"}}:
             if str(spec.get("subject") or "").lower() == "math":
@@ -324,13 +342,96 @@ class LearningScene(Scene):
         velocity = Arrow(LEFT * 4.4 + DOWN * 0.8, LEFT * 3.3 + DOWN * 0.8, color=ORANGE, buff=0)
         force = Arrow(RIGHT * 0.4 + DOWN * 0.15, RIGHT * 0.4 + UP * 0.8, color=BLUE, buff=0)
         self._show_step_caption(steps[0] if steps else "先确定磁场区域和粒子入射方向", color=YELLOW, wait_time=1.4)
+        physics_overlay = self._build_manim_physics_field_overlay(spec)
         self.play(FadeIn(field), FadeIn(marks), GrowArrow(velocity), run_time=1.1)
+        if physics_overlay is not None:
+            self.play(FadeIn(physics_overlay), run_time=0.9)
         self.wait(0.5)
         self._show_step_caption(steps[1] if len(steps) > 1 else "洛伦兹力始终垂直速度方向，轨迹开始弯曲", color=WHITE, wait_time=1.5)
         self.play(Create(path), run_time=1.1)
         self.play(MoveAlongPath(particle, path), GrowArrow(force), run_time=3.4, rate_func=linear)
         self._show_step_caption(steps[2] if len(steps) > 2 else "用半径、周期或偏转关系连接题目条件", color=YELLOW, wait_time=1.6)
         self.wait(1.0)
+
+    def _build_manim_physics_field_overlay(self, spec):
+        if not HAS_MANIM_PHYSICS:
+            return None
+        field_type = str(spec.get("field_type") or spec.get("subtype") or spec.get("scene_type") or "").lower()
+        try:
+            if "electric" in field_type or "charge" in field_type:
+                charge_a = Charge(1.2, LEFT * 1.2 + DOWN * 0.2, add_glow=False)
+                charge_b = Charge(-1.0, RIGHT * 2.0 + UP * 0.25, add_glow=False)
+                vector_field = ElectricField(
+                    charge_a,
+                    charge_b,
+                    x_range=[-2.8, 3.6, 0.75],
+                    y_range=[-1.5, 1.5, 0.75],
+                    length_func=lambda norm: min(0.35, norm * 0.10),
+                    colors=[BLUE, TEAL, YELLOW],
+                )
+                return VGroup(vector_field, charge_a, charge_b).set_opacity(0.78)
+            wire = Wire(Line(LEFT * 0.4 + DOWN * 1.1, RIGHT * 2.2 + UP * 1.1), current=1.0, samples=8)
+            vector_field = MagneticField(
+                wire,
+                x_range=[-1.2, 3.2, 0.8],
+                y_range=[-1.6, 1.6, 0.8],
+                length_func=lambda norm: min(0.32, norm * 0.09),
+                colors=[TEAL, BLUE, YELLOW],
+            )
+            wire.set_color(ORANGE)
+            return VGroup(vector_field, wire).set_opacity(0.72)
+        except Exception:
+            return None
+
+    def _draw_optics_scene(self, spec):
+        steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]
+        axis = Line(LEFT * 5.2, RIGHT * 5.2, color=GREY_B).shift(DOWN * 0.15)
+        lens_group = self._build_manim_physics_lens_group()
+        if lens_group is None:
+            lens = Ellipse(width=0.58, height=3.0, color=BLUE, fill_color=BLUE_E, fill_opacity=0.25)
+            rays = VGroup(*[
+                Line(LEFT * 4.7 + UP * y, RIGHT * 4.7 + UP * (y * 0.3), color=YELLOW)
+                for y in [-1.1, -0.45, 0.25, 0.95]
+            ])
+            lens_group = VGroup(lens, rays)
+        self._show_step_caption(steps[0] if steps else "Draw the principal axis, lens, and incoming rays.", color=YELLOW, wait_time=1.3)
+        self.play(Create(axis), FadeIn(lens_group), run_time=1.2)
+        self._show_step_caption(steps[1] if len(steps) > 1 else "Use the ray path to connect focal length, image position, and sign convention.", color=WHITE, wait_time=1.5)
+        focus = Dot(RIGHT * 2.5 + DOWN * 0.15, color=ORANGE)
+        focus_label = cjk_text("F", font_size=22, color=ORANGE).next_to(focus, DOWN, buff=0.05)
+        self.play(FadeIn(focus), FadeIn(focus_label), run_time=0.6)
+        for extra_step in steps[2:5]:
+            self._show_step_caption(extra_step, color=WHITE, wait_time=1.2)
+        self.wait(1.0)
+
+    def _build_manim_physics_lens_group(self):
+        if not HAS_MANIM_PHYSICS:
+            return None
+        try:
+            lens = Lens(-5, 1, fill_opacity=0.35, color=BLUE).scale(0.55)
+            rays = VGroup(*[
+                Ray(LEFT * 4.8 + UP * y, RIGHT, 6.8, [lens], color=YELLOW)
+                for y in [-1.2, -0.55, 0.1, 0.75, 1.25]
+            ])
+            return VGroup(lens, rays).shift(DOWN * 0.15)
+        except Exception:
+            return None
+
+    def _draw_wave_scene(self, spec):
+        steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]
+        baseline = Line(LEFT * 4.5, RIGHT * 4.5, color=GREY_B)
+        if HAS_MANIM_PHYSICS:
+            try:
+                wave = StandingWave(n=2, length=8.0, amplitude=0.85, period=1.6, color=YELLOW)
+                wave.start_wave()
+            except Exception:
+                wave = FunctionGraph(lambda x: 0.75 * np.sin(2 * x), x_range=[-4, 4], color=YELLOW)
+        else:
+            wave = FunctionGraph(lambda x: 0.75 * np.sin(2 * x), x_range=[-4, 4], color=YELLOW)
+        self._show_step_caption(steps[0] if steps else "Show equilibrium, nodes, and antinodes first.", color=YELLOW, wait_time=1.3)
+        self.play(Create(baseline), Create(wave), run_time=1.1)
+        self._show_step_caption(steps[1] if len(steps) > 1 else "The standing wave mode gives a visual handle for the formula parameters.", color=WHITE, wait_time=1.5)
+        self.wait(2.2)
 
     def _draw_physics_motion_scene(self, spec):
         steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]

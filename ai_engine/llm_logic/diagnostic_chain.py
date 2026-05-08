@@ -553,6 +553,20 @@ class DiagnosticService:
             solution_summary=solution_summary,
             solution_steps=solution_steps,
         )
+        wave_context = " ".join(
+            [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+        ).lower()
+        if scene_type == "unknown" and any(
+            keyword in wave_context
+            for keyword in ["波", "波长", "频率", "驻波", "波速", "wave", "standing wave", "wavelength", "frequency"]
+        ):
+            scene_type = "wave"
         if scene_type == "unknown":
             scene_type = "mechanics"
         title_map = {
