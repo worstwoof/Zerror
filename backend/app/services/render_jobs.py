@@ -14,11 +14,16 @@ from backend.app.rendering.manim_renderer import (
     is_manim_available,
     render_manim_video,
 )
+from backend.app.services.manimcat_client import (
+    ManimCatUnavailable,
+    is_manimcat_configured,
+    render_math_video_with_manimcat,
+)
 
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "physics-explainer-v7"
+MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v1"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -81,17 +86,23 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
         },
     )
     try:
-        output_path = render_manim_video(
-            scene_spec=scene_spec,
-            job_id=job_id,
-            output_dir=MEDIA_ROOT,
-        )
+        renderer_backend = "local_manim"
+        try:
+            output_path = _render_scene_video(scene_spec=scene_spec, job_id=job_id)
+            renderer_backend = "manimcat" if _should_use_manimcat(scene_spec) else "local_manim"
+        except ManimCatUnavailable:
+            output_path = render_manim_video(
+                scene_spec=scene_spec,
+                job_id=job_id,
+                output_dir=MEDIA_ROOT,
+            )
         video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
         elapsed = time.perf_counter() - started_at
         diagnostics = _video_diagnostics(video_url)
         diagnostics.update(
             {
                 "renderer_available": True,
+                "renderer_backend": renderer_backend,
                 "render_elapsed_seconds": round(elapsed, 3),
                 "error_summary": "",
             }
@@ -170,6 +181,7 @@ def _build_job(
         if diagnostics is not None
         else {
             "renderer_available": _renderer_available(),
+            "manimcat_configured": is_manimcat_configured(),
             "output_path_exists": False,
             "file_size_bytes": 0,
             "error_summary": "",
@@ -211,12 +223,35 @@ def _renderer_available() -> bool:
     return _renderer_available_cache
 
 
+def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
+    if _should_use_manimcat(scene_spec):
+        return render_math_video_with_manimcat(
+            scene_spec=scene_spec,
+            job_id=job_id,
+            output_dir=MEDIA_ROOT,
+        )
+    return render_manim_video(
+        scene_spec=scene_spec,
+        job_id=job_id,
+        output_dir=MEDIA_ROOT,
+    )
+
+
+def _should_use_manimcat(scene_spec: Dict[str, Any]) -> bool:
+    if not is_manimcat_configured():
+        return False
+    subject = str(scene_spec.get("subject") or "").lower()
+    scene_type = str(scene_spec.get("scene_type") or "").lower()
+    return subject == "math" or scene_type in {"conic", "function_graph", "geometry"}
+
+
 def _video_diagnostics(video_url: str) -> Dict[str, Any]:
     path = _path_for_video_url(video_url)
     exists = path.exists() if path else False
     size = path.stat().st_size if path and exists else 0
     return {
         "renderer_available": _renderer_available(),
+        "manimcat_configured": is_manimcat_configured(),
         "output_path_exists": exists,
         "output_path": str(path) if path else "",
         "file_size_bytes": size,
