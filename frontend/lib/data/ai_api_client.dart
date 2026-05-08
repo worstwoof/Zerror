@@ -116,6 +116,83 @@ class ImageAnalysisPayload {
   }
 }
 
+class ImageAnalysisJob {
+  final String jobId;
+  final String status;
+  final int progress;
+  final String message;
+  final String error;
+  final double createdAt;
+  final double updatedAt;
+  final ImageAnalysisPayload? result;
+  final ImageAnalysisPayload? partialResult;
+
+  const ImageAnalysisJob({
+    required this.jobId,
+    required this.status,
+    required this.progress,
+    required this.message,
+    required this.error,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.result,
+    required this.partialResult,
+  });
+
+  bool get hasBasicResult => partialResult != null || result != null;
+  bool get isFinished =>
+      status == 'completed' || status == 'failed' || status == 'need_retry';
+  bool get canRetry => status == 'partial_success' || status == 'need_retry';
+
+  String get displayMessage {
+    if (message.trim().isNotEmpty) {
+      return message;
+    }
+    switch (status) {
+      case 'pending':
+        return '待解析';
+      case 'processing':
+        return '解析中';
+      case 'partial_success':
+        return '已识别题目，正在生成高质量详解';
+      case 'completed':
+        return '解析完成';
+      case 'need_retry':
+        return '解析需要重试';
+      case 'failed':
+        return '解析失败';
+    }
+    return '后台整理中';
+  }
+
+  factory ImageAnalysisJob.fromJson(Map<String, dynamic> json) {
+    final rawResult = _staticAsMap(json['result']);
+    final rawPartial = _staticAsMap(json['partial_result']);
+    return ImageAnalysisJob(
+      jobId: (json['job_id'] ?? '').toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      progress: int.tryParse((json['progress'] ?? 0).toString()) ?? 0,
+      message: (json['message'] ?? '').toString(),
+      error: AiApiClient.friendlyError((json['error'] ?? '').toString()),
+      createdAt: double.tryParse((json['created_at'] ?? '0').toString()) ?? 0,
+      updatedAt: double.tryParse((json['updated_at'] ?? '0').toString()) ?? 0,
+      result: rawResult.isEmpty ? null : ImageAnalysisPayload.fromJson(rawResult),
+      partialResult:
+          rawPartial.isEmpty ? null : ImageAnalysisPayload.fromJson(rawPartial),
+    );
+  }
+
+  static Map<String, dynamic> _staticAsMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
+    }
+    return const <String, dynamic>{};
+  }
+}
+
 class PhysicsAnimationPayload {
   final String cleanedQuestion;
   final String sceneBrief;
@@ -346,6 +423,56 @@ class AiApiClient {
     return result;
   }
 
+  Future<ImageAnalysisJob> createImageAnalysisJob({
+    required String imagePath,
+    String subject = '未分类',
+    String wrongReasonHint = '',
+    bool enableSubjectExtensions = true,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(AppConstants.imageAnalysisJobsEndpoint),
+    )
+      ..fields['subject'] = subject
+      ..fields['user_answer'] = ''
+      ..fields['wrong_reason_hint'] = wrongReasonHint
+      ..fields['enable_subject_extensions'] =
+          enableSubjectExtensions ? 'true' : 'false'
+      ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+
+    final response = await _sendMultipart(
+      request,
+      timeout: const Duration(seconds: 45),
+    );
+    final payload = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(payload));
+    }
+    return ImageAnalysisJob.fromJson(payload);
+  }
+
+  Future<ImageAnalysisJob> fetchImageAnalysisJob(String jobId) async {
+    final response = await http
+        .get(Uri.parse(AppConstants.imageAnalysisJobEndpoint(jobId)))
+        .timeout(const Duration(seconds: 20));
+    final payload = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(payload));
+    }
+    return ImageAnalysisJob.fromJson(payload);
+  }
+
+  Future<ImageAnalysisJob> retryImageAnalysisJob(String jobId) async {
+    final response = await http
+        .post(Uri.parse(AppConstants.imageAnalysisJobRetryEndpoint(jobId)))
+        .timeout(const Duration(seconds: 20));
+    final payload = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(_extractErrorMessage(payload));
+    }
+    return ImageAnalysisJob.fromJson(payload);
+  }
+
   Future<PhysicsAnimationResult> generatePhysicsAnimation(
     PhysicsAnimationPayload payload,
   ) async {
@@ -398,6 +525,20 @@ class AiApiClient {
     }
   }
 
+  Future<http.Response> _sendMultipart(
+    http.MultipartRequest request, {
+    required Duration timeout,
+  }) async {
+    try {
+      final streamedResponse = await request.send().timeout(timeout);
+      return await http.Response.fromStream(streamedResponse).timeout(timeout);
+    } on TimeoutException catch (_) {
+      throw const AiApiException('AI 解析暂时较慢，已保留题目基础信息，可稍后重新生成详解。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，请检查网络后重试。');
+    }
+  }
+
   String _extractErrorMessage(
     Map<String, dynamic> payload, {
     String fallback = '请求失败，请稍后重试。',
@@ -405,7 +546,7 @@ class AiApiClient {
     for (final key in const ['detail', 'message', 'msg', 'error']) {
       final value = payload[key];
       if (value is String && value.trim().isNotEmpty) {
-        return value;
+        return friendlyError(value);
       }
     }
 
@@ -414,12 +555,12 @@ class AiApiClient {
       for (final key in const ['detail', 'message', 'msg', 'error']) {
         final value = nested[key];
         if (value is String && value.trim().isNotEmpty) {
-          return value;
+          return friendlyError(value);
         }
       }
     }
 
-    return fallback;
+    return friendlyError(fallback);
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -430,5 +571,25 @@ class AiApiClient {
       return value.map((key, mapValue) => MapEntry(key.toString(), mapValue));
     }
     return const <String, dynamic>{};
+  }
+
+  static String friendlyError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('clientexception') ||
+        lower.contains('connection abort') ||
+        lower.contains('connection reset') ||
+        lower.contains('socket')) {
+      return '网络连接中断，请检查网络后重试。';
+    }
+    if (lower.contains('timed out') ||
+        lower.contains('timeout') ||
+        lower.contains('read timed out') ||
+        lower.contains('502')) {
+      return 'AI 解析暂时较慢，已保留题目基础信息，可稍后重新生成详解。';
+    }
+    if (message.contains('vivo') || message.contains('上游')) {
+      return 'AI 服务暂时繁忙，可稍后重新生成详解。';
+    }
+    return message.trim().isEmpty ? '请求失败，请稍后重试。' : message;
   }
 }

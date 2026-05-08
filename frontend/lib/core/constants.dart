@@ -31,6 +31,12 @@ class AppConstants {
   static String get meEndpoint => '$apiBaseUrl/api/v1/auth/me';
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';
   static String get analysisEndpoint => '$apiBaseUrl/api/v1/analysis/text';
+  static String get imageAnalysisJobsEndpoint =>
+      '$apiBaseUrl/api/v1/analysis/image/jobs';
+  static String imageAnalysisJobEndpoint(String jobId) =>
+      '$imageAnalysisJobsEndpoint/${Uri.encodeComponent(jobId)}';
+  static String imageAnalysisJobRetryEndpoint(String jobId) =>
+      '${imageAnalysisJobEndpoint(jobId)}/retry';
   static String get manimRenderEndpoint => '$apiBaseUrl/api/v1/render/manim';
   static String manimJobEndpoint(String jobId) =>
       '$apiBaseUrl/api/v1/render/manim/${Uri.encodeComponent(jobId)}';
