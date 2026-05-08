@@ -382,8 +382,20 @@ class LearningScene(Scene):
                 }},
             ]
         if formulas:
-            for pos, formula in enumerate(formulas[:6]):
-                fallback[min(pos // 2, len(fallback) - 1)]["formulas"].append(formula)
+            if scene_type in {{"electromagnetism", "charged_particle_magnetic_field"}}:
+                for formula in formulas[:8]:
+                    compact = str(formula).replace(" ", "")
+                    if any(token in compact for token in ["sin", "cos", "theta", "d=", "x=", "L"]):
+                        target_index = 2
+                    elif any(token in compact for token in ["R=", "qv", "eB", "qB", "B"]):
+                        target_index = 1
+                    else:
+                        target_index = 2
+                    if formula not in fallback[target_index]["formulas"]:
+                        fallback[target_index]["formulas"].append(formula)
+            else:
+                for pos, formula in enumerate(formulas[:6]):
+                    fallback[min(pos // 2, len(fallback) - 1)]["formulas"].append(formula)
         return fallback
 
     def _build_derivation_group(self, index, section):
