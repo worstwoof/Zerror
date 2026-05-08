@@ -241,6 +241,24 @@ function getCodeLine(code: string, oneBasedLineNumber: number): CodeLine | null 
   }
 }
 
+function findBannedManimApiDiagnostic(code: string, lineOffset: number): StaticDiagnostic | null {
+  const bannedPattern = /\.(get_intersection|get_intersections|get_intersection_points)\s*\(/
+  const lines = code.split('\n')
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(bannedPattern)
+    if (match) {
+      return {
+        tool: 'py_compile',
+        line: index + 1 + lineOffset,
+        message:
+          `${match[1]} is not a reliable Manim CE mobject intersection API. ` +
+          'Compute conic/line intersection coordinates analytically, then map them with axes.c2p.'
+      }
+    }
+  }
+  return null
+}
+
 function shouldIgnoreMypyDiagnostic(diagnostic: StaticDiagnostic, code: string, lineOffset: number): boolean {
   if (diagnostic.tool !== 'mypy') {
     return false
@@ -288,6 +306,16 @@ async function checkUnit(code: string, lineOffset: number): Promise<StaticDiagno
       lineOffset,
       codeLength: code.length
     })
+
+    const bannedManimApiDiagnostic = findBannedManimApiDiagnostic(code, lineOffset)
+    if (bannedManimApiDiagnostic) {
+      logger.warn('Static guard rejected banned Manim API', {
+        codeFile,
+        line: bannedManimApiDiagnostic.line,
+        message: bannedManimApiDiagnostic.message
+      })
+      return [bannedManimApiDiagnostic]
+    }
 
     const pythonExecutable = process.env.PYTHON_EXECUTABLE || process.env.PYTHON || 'python3'
     const pyCompileResult = await runCommand(pythonExecutable, ['-m', 'py_compile', codeFile], tempDir)

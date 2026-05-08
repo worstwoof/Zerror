@@ -117,6 +117,7 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "- Start with a clean problem framing, then animate the geometry/algebra relation, then show the conclusion.\n"
             "- Keep all labels readable on mobile: large fonts, high contrast, no overlapping formulas.\n"
             "- For conic/geometry problems, verify point coordinates and helper lines before rendering.\n"
+            "- Never call Manim Mobject intersection helpers such as get_intersections; compute conic-line points analytically.\n"
             "- Use one coherent color vocabulary: original objects, derived helpers, moving point, final result.\n"
             "- Avoid decorative intro slides; the first frame should already show the math object.",
             "Storyboard beats:\n" + "\n".join(f"{index + 1}. {beat}" for index, beat in enumerate(storyboard))
