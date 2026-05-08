@@ -10,9 +10,24 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List
 
+from backend.app.core.config import DEFAULT_ENV_PATH, _parse_env_file
+
 
 class ManimCatUnavailable(RuntimeError):
     pass
+
+
+_file_env_cache: Dict[str, str] | None = None
+
+
+def _env(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    global _file_env_cache
+    if _file_env_cache is None:
+        _file_env_cache = _parse_env_file(DEFAULT_ENV_PATH)
+    return _file_env_cache.get(name, default)
 
 
 def is_manimcat_configured() -> bool:
@@ -67,9 +82,9 @@ def _build_generate_payload(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "concept": _build_math_concept(scene_spec),
         "outputMode": "video",
-        "quality": os.getenv("MANIMCAT_QUALITY", "medium"),
+        "quality": _env("MANIMCAT_QUALITY", "medium"),
         "videoConfig": {
-            "duration": int(os.getenv("MANIMCAT_MATH_DURATION_SECONDS", "70")),
+            "duration": int(_env("MANIMCAT_MATH_DURATION_SECONDS", "70")),
             "pace": "slow",
             "aspectRatio": "16:9",
         },
@@ -176,27 +191,27 @@ def _download_video(video_url: str, output_path: Path, *, base_url: str, api_key
 
 
 def _base_url() -> str:
-    return os.getenv("MANIMCAT_BASE_URL", "").strip().rstrip("/")
+    return _env("MANIMCAT_BASE_URL").strip().rstrip("/")
 
 
 def _api_key() -> str:
-    return os.getenv("MANIMCAT_API_KEY", "").strip()
+    return _env("MANIMCAT_API_KEY").strip()
 
 
 def _request_timeout() -> int:
-    return int(os.getenv("MANIMCAT_REQUEST_TIMEOUT_SECONDS", "30"))
+    return int(_env("MANIMCAT_REQUEST_TIMEOUT_SECONDS", "30"))
 
 
 def _download_timeout() -> int:
-    return int(os.getenv("MANIMCAT_DOWNLOAD_TIMEOUT_SECONDS", "120"))
+    return int(_env("MANIMCAT_DOWNLOAD_TIMEOUT_SECONDS", "120"))
 
 
 def _job_timeout() -> int:
-    return int(os.getenv("MANIMCAT_JOB_TIMEOUT_SECONDS", "480"))
+    return int(_env("MANIMCAT_JOB_TIMEOUT_SECONDS", "480"))
 
 
 def _poll_interval() -> float:
-    return float(os.getenv("MANIMCAT_POLL_INTERVAL_SECONDS", "4"))
+    return float(_env("MANIMCAT_POLL_INTERVAL_SECONDS", "4"))
 
 
 def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
