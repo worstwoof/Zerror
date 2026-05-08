@@ -137,7 +137,10 @@ class LearningScene(Scene):
         elif scene_type in {{"mechanics", "incline", "projectile", "collision", "circuit", "optics"}}:
             self._draw_physics_motion_scene(spec)
         elif scene_type in {{"function_graph", "conic", "geometry", "generic"}}:
-            self._draw_axes_scene(spec)
+            if str(spec.get("subject") or "").lower() == "math":
+                self._draw_math_story_scene(spec)
+            else:
+                self._draw_axes_scene(spec)
         else:
             self._draw_axes_scene(spec)
 
@@ -348,6 +351,61 @@ class LearningScene(Scene):
         self.play(body.animate.shift(RIGHT * 2.7 + UP * 0.17), velocity.animate.shift(RIGHT * 2.7 + UP * 0.17), force.animate.shift(RIGHT * 2.7 + UP * 0.17), run_time=2.0, rate_func=smooth)
         self._show_step_caption(steps[3] if len(steps) > 3 else "最后把过程图转成方程求解", color=YELLOW, wait_time=1.6)
         self.wait(1.0)
+
+    def _draw_math_story_scene(self, spec):
+        steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]
+        scene_type = str(spec.get("scene_type") or "geometry")
+        axes = Axes(
+            x_range=[-5, 5, 1],
+            y_range=[-3, 4, 1],
+            x_length=8.8,
+            y_length=5.2,
+            tips=True,
+        ).shift(DOWN * 0.25)
+        x_label = cjk_text("x", font_size=20).next_to(axes.x_axis.get_end(), RIGHT, buff=0.08)
+        y_label = cjk_text("y", font_size=20).next_to(axes.y_axis.get_end(), UP, buff=0.08)
+        self._show_step_caption(steps[0] if steps else "先建立图形和坐标系，把题目条件放到图上", color=YELLOW, wait_time=1.4)
+        self.play(Create(axes), FadeIn(x_label), FadeIn(y_label), run_time=1.2)
+
+        if scene_type == "conic":
+            curve = ParametricFunction(
+                lambda t: axes.c2p(3.1 * np.cos(t), 1.65 * np.sin(t)),
+                t_range=[0, TAU],
+                color=YELLOW,
+            )
+            focus_l = Dot(axes.c2p(-2.2, 0), color=ORANGE)
+            focus_r = Dot(axes.c2p(2.2, 0), color=ORANGE)
+            labels = VGroup(
+                cjk_text("F1", font_size=20, color=ORANGE).next_to(focus_l, DOWN, buff=0.06),
+                cjk_text("F2", font_size=20, color=ORANGE).next_to(focus_r, DOWN, buff=0.06),
+            )
+            moving_point = Dot(axes.c2p(1.1, 1.55), color=BLUE)
+            chord = Line(axes.c2p(-1.8, -1.35), axes.c2p(1.1, 1.55), color=BLUE)
+            guide = DashedLine(axes.c2p(1.1, 1.55), axes.c2p(1.1, 0), color=GREY_B)
+            self.play(Create(curve), FadeIn(focus_l), FadeIn(focus_r), FadeIn(labels), run_time=1.8)
+            self._show_step_caption(steps[1] if len(steps) > 1 else "圆锥曲线题先抓住焦点、弦、切线或对称关系", color=WHITE, wait_time=1.5)
+            self.play(FadeIn(moving_point), Create(chord), Create(guide), run_time=1.3)
+            self.play(moving_point.animate.move_to(axes.c2p(2.3, 1.1)), chord.animate.put_start_and_end_on(axes.c2p(-1.4, -1.45), axes.c2p(2.3, 1.1)), run_time=2.2, rate_func=smooth)
+        elif scene_type == "function_graph":
+            graph = axes.plot(lambda x: 0.16 * (x - 0.8) * (x - 0.8) - 1.1, x_range=[-4.2, 4.4], color=YELLOW)
+            tangent_point = Dot(axes.c2p(2.0, 0.16 * (2.0 - 0.8) * (2.0 - 0.8) - 1.1), color=ORANGE)
+            tangent = Line(axes.c2p(0.3, -1.1), axes.c2p(3.7, 1.0), color=BLUE)
+            area = axes.get_area(graph, x_range=[-1.5, 1.8], color=TEAL, opacity=0.32)
+            self.play(Create(graph), run_time=1.8)
+            self._show_step_caption(steps[1] if len(steps) > 1 else "函数题要把图像、关键点和变化趋势同步看", color=WHITE, wait_time=1.5)
+            self.play(FadeIn(tangent_point), Create(tangent), FadeIn(area), run_time=1.4)
+            self.play(tangent_point.animate.move_to(axes.c2p(3.0, 0.16 * (3.0 - 0.8) * (3.0 - 0.8) - 1.1)), run_time=1.8, rate_func=smooth)
+        else:
+            triangle = Polygon(axes.c2p(-2.8, -1.2), axes.c2p(2.0, -1.2), axes.c2p(0.8, 1.6), color=YELLOW)
+            altitude = DashedLine(axes.c2p(0.8, 1.6), axes.c2p(0.8, -1.2), color=BLUE)
+            angle_arc = Arc(radius=0.55, start_angle=0, angle=0.75, color=ORANGE).move_arc_center_to(axes.c2p(-2.8, -1.2))
+            self.play(Create(triangle), run_time=1.4)
+            self._show_step_caption(steps[1] if len(steps) > 1 else "几何题要把辅助线、角度和相似关系逐步显出来", color=WHITE, wait_time=1.5)
+            self.play(Create(altitude), Create(angle_arc), run_time=1.2)
+
+        for extra_step in steps[2:5]:
+            self._show_step_caption(extra_step, color=WHITE, wait_time=1.2)
+        self.wait(0.8)
 
     def _draw_axes_scene(self, spec):
         steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]

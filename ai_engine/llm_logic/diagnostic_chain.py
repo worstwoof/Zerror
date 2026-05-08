@@ -859,7 +859,13 @@ class DiagnosticService:
             if part and part.strip()
         )
         if "math" in subject.lower() or "数学" in subject or "鏁板" in subject:
-            return self._build_math_scene_spec(combined_context)
+            return self._build_math_scene_spec(
+                combined_context,
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
         return self._build_physics_scene_spec(
             combined_context=combined_context,
             scene_brief=scene_brief,
@@ -867,9 +873,26 @@ class DiagnosticService:
             solution_summary=solution_summary,
         )
 
-    def _build_math_scene_spec(self, text: str) -> Dict[str, Any]:
+    def _build_math_scene_spec(
+        self,
+        text: str,
+        *,
+        cleaned_question: str = "",
+        knowledge_points: List[str] | None = None,
+        solution_summary: str = "",
+        solution_steps: List[str] | None = None,
+    ) -> Dict[str, Any]:
+        knowledge_points = knowledge_points or []
+        solution_steps = solution_steps or []
         v2_spec = self._build_math_scene_spec_v2(text)
         if v2_spec:
+            self._enrich_math_manim_spec(
+                v2_spec,
+                cleaned_question=cleaned_question or text,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
             return v2_spec
 
         lowered = text.lower()
@@ -926,7 +949,7 @@ class DiagnosticService:
             scene_type = "conic"
             title = "Conic section"
 
-        return {
+        scene_spec = {
             "subject": "math",
             "scene_type": scene_type,
             "title": title,
@@ -942,6 +965,85 @@ class DiagnosticService:
                 "caption": "Drag points on the graph to inspect the geometry.",
             },
         }
+        self._enrich_math_manim_spec(
+            scene_spec,
+            cleaned_question=cleaned_question or text,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        return scene_spec
+
+    def _enrich_math_manim_spec(
+        self,
+        scene_spec: Dict[str, Any],
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> None:
+        focus_points = [
+            self._display_plain_text(str(item), limit=22)
+            for item in knowledge_points[:5]
+            if str(item).strip()
+        ]
+        formula_steps = self._extract_physics_formula_steps(solution_steps)
+        narration_steps = self._build_math_animation_steps(
+            scene_type=str(scene_spec.get("scene_type") or "geometry"),
+            knowledge_points=focus_points,
+            solution_steps=solution_steps,
+            solution_summary=solution_summary,
+        )
+        parameters = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
+        parameters.update(
+            {
+                "question_excerpt": self._display_plain_text(cleaned_question, limit=140),
+                "focus_points": focus_points,
+                "solution_outline": [
+                    self._display_plain_text(step, limit=90)
+                    for step in solution_steps[:8]
+                    if str(step).strip()
+                ],
+                "target_duration_seconds": 65,
+            }
+        )
+        scene_spec["parameters"] = parameters
+        scene_spec["steps"] = narration_steps
+        scene_spec["formula_steps"] = formula_steps
+        scene_spec["show_title"] = True
+        scene_spec["show_summary"] = True
+        scene_spec["fallback_text"] = (
+            self._display_plain_text(solution_summary, limit=92)
+            or str(scene_spec.get("fallback_text") or "用 Manim 展示数学对象、图形关系和推导步骤。")
+        )
+
+    def _build_math_animation_steps(
+        self,
+        *,
+        scene_type: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+        solution_summary: str,
+    ) -> List[str]:
+        intro = {
+            "conic": "先把圆锥曲线、焦点、弦和关键点放到同一坐标系里",
+            "function_graph": "先画出函数图像，再把交点、单调性或极值放到图上",
+            "geometry": "先还原几何对象和辅助线，明确已知量与求解目标",
+        }.get(scene_type, "先把数学对象转成可观察的图形关系")
+        steps = [intro]
+        for point in knowledge_points[:3]:
+            if point and point not in steps:
+                steps.append(point)
+        for step in solution_steps[:8]:
+            cleaned = re.sub(r"\$\$.+?\$\$", "", step, flags=re.S)
+            text = self._display_plain_text(cleaned, limit=68)
+            if text and text not in steps:
+                steps.append(text)
+        summary = self._display_plain_text(solution_summary, limit=72)
+        if summary and summary not in steps:
+            steps.append(summary)
+        return steps[:10]
 
     def _build_physics_scene_spec(
         self,
