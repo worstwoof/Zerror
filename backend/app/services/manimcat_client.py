@@ -96,7 +96,10 @@ def _build_generate_payload(scene_spec: Dict[str, Any], *, job_id: str) -> Dict[
 
 def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
     params = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
-    question = _plain(params.get("question_excerpt") or scene_spec.get("fallback_text"), 420)
+    question = _clean_prompt_text(
+        params.get("question_excerpt") or scene_spec.get("fallback_text"),
+        420,
+    )
     focus_points = _list_text(params.get("focus_points"), limit=6, item_limit=60)
     steps = _list_text(scene_spec.get("steps"), limit=10, item_limit=120)
     formulas = _list_text(scene_spec.get("formula_steps"), limit=8, item_limit=100)
@@ -124,6 +127,8 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "- Use only Manim CE color constants that exist in `from manim import *`, such as BLUE, GREEN, RED, YELLOW, ORANGE, PURPLE, TEAL, WHITE, BLACK, GRAY, GREY, GOLD.\n"
             "- Do not use undefined color aliases like LIGHT_BLUE or DARK_GREEN.\n"
             "- Put Chinese prose in Text or MarkupText. MathTex/Tex must contain formulas only, with no Chinese characters.\n"
+            "- Never put dollar-delimited math such as `$x^2$` inside Text/MarkupText. Strip `$` from prose, and render every formula as a separate MathTex object.\n"
+            "- Do not place the full OCR problem statement as one Text line when it contains formulas. Use a short Chinese Text title plus separate MathTex formulas like `x^2+y^2=1`, `|MQ|`, and `\\lambda>0`.\n"
             "- Use one coherent color vocabulary: original objects, derived helpers, moving point, final result.\n"
             "- Avoid decorative intro slides; the first frame should already show the math object.",
             "Storyboard beats:\n" + "\n".join(f"{index + 1}. {beat}" for index, beat in enumerate(storyboard))
@@ -318,6 +323,18 @@ def _plain(value: Any, limit: int) -> str:
     if len(text) > limit:
         return text[: limit - 3] + "..."
     return text
+
+
+def _clean_prompt_text(value: Any, limit: int) -> str:
+    text = _plain(value, limit * 2)
+    if not text:
+        return ""
+    # OCR/LLM output often wraps inline formulas in Markdown `$...$`. If those
+    # delimiters are copied into Manim Text, they render literally in the video.
+    text = text.replace("$", "")
+    text = text.replace("\\(", "").replace("\\)", "")
+    text = text.replace("\\[", "").replace("\\]", "")
+    return _plain(text, limit)
 
 
 def _error_text(payload: Dict[str, Any]) -> str:

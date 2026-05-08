@@ -346,6 +346,23 @@ class RenderDiagnosticsTest(unittest.TestCase):
             manimcat_client._render_cache_key(scene, job_id="job-b"),
         )
 
+    def test_manimcat_concept_strips_inline_math_delimiters_from_question(self) -> None:
+        concept = manimcat_client._build_math_concept(
+            {
+                "subject": "math",
+                "scene_type": "conic",
+                "title": "阿波罗尼斯圆",
+                "parameters": {
+                    "question_excerpt": "圆C:$x^2+y^2=1$，动点M满足$|MQ|$与$\\lambda>0$。",
+                },
+            }
+        )
+
+        self.assertNotIn("$x^2+y^2=1$", concept)
+        self.assertNotIn("$|MQ|$", concept)
+        self.assertIn("x^2+y^2=1", concept)
+        self.assertIn("Never put dollar-delimited math", concept)
+
     def test_mp4_mime_type_is_registered(self) -> None:
         main_source = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")
         self.assertIn('mimetypes.add_type("video/mp4", ".mp4")', main_source)
