@@ -242,17 +242,51 @@ function getCodeLine(code: string, oneBasedLineNumber: number): CodeLine | null 
 }
 
 function findBannedManimApiDiagnostic(code: string, lineOffset: number): StaticDiagnostic | null {
-  const bannedPattern = /\.(get_intersection|get_intersections|get_intersection_points)\s*\(/
+  const bannedCallPattern = /\.(get_intersection|get_intersections|get_intersection_points)\s*\(/
+  const bannedAxesAttributePattern = /\.(origin|x_unit|y_unit)\b/
+  const bannedColorPattern = /\b(LIGHT_BLUE|DARK_GREEN)\b/
+  const cjkInTexPattern = /\b(MathTex|Tex)\s*\(([^)]*[\u3400-\u9fff][^)]*)\)/
   const lines = code.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(bannedPattern)
-    if (match) {
+    const line = lines[index]
+    const bannedCall = line.match(bannedCallPattern)
+    if (bannedCall) {
       return {
         tool: 'py_compile',
         line: index + 1 + lineOffset,
         message:
-          `${match[1]} is not a reliable Manim CE mobject intersection API. ` +
+          `${bannedCall[1]} is not a reliable Manim CE mobject intersection API. ` +
           'Compute conic/line intersection coordinates analytically, then map them with axes.c2p.'
+      }
+    }
+    const bannedAxesAttribute = line.match(bannedAxesAttributePattern)
+    if (bannedAxesAttribute) {
+      return {
+        tool: 'py_compile',
+        line: index + 1 + lineOffset,
+        message:
+          `axes.${bannedAxesAttribute[1]} is not a public Manim CE Axes API. ` +
+          'Use axes.c2p, axes.p2c, axes.get_origin(), or compute the scale from the configured axis range.'
+      }
+    }
+    const bannedColor = line.match(bannedColorPattern)
+    if (bannedColor) {
+      return {
+        tool: 'py_compile',
+        line: index + 1 + lineOffset,
+        message:
+          `${bannedColor[1]} is not a Manim CE color constant imported by from manim import *. ` +
+          'Use stable constants such as BLUE, GREEN, TEAL, YELLOW, ORANGE, PURPLE, GRAY, GREY, GOLD, WHITE, or BLACK.'
+      }
+    }
+    const cjkInTex = line.match(cjkInTexPattern)
+    if (cjkInTex) {
+      return {
+        tool: 'py_compile',
+        line: index + 1 + lineOffset,
+        message:
+          `${cjkInTex[1]} contains Chinese text, which commonly fails in LaTeX rendering. ` +
+          'Put Chinese prose in Text or MarkupText, and keep MathTex/Tex for formulas only.'
       }
     }
   }

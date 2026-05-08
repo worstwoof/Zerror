@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from backend.app.core.config import DEFAULT_ENV_PATH, _parse_env_file
 
@@ -39,6 +39,7 @@ def render_math_video_with_manimcat(
     scene_spec: Dict[str, Any],
     job_id: str,
     output_dir: Path,
+    on_progress: Callable[[Dict[str, Any]], None] | None = None,
 ) -> Path:
     """Render a math scene through an optional external ManimCat service.
 
@@ -67,6 +68,7 @@ def render_math_video_with_manimcat(
         base_url=base_url,
         api_key=api_key,
         remote_job_id=remote_job_id,
+        on_progress=on_progress,
     )
     video_url = str(remote_result.get("video_url") or remote_result.get("videoUrl") or "").strip()
     if not video_url:
@@ -118,6 +120,10 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "- Keep all labels readable on mobile: large fonts, high contrast, no overlapping formulas.\n"
             "- For conic/geometry problems, verify point coordinates and helper lines before rendering.\n"
             "- Never call Manim Mobject intersection helpers such as get_intersections; compute conic-line points analytically.\n"
+            "- Never access non-public Axes attributes like axes.origin, axes.x_unit, or axes.y_unit; use axes.c2p, axes.p2c, and axes.get_origin().\n"
+            "- Use only Manim CE color constants that exist in `from manim import *`, such as BLUE, GREEN, RED, YELLOW, ORANGE, PURPLE, TEAL, WHITE, BLACK, GRAY, GREY, GOLD.\n"
+            "- Do not use undefined color aliases like LIGHT_BLUE or DARK_GREEN.\n"
+            "- Put Chinese prose in Text or MarkupText. MathTex/Tex must contain formulas only, with no Chinese characters.\n"
             "- Use one coherent color vocabulary: original objects, derived helpers, moving point, final result.\n"
             "- Avoid decorative intro slides; the first frame should already show the math object.",
             "Storyboard beats:\n" + "\n".join(f"{index + 1}. {beat}" for index, beat in enumerate(storyboard))
@@ -164,12 +170,18 @@ def _build_storyboard_beats(
     for step in steps[:5]:
         beats.append(f"Animate reasoning step: {step[:110]}")
     for formula in formulas[:3]:
-        beats.append(f"Show formula as a short MathTex checkpoint: {formula[:90]}")
+        beats.append(f"Show formula as a short MathTex checkpoint only if it is pure LaTeX; put any Chinese explanation in Text: {formula[:90]}")
     beats.append("End with a compact recap: condition, transformation, answer.")
     return beats[:10]
 
 
-def _poll_job(*, base_url: str, api_key: str, remote_job_id: str) -> Dict[str, Any]:
+def _poll_job(
+    *,
+    base_url: str,
+    api_key: str,
+    remote_job_id: str,
+    on_progress: Callable[[Dict[str, Any]], None] | None = None,
+) -> Dict[str, Any]:
     deadline = time.time() + _job_timeout()
     poll_interval = _poll_interval()
     last_payload: Dict[str, Any] = {}
@@ -181,6 +193,8 @@ def _poll_job(*, base_url: str, api_key: str, remote_job_id: str) -> Dict[str, A
             timeout=_request_timeout(),
         )
         last_payload = payload
+        if on_progress is not None:
+            on_progress(payload)
         status = str(payload.get("status") or "").lower()
         if status == "completed":
             return payload

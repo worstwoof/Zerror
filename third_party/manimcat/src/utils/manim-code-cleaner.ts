@@ -23,6 +23,14 @@ export function cleanManimCode(code: string): CleanupResult {
     changes.push('remove-replacement-char')
   }
 
+  const normalizedColors = cleaned
+    .replace(/\bLIGHT_BLUE\b/g, 'BLUE')
+    .replace(/\bDARK_GREEN\b/g, 'GREEN')
+  if (normalizedColors !== cleaned) {
+    cleaned = normalizedColors
+    changes.push('normalize-unsupported-colors')
+  }
+
   const fullwidthResult = replaceFullwidthOutsideStrings(cleaned)
   if (fullwidthResult.replaced > 0) {
     cleaned = fullwidthResult.code

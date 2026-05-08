@@ -23,7 +23,7 @@ from backend.app.services.manimcat_client import (
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v1"
+MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v2"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -230,6 +230,7 @@ def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
             scene_spec=scene_spec,
             job_id=job_id,
             output_dir=MEDIA_ROOT,
+            on_progress=lambda payload: _update_manimcat_progress(job_id, payload),
         )
     return render_manim_video(
         scene_spec=scene_spec,
@@ -244,6 +245,50 @@ def _is_math_scene(scene_spec: Dict[str, Any]) -> bool:
     if subject:
         return subject == "math"
     return scene_type in {"conic", "function_graph", "geometry"}
+
+
+def _update_manimcat_progress(job_id: str, payload: Dict[str, Any]) -> None:
+    status = str(payload.get("status") or "").lower()
+    stage = str(payload.get("stage") or "").lower()
+    revision = payload.get("revision")
+    attempt = payload.get("attempt")
+    progress = 25
+    if status in {"queued", "waiting", "delayed"}:
+        progress = 10
+    elif stage == "analyzing":
+        progress = 30
+    elif stage in {"generating", "rendering"}:
+        progress = 60
+    elif status == "processing":
+        progress = 45
+    elif status == "completed":
+        progress = 95
+    elif status in {"failed", "cancelled", "canceled"}:
+        progress = 100
+
+    message = "ManimCat is generating the math video."
+    if stage:
+        message = f"ManimCat stage: {stage}."
+    elif status:
+        message = f"ManimCat status: {status}."
+
+    diagnostics = {
+        "renderer_available": True,
+        "renderer_backend": "manimcat",
+        "manimcat_remote_job_id": payload.get("jobId") or payload.get("job_id"),
+        "manimcat_status": status,
+        "manimcat_stage": stage,
+        "manimcat_revision": revision,
+        "manimcat_attempt": attempt,
+        "manimcat_updated_at": payload.get("updated_at"),
+    }
+    _update_job(
+        job_id,
+        status="running",
+        progress=progress,
+        message=message,
+        diagnostics={key: value for key, value in diagnostics.items() if value not in (None, "")},
+    )
 
 
 def _video_diagnostics(video_url: str) -> Dict[str, Any]:

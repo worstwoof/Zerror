@@ -2112,14 +2112,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final jobId = (data['job_id'] ?? '').toString();
     final error = (data['error'] ?? '').toString();
     final message = (data['message'] ?? '讲解视频正在等待后台生成。').toString();
+    final isFinished = status == 'succeeded' || status == 'failed';
     return _buildArtifactStatusBox(
       icon: Icons.movie_filter_rounded,
       title: 'Manim 任务：$status',
       message: error.isNotEmpty ? error : '$message 进度 $progress%',
-      actionLabel: jobId.isEmpty
+      actionLabel: jobId.isEmpty || isFinished
           ? null
           : (_isPollingManimJob ? '正在轮询' : '轮询状态'),
-      onAction: jobId.isEmpty || _isPollingManimJob
+      onAction: jobId.isEmpty || isFinished || _isPollingManimJob
           ? null
           : () => _pollManimJob(jobId),
     );
