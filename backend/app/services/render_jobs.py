@@ -4,6 +4,7 @@ import hashlib
 import json
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict
@@ -28,33 +29,13 @@ MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v2"
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
-_cache: Dict[str, str] = {}
 _renderer_available_cache: bool | None = None
 
 
 def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     scene_hash = _scene_hash(scene_spec)
     with _lock:
-        cached_url = _cache.get(scene_hash)
-        if cached_url:
-            job_id = f"cached-{scene_hash[:16]}"
-            job = _build_job(
-                job_id=job_id,
-                scene_hash=scene_hash,
-                status="succeeded",
-                progress=100,
-                video_url=cached_url,
-                message="Manim video is ready.",
-                diagnostics=_video_diagnostics(cached_url),
-            )
-            _jobs[job_id] = job
-            return dict(job)
-
-        job_id = scene_hash[:20]
-        existing = _jobs.get(job_id)
-        if existing:
-            return dict(existing)
-
+        job_id = f"{scene_hash[:12]}{uuid.uuid4().hex[:12]}"
         job = _build_job(
             job_id=job_id,
             scene_hash=scene_hash,
@@ -108,8 +89,6 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
                 "error_summary": "",
             }
         )
-        with _lock:
-            _cache[scene_hash] = video_url
         _update_job(
             job_id,
             status="succeeded",

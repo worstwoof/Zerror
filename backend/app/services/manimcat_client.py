@@ -57,7 +57,7 @@ def render_math_video_with_manimcat(
         "POST",
         f"{base_url}/api/generate",
         api_key=api_key,
-        payload=_build_generate_payload(scene_spec),
+        payload=_build_generate_payload(scene_spec, job_id=job_id),
         timeout=_request_timeout(),
     )
     remote_job_id = str(submit_response.get("jobId") or "").strip()
@@ -80,7 +80,7 @@ def render_math_video_with_manimcat(
     return output_path
 
 
-def _build_generate_payload(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
+def _build_generate_payload(scene_spec: Dict[str, Any], *, job_id: str) -> Dict[str, Any]:
     return {
         "concept": _build_math_concept(scene_spec),
         "outputMode": "video",
@@ -90,7 +90,7 @@ def _build_generate_payload(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
             "pace": "slow",
             "aspectRatio": "16:9",
         },
-        "renderCacheKey": _render_cache_key(scene_spec),
+        "renderCacheKey": _render_cache_key(scene_spec, job_id=job_id),
     }
 
 
@@ -281,7 +281,7 @@ def _poll_interval() -> float:
     return float(_env("MANIMCAT_POLL_INTERVAL_SECONDS", "4"))
 
 
-def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
+def _render_cache_key(scene_spec: Dict[str, Any], *, job_id: str = "") -> str:
     title = _plain(scene_spec.get("title") or "", 60)
     params = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
     identity_payload = {
@@ -298,7 +298,8 @@ def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
         json.dumps(identity_payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
     ).hexdigest()[:16]
     readable_title = title or _plain(identity_payload["question"], 60) or "math"
-    return f"zerror-math:{readable_title}:{digest}"
+    unique_suffix = job_id or digest
+    return f"zerror-math:{readable_title}:{digest}:{unique_suffix}"
 
 
 def _list_text(value: Any, *, limit: int, item_limit: int) -> List[str]:

@@ -23,7 +23,6 @@ from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 class RenderDiagnosticsTest(unittest.TestCase):
     def setUp(self) -> None:
         render_jobs._jobs.clear()
-        render_jobs._cache.clear()
         render_jobs._renderer_available_cache = True
 
     def test_geogebra_magnetic_particle_scene_has_commands_and_variants(self) -> None:
@@ -202,7 +201,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
 
         self.assertNotIn("_ensure_credentials()", endpoint_source)
 
-    def test_manim_success_and_cached_jobs_include_diagnostics(self) -> None:
+    def test_manim_success_and_repeated_jobs_use_distinct_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             media_root = Path(temp_dir)
 
@@ -224,10 +223,11 @@ class RenderDiagnosticsTest(unittest.TestCase):
                 self.assertGreater(completed["diagnostics"]["file_size_bytes"], 0)
                 self.assertTrue(completed["diagnostics"]["output_path_exists"])
 
-                cached = render_jobs.create_manim_job(scene)
-                self.assertEqual(cached["status"], "succeeded")
-                self.assertIn("diagnostics", cached)
-                self.assertTrue(cached["diagnostics"]["output_path_exists"])
+                repeated = render_jobs.create_manim_job(scene)
+                repeated_completed = self._wait_for_job(repeated["job_id"])
+                self.assertEqual(repeated_completed["status"], "succeeded")
+                self.assertNotEqual(job["job_id"], repeated["job_id"])
+                self.assertNotEqual(completed["video_url"], repeated_completed["video_url"])
 
     def test_manim_failed_job_includes_diagnostics(self) -> None:
         with patch.object(
@@ -282,8 +282,20 @@ class RenderDiagnosticsTest(unittest.TestCase):
         }
 
         self.assertNotEqual(
-            manimcat_client._render_cache_key(first),
-            manimcat_client._render_cache_key(second),
+            manimcat_client._render_cache_key(first, job_id="job-a"),
+            manimcat_client._render_cache_key(second, job_id="job-b"),
+        )
+
+    def test_manimcat_cache_key_includes_job_identity(self) -> None:
+        scene = {
+            "subject": "math",
+            "scene_type": "function_graph",
+            "parameters": {"question_excerpt": "Draw y=x^2."},
+        }
+
+        self.assertNotEqual(
+            manimcat_client._render_cache_key(scene, job_id="job-a"),
+            manimcat_client._render_cache_key(scene, job_id="job-b"),
         )
 
     def test_mp4_mime_type_is_registered(self) -> None:
