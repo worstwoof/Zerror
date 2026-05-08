@@ -149,6 +149,44 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("B = Intersect(C, l, 2)", commands)
         self.assertNotEqual(payload["metadata"]["object_count"], 1)
 
+    def test_math_apollonius_locus_creates_manim_job_over_text_fallback(self) -> None:
+        service = object.__new__(DiagnosticService)
+        with patch(
+            "ai_engine.llm_logic.diagnostic_chain.create_manim_job",
+            return_value={
+                "job_id": "job-apollonius",
+                "status": "pending",
+                "progress": 0,
+                "message": "queued",
+                "error": "",
+                "diagnostics": {},
+            },
+        ):
+            artifacts = service._build_structured_render_artifacts(
+                subject="math",
+                cleaned_question=(
+                    "已知直角坐标平面上点 Q(2,0) 和圆 C:x²+y²=1，"
+                    "动点 M 到圆 C 的切线长与 |MQ| 的比为 λ，求 M 的轨迹方程。"
+                ),
+                scene_brief="",
+                knowledge_points=["阿波罗尼斯圆", "圆的切线长公式", "轨迹方程"],
+                solution_summary="利用圆的切线长公式和两点距离公式建立方程。",
+                solution_steps=[],
+                existing_artifacts=[],
+                model_scene_spec={
+                    "subject": "math",
+                    "scene_type": "generic",
+                    "objects": [],
+                    "relations": [],
+                    "render_targets": [],
+                    "fallback_text": "This question is not structured enough for a reliable graph yet.",
+                },
+            )
+
+        artifact_types = {artifact.artifact_type for artifact in artifacts}
+        self.assertIn("manim_job", artifact_types)
+        self.assertNotIn("text_explanation", artifact_types)
+
     def test_frontend_physics_card_uses_algodoo_artifacts(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "error_edit_screen.dart").read_text(
             encoding="utf-8"

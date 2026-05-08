@@ -366,18 +366,13 @@ class DiagnosticService:
             return [artifact] if artifact is not None else []
         deterministic_math_spec = None
         if scene_subject == "math":
-            deterministic_math_spec = self._build_ellipse_focus_chord_scene_spec_v2(
-                " ".join(
-                    part.strip()
-                    for part in [
-                        cleaned_question,
-                        scene_brief,
-                        solution_summary,
-                        " ".join(knowledge_points),
-                        " ".join(solution_steps),
-                    ]
-                    if part and part.strip()
-                )
+            deterministic_math_spec = self._build_scene_spec_from_context(
+                subject=scene_subject,
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
             )
         scene_spec = (
             deterministic_math_spec
