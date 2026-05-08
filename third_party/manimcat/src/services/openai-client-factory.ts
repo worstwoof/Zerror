@@ -9,9 +9,7 @@ const nodeRequire = createRequire(pathToFileURL(path.join(process.cwd(), '__stud
 
 interface OpenAIBaseConfig {
   timeout: number
-  defaultHeaders: {
-    'User-Agent': string
-  }
+  defaultHeaders: Record<string, string>
 }
 
 function getProxyUrl(apiUrl: string): string | undefined {
@@ -25,11 +23,16 @@ function getProxyUrl(apiUrl: string): string | undefined {
 }
 
 function createBaseConfig(): OpenAIBaseConfig {
+  const defaultHeaders: Record<string, string> = {
+    'User-Agent': 'ManimCat/1.0'
+  }
+  const appId = process.env.MANIMCAT_ROUTE_APP_ID || process.env.VIVO_APP_ID
+  if (appId?.trim()) {
+    defaultHeaders.app_id = appId.trim()
+  }
   return {
     timeout: OPENAI_TIMEOUT,
-    defaultHeaders: {
-      'User-Agent': 'ManimCat/1.0'
-    }
+    defaultHeaders
   }
 }
 
