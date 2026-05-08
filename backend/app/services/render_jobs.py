@@ -86,11 +86,12 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
         },
     )
     try:
-        renderer_backend = "local_manim"
+        renderer_backend = "manimcat" if _is_math_scene(scene_spec) else "local_manim"
         try:
             output_path = _render_scene_video(scene_spec=scene_spec, job_id=job_id)
-            renderer_backend = "manimcat" if _should_use_manimcat(scene_spec) else "local_manim"
         except ManimCatUnavailable:
+            if _is_math_scene(scene_spec):
+                raise
             output_path = render_manim_video(
                 scene_spec=scene_spec,
                 job_id=job_id,
@@ -224,7 +225,7 @@ def _renderer_available() -> bool:
 
 
 def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
-    if _should_use_manimcat(scene_spec):
+    if _is_math_scene(scene_spec):
         return render_math_video_with_manimcat(
             scene_spec=scene_spec,
             job_id=job_id,
@@ -237,12 +238,12 @@ def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
     )
 
 
-def _should_use_manimcat(scene_spec: Dict[str, Any]) -> bool:
-    if not is_manimcat_configured():
-        return False
+def _is_math_scene(scene_spec: Dict[str, Any]) -> bool:
     subject = str(scene_spec.get("subject") or "").lower()
     scene_type = str(scene_spec.get("scene_type") or "").lower()
-    return subject == "math" or scene_type in {"conic", "function_graph", "geometry"}
+    if subject:
+        return subject == "math"
+    return scene_type in {"conic", "function_graph", "geometry"}
 
 
 def _video_diagnostics(video_url: str) -> Dict[str, Any]:

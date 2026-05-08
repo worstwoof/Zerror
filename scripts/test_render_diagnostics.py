@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
 from backend.app.rendering.manim_renderer import ManimUnavailable
+from backend.app.services import manimcat_client
 from backend.app.services import render_jobs
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 
@@ -241,6 +242,49 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("diagnostics", completed)
         self.assertFalse(completed["diagnostics"]["output_path_exists"])
         self.assertIn("Manim missing", completed["diagnostics"]["error_summary"])
+
+    def test_math_manim_requires_manimcat_without_local_fallback(self) -> None:
+        with patch.object(
+            render_jobs,
+            "render_math_video_with_manimcat",
+            side_effect=render_jobs.ManimCatUnavailable("ManimCat missing"),
+        ) as manimcat_render, patch.object(render_jobs, "render_manim_video") as local_render:
+            job = render_jobs.create_manim_job(
+                {
+                    "subject": "math",
+                    "scene_type": "function_graph",
+                    "parameters": {"question_excerpt": "y=x^2"},
+                }
+            )
+            completed = self._wait_for_job(job["job_id"])
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertIn("ManimCat missing", completed["diagnostics"]["error_summary"])
+        manimcat_render.assert_called_once()
+        local_render.assert_not_called()
+
+    def test_manimcat_cache_key_includes_math_problem_identity(self) -> None:
+        base_scene = {
+            "subject": "math",
+            "scene_type": "function_graph",
+            "title": "Function graph",
+            "fallback_text": "Use Manim to explain the graph.",
+        }
+        first = {
+            **base_scene,
+            "parameters": {"question_excerpt": "Find the vertex of y=x^2-2x+1."},
+            "steps": ["Complete the square."],
+        }
+        second = {
+            **base_scene,
+            "parameters": {"question_excerpt": "Find the zeros of y=x^2-4."},
+            "steps": ["Factor the polynomial."],
+        }
+
+        self.assertNotEqual(
+            manimcat_client._render_cache_key(first),
+            manimcat_client._render_cache_key(second),
+        )
 
     def test_mp4_mime_type_is_registered(self) -> None:
         main_source = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")

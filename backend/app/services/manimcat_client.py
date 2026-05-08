@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 import time
 import urllib.error
 import urllib.parse
@@ -200,8 +201,22 @@ def _poll_interval() -> float:
 
 def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
     title = _plain(scene_spec.get("title") or "", 60)
-    fallback = _plain(scene_spec.get("fallback_text") or "", 120)
-    return f"zerror-math:{title}:{fallback}"
+    params = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
+    identity_payload = {
+        "title": scene_spec.get("title") or "",
+        "scene_type": scene_spec.get("scene_type") or "",
+        "question": params.get("question_excerpt") or scene_spec.get("fallback_text") or "",
+        "focus_points": params.get("focus_points") or [],
+        "steps": scene_spec.get("steps") or [],
+        "formula_steps": scene_spec.get("formula_steps") or [],
+        "objects": scene_spec.get("objects") or [],
+        "relations": scene_spec.get("relations") or [],
+    }
+    digest = hashlib.sha256(
+        json.dumps(identity_payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()[:16]
+    readable_title = title or _plain(identity_payload["question"], 60) or "math"
+    return f"zerror-math:{readable_title}:{digest}"
 
 
 def _list_text(value: Any, *, limit: int, item_limit: int) -> List[str]:
