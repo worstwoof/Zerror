@@ -1062,16 +1062,16 @@ class LearningScene(Scene):
         block.move_to(board.get_right() + LEFT * 0.74 + UP * 0.76)
         board_label = self._label("A", board.get_center(), 30)
         block_label = self._label("B", block.get_center(), 30)
-        v_arrow = Arrow(block.get_top() + UP * 0.36 + RIGHT * 0.20, block.get_top() + UP * 0.36 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
-        v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.04)
+        v_arrow = Arrow(block.get_top() + UP * 0.72 + RIGHT * 0.20, block.get_top() + UP * 0.72 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
+        v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.05)
         f_formula = self._value_formula("F", board_data.get("F"), "N")
         force_arrow = Arrow(block.get_right() + UP * 0.20, block.get_right() + RIGHT * 1.30 + UP * 0.20, buff=0, color=WHITE, stroke_width=3.4)
         force_label = MathTex(f_formula, color=WHITE).scale(0.55).next_to(force_arrow, UP, buff=0.10)
         board_motion = Arrow(board.get_center() + DOWN * 0.60, board.get_center() + LEFT * 1.16 + DOWN * 0.60, buff=0, color=GREY_A, stroke_width=2.4)
-        block_motion = Arrow(block.get_center() + UP * 0.82, block.get_center() + LEFT * 1.32 + UP * 0.82, buff=0, color=GREY_A, stroke_width=2.4)
+        block_motion = Arrow(block.get_top() + UP * 0.28 + RIGHT * 0.12, block.get_top() + UP * 0.28 + LEFT * 1.20, buff=0, color=GREY_A, stroke_width=2.4)
         motion_labels = VGroup(
             cjk_text("A 的运动趋势", font_size=15, color=GREY_A).next_to(board_motion, DOWN, buff=0.06),
-            cjk_text("B 的相对滑动", font_size=15, color=GREY_A).next_to(block_motion, UP, buff=0.06),
+            cjk_text("B 的相对滑动", font_size=14, color=GREY_A).next_to(block_motion, DOWN, buff=0.05).shift(LEFT * 0.10),
         )
         board_final_center = board.get_center()
         block_final_center = block.get_center()
@@ -1418,7 +1418,7 @@ class LearningScene(Scene):
         if title.width > 6.30:
             title.scale_to_fit_width(6.30)
             title.to_corner(UL, buff=0.42)
-        notes = VGroup(*[cjk_text(str(item), font_size=16, color=GREY_A) for item in section.get("notes") or []])
+        notes = VGroup(*[self._board_chalk_note_line(str(item), font_size=16) for item in section.get("notes") or []])
         if len(notes) > 0:
             notes.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
             notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.16)
@@ -1429,20 +1429,45 @@ class LearningScene(Scene):
         if len(formula_lines) > 0:
             formula_lines.scale(1.06)
             formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.22)
-            if formula_lines.width > 5.75:
-                formula_lines.scale_to_fit_width(5.75)
+            if formula_lines.width > 4.55:
+                formula_lines.scale_to_fit_width(4.55)
                 formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.20)
             if formula_lines.height > 2.45:
                 formula_lines.scale_to_fit_height(2.45)
                 formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.17)
-            formula_lines.shift(RIGHT * (0.70 - formula_lines.get_left()[0]))
-            formula_lines.shift(UP * (2.44 - formula_lines.get_top()[1]))
+            formula_lines.shift(RIGHT * (2.15 - formula_lines.get_left()[0]))
+            formula_lines.shift(UP * (2.54 - formula_lines.get_top()[1]))
         group = VGroup(title)
         if len(notes) > 0:
             group.add(notes)
         if len(formula_lines) > 0:
             group.add(formula_lines)
         return group, title, notes, formula_lines
+
+    def _board_chalk_note_line(self, text, font_size=16):
+        pieces = []
+        token_pattern = re.compile(r"(-?v_?0|F)")
+        cursor = 0
+        for match in token_pattern.finditer(str(text)):
+            before = str(text)[cursor:match.start()]
+            if before:
+                pieces.append(cjk_text(before, font_size=font_size, color=GREY_A))
+            token = match.group(1)
+            if token.startswith("-"):
+                pieces.append(MathTex("-v_0", color=GREY_A).scale(0.48))
+            elif token.startswith("v"):
+                pieces.append(MathTex("v_0", color=GREY_A).scale(0.48))
+            else:
+                pieces.append(MathTex("F", color=GREY_A).scale(0.48))
+            cursor = match.end()
+        tail = str(text)[cursor:]
+        if tail:
+            pieces.append(cjk_text(tail, font_size=font_size, color=GREY_A))
+        if not pieces:
+            return cjk_text(str(text), font_size=font_size, color=GREY_A)
+        line = VGroup(*pieces)
+        line.arrange(RIGHT, aligned_edge=DOWN, buff=0.035)
+        return line
 
     def _play_board_chalk_sequence(self, index, section, model):
         self._prepare_board_chalk_focus(model, section.get("focus") or "")
