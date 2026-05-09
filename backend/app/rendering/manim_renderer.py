@@ -401,18 +401,20 @@ class LearningScene(Scene):
 
     def _build_board_question_block(self, board, compact=False):
         title = cjk_text("原题摘要", font_size=23 if not compact else 16, color=YELLOW)
-        question_lines = self._wrap_cjk_lines(
-            board.get("question") or "光滑水平面上，物块 B 位于长木板 A 右端并相对滑动。",
-            max_chars=24 if not compact else 30,
-        )[:2]
+        question_source = " ".join(str(board.get("question") or "光滑水平面上，物块 B 位于长木板 A 右端并相对滑动。").replace("\\n", " ").split())
+        max_question_chars = 72 if not compact else 54
+        if len(question_source) > max_question_chars:
+            question_source = question_source[:max_question_chars - 3] + "..."
+        question_line_chars = 24 if not compact else 27
+        question_lines = [question_source[i:i + question_line_chars] for i in range(0, len(question_source), question_line_chars)][:3]
         if len(question_lines) == 0:
             question_lines = ["光滑水平面 · B 在 A 右端 · 相对滑动后共速"]
-        question_body = VGroup(*[cjk_text(line, font_size=14 if not compact else 10, color=GREY_A) for line in question_lines])
+        question_body = VGroup(*[cjk_text(line, font_size=13 if not compact else 10, color=GREY_A) for line in question_lines])
         question_body.arrange(DOWN, aligned_edge=LEFT, buff=0.08 if not compact else 0.05)
         story_panel = VGroup(title, question_body)
         story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
-        if story_panel.width > 4.75:
-            story_panel.scale_to_fit_width(4.75)
+        if story_panel.width > 5.25:
+            story_panel.scale_to_fit_width(5.25)
         known_items = [
             self._value_formula("m_A", board.get("m_A"), "kg"),
             self._value_formula("m_B", board.get("m_B"), "kg"),
@@ -451,7 +453,7 @@ class LearningScene(Scene):
         )
         goal_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
         row = VGroup(story_panel, known_panel, goal_panel)
-        row.arrange(RIGHT, aligned_edge=UP, buff=0.44 if not compact else 0.30)
+        row.arrange(RIGHT, aligned_edge=UP, buff=0.34 if not compact else 0.26)
         backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.34, 1.08), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.12)
         backdrop.move_to(row.get_center())
         divider = Line(LEFT * 6.34, RIGHT * 6.34, color=GREY_D, stroke_width=1)
