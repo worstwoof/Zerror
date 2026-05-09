@@ -273,6 +273,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("block_motion = Arrow(block.get_bottom() + DOWN * 0.10", source)
         self.assertIn("B 相对 A 滑动\", font_size=13", source)
         self.assertIn("next_to(block_motion, DOWN, buff=0.03)", source)
+        self.assertIn("relative_y = board.get_top()[1] + 0.42", source)
         self.assertIn("force_arrow_centered = Arrow(block_final_center + UP * 0.13", source)
         self.assertIn("f_on_b = Arrow(block_final_center + DOWN * 0.13", source)
         self.assertIn("n_arrow = Arrow(block_final_center", source)

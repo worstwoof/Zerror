@@ -1091,7 +1091,7 @@ class LearningScene(Scene):
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
         forces.set_opacity(0)
-        relative_y = board.get_top()[1] + 0.72
+        relative_y = board.get_top()[1] + 0.42
         relative_right = block.get_left() + LEFT * 0.04
         relative_left = relative_right + LEFT * 2.20
         relative_right[1] = relative_y
