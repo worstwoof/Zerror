@@ -273,7 +273,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("f_on_b = Arrow(block_final_center + DOWN * 0.13", source)
         self.assertIn("n_arrow = Arrow(block_final_center", source)
         self.assertIn("g_arrow = Arrow(block_final_center", source)
-        self.assertIn('MathTex("m_B g", color=BLUE_B).scale(0.54).next_to(g_arrow, DOWN, buff=0.07)', source)
+        self.assertIn('MathTex("m_B g", color=BLUE_B).scale(0.54).next_to(g_arrow, DOWN, buff=0.10).shift(RIGHT * 0.18)', source)
         self.assertIn('"initial_vectors": VGroup(v_arrow, v_label, force_arrow, force_label)', source)
         self.assertIn('FadeOut(model["initial_vectors"])', source)
         self.assertIn('model["board_group"].animate.shift(LEFT * 0.34)', source)

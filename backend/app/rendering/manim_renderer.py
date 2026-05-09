@@ -1083,10 +1083,10 @@ class LearningScene(Scene):
         g_arrow = Arrow(block_final_center, block_final_center + DOWN * 0.98, buff=0, color=BLUE_B, stroke_width=3.2)
         f_on_a = Arrow(board_final_center, board_final_center + LEFT * 1.12, buff=0, color=YELLOW, stroke_width=3.2)
         force_labels = VGroup(
-            MathTex(f_formula, color=WHITE).scale(0.50).next_to(force_arrow_centered, UP, buff=0.08),
-            MathTex("f_B", color=YELLOW).scale(0.52).next_to(f_on_b, DOWN, buff=0.10),
+            MathTex(f_formula, color=WHITE).scale(0.50).move_to(force_arrow_centered.get_end() + UP * 0.22 + LEFT * 0.16),
+            MathTex("f_B", color=YELLOW).scale(0.52).move_to(f_on_b.get_end() + DOWN * 0.22 + LEFT * 0.08),
             MathTex("N", color=BLUE_B).scale(0.54).next_to(n_arrow, UP, buff=0.05),
-            MathTex("m_B g", color=BLUE_B).scale(0.54).next_to(g_arrow, DOWN, buff=0.07),
+            MathTex("m_B g", color=BLUE_B).scale(0.54).next_to(g_arrow, DOWN, buff=0.10).shift(RIGHT * 0.18),
             MathTex("f_A", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.13),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
