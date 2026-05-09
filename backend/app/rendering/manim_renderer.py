@@ -219,7 +219,7 @@ class LearningScene(Scene):
         self._play_global_physics_preview(model, scene_type)
         self.wait(0.8)
         if scene_type == "board_block":
-            self.play(question_block.animate.scale(0.96).to_edge(UP, buff=0.10), run_time=0.55)
+            self.play(FadeOut(question_block, shift=UP * 0.12), run_time=0.45)
         else:
             self.play(question_block.animate.scale(0.88).to_corner(UL, buff=0.24), run_time=0.55)
         self._play_step_breakdown(spec, model, scene_type, board_data=board_data)
@@ -1066,7 +1066,7 @@ class LearningScene(Scene):
         v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.04)
         f_formula = self._value_formula("F", board_data.get("F"), "N")
         force_arrow = Arrow(block.get_right() + UP * 0.20, block.get_right() + RIGHT * 1.30 + UP * 0.20, buff=0, color=WHITE, stroke_width=3.4)
-        force_label = MathTex(f_formula, color=WHITE).scale(0.55).next_to(force_arrow, UP, buff=0.04)
+        force_label = MathTex(f_formula, color=WHITE).scale(0.55).next_to(force_arrow, UP, buff=0.10)
         board_motion = Arrow(board.get_center() + DOWN * 0.60, board.get_center() + LEFT * 1.16 + DOWN * 0.60, buff=0, color=GREY_A, stroke_width=2.4)
         block_motion = Arrow(block.get_center() + UP * 0.82, block.get_center() + LEFT * 1.32 + UP * 0.82, buff=0, color=GREY_A, stroke_width=2.4)
         motion_labels = VGroup(
@@ -1085,11 +1085,11 @@ class LearningScene(Scene):
         g_arrow = Arrow(block_final_center, block_final_center + DOWN * 0.98, buff=0, color=BLUE_B, stroke_width=3.2)
         f_on_a = Arrow(board_final_center, board_final_center + LEFT * 1.12, buff=0, color=YELLOW, stroke_width=3.2)
         force_labels = VGroup(
-            MathTex(f_formula, color=WHITE).scale(0.50).move_to(force_arrow_centered.get_end() + RIGHT * 0.26 + UP * 0.24),
-            MathTex("f_B", color=YELLOW).scale(0.52).move_to(f_on_b.get_end() + RIGHT * 0.22 + DOWN * 0.28),
-            MathTex("N", color=BLUE_B).scale(0.54).move_to(n_arrow.get_end() + UP * 0.24 + RIGHT * 0.18),
-            MathTex("m_B g", color=BLUE_B).scale(0.54).move_to(g_arrow.get_center() + RIGHT * 0.62 + DOWN * 0.12),
-            MathTex("f_A", color=YELLOW).scale(0.52).move_to(f_on_a.get_end() + LEFT * 0.22 + UP * 0.24),
+            MathTex(f_formula, color=WHITE).scale(0.50).next_to(force_arrow_centered, UP, buff=0.13),
+            MathTex("f_B", color=YELLOW).scale(0.52).next_to(f_on_b, DOWN, buff=0.13),
+            MathTex("N", color=BLUE_B).scale(0.54).next_to(n_arrow, RIGHT, buff=0.12),
+            MathTex("m_B g", color=BLUE_B).scale(0.54).next_to(g_arrow, RIGHT, buff=0.16),
+            MathTex("f_A", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.13),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
         relative_y = board.get_top()[1] + 0.72
@@ -1105,6 +1105,7 @@ class LearningScene(Scene):
         motion = VGroup(board_motion, block_motion, motion_labels)
         full_group = VGroup(ground, board_group, block_group)
         moving = VGroup(board_group, block_group, motion)
+        layout_group = VGroup(ground, board_group, block_group, motion, forces, relative)
         moving.save_state()
         return {{
             "type": "board_block",
@@ -1120,6 +1121,7 @@ class LearningScene(Scene):
             "force_arrow": VGroup(force_arrow, force_label),
             "relative": relative,
             "full_group": full_group,
+            "layout_group": layout_group,
             "board_data": board_data,
             "forces_shown": False,
             "vectors_hidden": False,
@@ -1157,6 +1159,9 @@ class LearningScene(Scene):
             self.play(FadeOut(particle), run_time=0.25)
             return
         if model.get("type") == "board_block":
+            preview_shift = RIGHT * 3.15 + UP * 0.28
+            model["layout_group"].shift(preview_shift)
+            model["preview_shift"] = preview_shift
             self.play(Create(model["ground"]), FadeIn(model["board_group"]), FadeIn(model["block_group"]), run_time=1.2)
             start_ghost = VGroup(model["board"].copy(), model["block"].copy())
             start_ghost.set_opacity(0.20)
@@ -1167,21 +1172,22 @@ class LearningScene(Scene):
             self.add(board_trace, block_trace)
             self.play(FadeIn(model["motion"]), run_time=0.65)
             self.play(
-                model["board_group"].animate.shift(LEFT * 0.42),
-                model["block_group"].animate.shift(LEFT * 1.48),
+                model["board_group"].animate.shift(LEFT * 0.50),
+                model["block_group"].animate.shift(LEFT * 1.70),
                 model["motion"].animate.shift(LEFT * 0.44),
-                run_time=5.4,
+                run_time=6.1,
                 rate_func=linear,
             )
             self.play(
-                model["board_group"].animate.shift(LEFT * 0.46),
-                model["block_group"].animate.shift(LEFT * 0.57),
+                model["board_group"].animate.shift(LEFT * 0.38),
+                model["block_group"].animate.shift(LEFT * 0.38),
                 model["motion"].animate.shift(LEFT * 0.44),
                 FadeOut(start_ghost),
                 FadeOut(VGroup(board_trace, block_trace)),
-                run_time=1.8,
+                run_time=2.2,
                 rate_func=linear,
             )
+            self.play(model["layout_group"].animate.shift(-preview_shift), run_time=0.85, rate_func=smooth)
             model["moving"].save_state()
             return
         self.play(Create(VGroup(model["base"], model["body"], model["velocity"], model["force"], model["labels"])), run_time=1.4)
@@ -1190,7 +1196,37 @@ class LearningScene(Scene):
     def _play_step_breakdown(self, spec, model, scene_type, board_data=None):
         sections = self._breakdown_sections(spec, scene_type, board_data=board_data)
         for index, section in enumerate(sections, start=1):
+            step_header = None
+            if scene_type == "board_block":
+                step_header = self._build_board_step_header(index, section)
+                self.play(FadeIn(step_header, shift=DOWN * 0.08), run_time=0.38)
             self._play_derivation_sequence(index, section, model, scene_type)
+            if step_header is not None:
+                self.play(FadeOut(step_header, shift=UP * 0.08), run_time=0.28)
+
+    def _build_board_step_header(self, index, section):
+        label = cjk_text("当前小问", font_size=15, color=BLUE_B)
+        title_text = str(section.get("title") or "板块模型分析")
+        title_text = title_text.replace("小问一：", "").replace("小问二：", "").replace("小问三：", "")
+        title = cjk_text(str(index) + ". " + title_text, font_size=21, color=YELLOW)
+        content = VGroup(label, title)
+        content.arrange(RIGHT, aligned_edge=DOWN, buff=0.20)
+        if content.width > 12.4:
+            title.scale_to_fit_width(max(1.0, 12.4 - label.width - 0.24))
+            content.arrange(RIGHT, aligned_edge=DOWN, buff=0.20)
+        backdrop = RoundedRectangle(
+            width=13.15,
+            height=0.72,
+            corner_radius=0.04,
+            color=GREY_E,
+            stroke_width=1,
+            fill_color=GREY_E,
+            fill_opacity=0.12,
+        )
+        backdrop.move_to(content.get_center())
+        group = VGroup(backdrop, content)
+        group.to_edge(UP, buff=0.14)
+        return group
 
     def _board_block_sections(self, board):
         questions = board.get("questions") or []
