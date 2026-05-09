@@ -158,6 +158,7 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "- For conic/geometry problems, verify point coordinates and helper lines before rendering.\n"
             "- Never call Manim Mobject intersection helpers such as get_intersections; compute conic-line points analytically.\n"
             "- Never access non-public Axes attributes like axes.origin, axes.x_unit, or axes.y_unit; use axes.c2p, axes.p2c, and axes.get_origin().\n"
+            "- Never pass unsupported keyword arguments such as `dashed=True` to Line, Circle, or generic Mobject constructors; use DashedLine for dashed helper segments.\n"
             "- Use only Manim CE color constants that exist in `from manim import *`, such as BLUE, GREEN, RED, YELLOW, ORANGE, PURPLE, TEAL, WHITE, BLACK, GRAY, GREY, GOLD.\n"
             "- Do not use undefined color aliases like LIGHT_BLUE or DARK_GREEN.\n"
             "- Put Chinese prose in Text or MarkupText. MathTex/Tex must contain formulas only, with no Chinese characters.\n"
@@ -338,7 +339,7 @@ def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
         "formula_steps": scene_spec.get("formula_steps") or [],
         "objects": scene_spec.get("objects") or [],
         "relations": scene_spec.get("relations") or [],
-        "style_version": "blackboard_kindergarten_v1",
+        "style_version": "blackboard_kindergarten_v2",
     }
     digest = hashlib.sha256(
         json.dumps(identity_payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
