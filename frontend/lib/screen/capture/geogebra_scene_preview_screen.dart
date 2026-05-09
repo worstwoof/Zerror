@@ -22,7 +22,8 @@ class GeoGebraScenePreviewScreen extends StatefulWidget {
       _GeoGebraScenePreviewScreenState();
 }
 
-class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen> {
+class _GeoGebraScenePreviewScreenState
+    extends State<GeoGebraScenePreviewScreen> {
   late final WebViewController _controller;
   _PreviewStatus _status = _PreviewStatus.loading;
   int _variantIndex = 0;
@@ -44,10 +45,11 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
 
   @override
   Widget build(BuildContext context) {
-    final metadata = _mapValue(widget.spec['metadata']);
-    final geogebra = _mapValue(widget.spec['geogebra']);
-    final variants = _variantList(widget.spec);
-    final commands = _commandsForVariant(widget.spec, _variantIndex);
+    final previewSpec = _previewSpecForVariant(widget.spec, _variantIndex);
+    final metadata = _mapValue(previewSpec['metadata']);
+    final geogebra = _mapValue(previewSpec['geogebra']);
+    final variants = _variantList(previewSpec);
+    final commands = _commandsForVariant(previewSpec, _variantIndex);
     final isValid = metadata['valid'] != false && commands.isNotEmpty;
     final caption = _stringValue(
       geogebra['caption'],
@@ -101,7 +103,8 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(
-                              color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+                              color:
+                                  AppPalette.pastelGrey.withValues(alpha: 0.10),
                             ),
                           ),
                           child: WebViewWidget(controller: _controller),
@@ -307,7 +310,8 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.10)),
+        border:
+            Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.10)),
       ),
       child: Column(
         children: [
@@ -409,7 +413,10 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
       });
     }
     _controller.loadHtmlString(
-      _buildGeoGebraHtml(widget.spec, _variantIndex),
+      _buildGeoGebraHtml(
+        _previewSpecForVariant(widget.spec, _variantIndex),
+        _variantIndex,
+      ),
       baseUrl: 'https://www.geogebra.org',
     );
   }
@@ -479,7 +486,8 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
     }
     final geogebra = _mapValue(spec['geogebra']);
     final metadata = _mapValue(spec['metadata']);
-    final sceneType = _stringValue(metadata['scene_type'], _stringValue(spec['scene_type']));
+    final sceneType =
+        _stringValue(metadata['scene_type'], _stringValue(spec['scene_type']));
     if (sceneType == 'charged_particle_magnetic_field' ||
         sceneType == 'electromagnetism') {
       return _buildElectromagnetismDemoHtml(spec, variantIndex);
@@ -487,7 +495,8 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
     final commands = _commandsForVariant(spec, variantIndex);
     final sceneTypeJson = jsonEncode(sceneType);
     final commandsJson = jsonEncode(commands);
-    final appNameJson = jsonEncode(_stringValue(geogebra['app_name'], 'classic'));
+    final appNameJson =
+        jsonEncode(_stringValue(geogebra['app_name'], 'classic'));
     final fallbackText = jsonEncode(
       _stringValue(
         spec['fallback_text'],
@@ -505,12 +514,54 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    html, body, #ggb-element {
+    html, body {
       margin: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
+      background: #f8faf7;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+    #ggb-element {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
       background: #ffffff;
+    }
+    #ggb-controls {
+      display: none;
+      flex: 0 0 auto;
+      gap: 8px;
+      padding: 9px 11px 10px;
+      background: #f8faf7;
+      border-top: 1px solid rgba(73, 91, 84, 0.14);
+      box-shadow: 0 -8px 20px rgba(32, 42, 37, 0.08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #ggb-controls.is-visible {
+      display: grid;
+    }
+    .control-row {
+      display: grid;
+      grid-template-columns: 44px 1fr 54px;
+      align-items: center;
+      gap: 9px;
+      color: #26352f;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .control-row input {
+      width: 100%;
+      accent-color: #5f8f78;
+    }
+    .control-value {
+      text-align: right;
+      color: #5a6a63;
+      font-variant-numeric: tabular-nums;
     }
     .loading, .error {
       height: 100%;
@@ -553,8 +604,9 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
 </head>
 <body>
   <div id="ggb-element"><div class="loading">正在加载 GeoGebra...</div></div>
+  <div id="ggb-controls"></div>
   <script>
-    const commands = $commandsJson;
+    const rawCommands = $commandsJson;
     const sceneType = $sceneTypeJson;
     const appName = $appNameJson;
     const fallbackText = $fallbackText;
@@ -564,7 +616,7 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
       try {
         PreviewDiagnostics.postMessage(JSON.stringify(Object.assign({
           event: event,
-          command_count: commands.length
+          command_count: rawCommands.length
         }, detail || {})));
       } catch (_) {}
     }
@@ -597,6 +649,97 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
       }
       if (current.trim()) args.push(current.trim());
       return args;
+    }
+
+    function formatControlValue(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return String(value || '');
+      return Math.abs(number) >= 10 ? number.toFixed(1) : number.toFixed(2);
+    }
+
+    function shouldSkipDecorativeText(command) {
+      const match = String(command || '').trim().match(/^Text\\((.*)\\)\$/);
+      if (!match) return false;
+      const args = splitArgs(match[1]);
+      const label = String(args[0] || '').replace(/^["']|["']\$/g, '');
+      if (label.includes('拖动') || label.includes('观察')) return true;
+      if (label.includes('=') && label.includes('+')) return true;
+      return label.length > 18;
+    }
+
+    function prepareCommands(items) {
+      const setValues = {};
+      const sliders = {};
+      items.forEach(function(command) {
+        const text = String(command || '').trim();
+        let match = text.match(/^SetValue\\(([A-Za-z_]\\w*)\\s*,\\s*([-+0-9.]+)\\)\$/);
+        if (match) setValues[match[1]] = Number(match[2]);
+        match = text.match(/^([A-Za-z_]\\w*)\\s*=\\s*Slider\\(\\s*([-+0-9.]+)\\s*,\\s*([-+0-9.]+)\\s*,\\s*([-+0-9.]+)\\s*\\)\$/);
+        if (match) {
+          sliders[match[1]] = {
+            name: match[1],
+            min: Number(match[2]),
+            max: Number(match[3]),
+            step: Number(match[4])
+          };
+        }
+      });
+
+      const controls = Object.keys(sliders).map(function(name) {
+        const slider = sliders[name];
+        const initial = Object.prototype.hasOwnProperty.call(setValues, name)
+          ? setValues[name]
+          : slider.min;
+        return Object.assign({}, slider, { value: initial });
+      });
+
+      const cleaned = [];
+      items.forEach(function(command) {
+        const text = String(command || '').trim();
+        if (!text) return;
+        let match = text.match(/^([A-Za-z_]\\w*)\\s*=\\s*Slider\\(/);
+        if (match && sliders[match[1]]) {
+          const control = controls.find(function(item) { return item.name === match[1]; });
+          cleaned.push(match[1] + ' = ' + formatControlValue(control ? control.value : sliders[match[1]].min));
+          return;
+        }
+        match = text.match(/^SetValue\\(([A-Za-z_]\\w*)\\s*,/);
+        if (match && sliders[match[1]]) return;
+        if (/^axis\\s*=\\s*Segment\\(/.test(text)) return;
+        if (/^Set(Color|LineThickness|LineStyle)\\(axis\\b/.test(text)) return;
+        if (shouldSkipDecorativeText(text)) return;
+        cleaned.push(text);
+      });
+      return { commands: cleaned, controls: controls };
+    }
+
+    const preparedScene = prepareCommands(rawCommands);
+    const commands = preparedScene.commands;
+    const sliderControls = preparedScene.controls;
+
+    function renderControls(api) {
+      const host = document.getElementById('ggb-controls');
+      if (!host || !sliderControls.length) return;
+      host.classList.add('is-visible');
+      host.innerHTML = sliderControls.map(function(control, index) {
+        const safeName = String(control.name).replace(/[^A-Za-z0-9_]/g, '');
+        const displayName = safeName === 'k' ? 'λ' : safeName;
+        return '<label class="control-row" for="ggb-control-' + index + '">' +
+          '<span>' + displayName + '</span>' +
+          '<input id="ggb-control-' + index + '" data-name="' + safeName + '" type="range" min="' +
+          control.min + '" max="' + control.max + '" step="' + control.step + '" value="' + control.value + '">' +
+          '<span class="control-value" id="ggb-control-value-' + index + '">' + formatControlValue(control.value) + '</span>' +
+          '</label>';
+      }).join('');
+      host.querySelectorAll('input[data-name]').forEach(function(input, index) {
+        input.addEventListener('input', function() {
+          const value = Number(input.value);
+          const name = input.getAttribute('data-name');
+          const valueLabel = document.getElementById('ggb-control-value-' + index);
+          if (valueLabel) valueLabel.textContent = formatControlValue(value);
+          try { api.setValue(name, value); } catch (_) {}
+        });
+      });
     }
 
     function renderFallbackScene(reason, failures) {
@@ -775,21 +918,53 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
           }
         });
         if (isMathScene) {
-          const darkObjects = ['C', 'c', 'l', 'line', 'OA', 'OB', 'AB', 'axis'];
-          darkObjects.forEach(function(name) {
-            try { api.setColor(name, 0, 0, 0); } catch (_) {}
-            try { api.setLineThickness(name, name === 'axis' ? 3 : 5); } catch (_) {}
+          const curveObjects = ['C', 'c'];
+          curveObjects.forEach(function(name) {
+            try { api.setColor(name, 48, 66, 58); } catch (_) {}
+            try { api.setLineThickness(name, 4); } catch (_) {}
           });
-          try { api.setColor('tri', 85, 120, 255); } catch (_) {}
-          try { api.setFilling('tri', 0.16); } catch (_) {}
+          const segmentObjects = ['OA', 'OB', 'AB'];
+          segmentObjects.forEach(function(name) {
+            try { api.setColor(name, 64, 94, 178); } catch (_) {}
+            try { api.setLineThickness(name, 4); } catch (_) {}
+          });
+          const lineObjects = ['l', 'line'];
+          lineObjects.forEach(function(name) {
+            try { api.setColor(name, 86, 91, 97); } catch (_) {}
+            try { api.setLineThickness(name, 3); } catch (_) {}
+            try { api.setLineStyle(name, 1); } catch (_) {}
+          });
+          const highContrastObjects = [
+            ['L', 0, 96, 120, 6],
+            ['MQ', 190, 62, 52, 4],
+            ['OM', 118, 88, 26, 3],
+          ];
+          highContrastObjects.forEach(function(item) {
+            try { api.setColor(item[0], item[1], item[2], item[3]); } catch (_) {}
+            try { api.setLineThickness(item[0], item[4]); } catch (_) {}
+          });
+          try { api.setColor('tri', 90, 124, 224); } catch (_) {}
+          try { api.setFilling('tri', 0.12); } catch (_) {}
+          try { api.setColor('A', 221, 79, 67); } catch (_) {}
+          try { api.setColor('B', 27, 191, 191); } catch (_) {}
+          try { api.setColor('M', 205, 54, 46); } catch (_) {}
+          try { api.setColor('Q', 0, 112, 150); } catch (_) {}
+          try { api.setColor('O', 89, 101, 240); } catch (_) {}
+          try { api.setColor('F', 89, 101, 240); } catch (_) {}
+          try { api.setColor('F_prime', 89, 101, 240); } catch (_) {}
+          ['A', 'B', 'F', 'F_prime', 'O', 'M', 'Q'].forEach(function(name) {
+            try { api.setPointSize(name, 6); } catch (_) {}
+            try { api.setPointStyle(name, 0); } catch (_) {}
+          });
         }
         try {
           if (isMathScene) {
-            api.setCoordSystem(-8, 8, -6, 6);
+            api.setCoordSystem(-6.4, 6.4, -5.6, 5.6);
           } else {
             api.setCoordSystem(-2, 12, -2, 7);
           }
         } catch (_) {}
+        renderControls(api);
         if (commands.length && failures.length >= commands.length) {
           renderFallbackScene('all_commands_failed', failures);
           return;
@@ -836,7 +1011,8 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
         ? const <String, dynamic>{}
         : variants[variantIndex.clamp(0, variants.length - 1)];
     final title = jsonEncode(
-      _stringValue(variant['title'], _stringValue(metadata['fallback_text'], '磁场中圆周偏转')),
+      _stringValue(
+          variant['title'], _stringValue(metadata['fallback_text'], '磁场中圆周偏转')),
     );
     final condition = jsonEncode(_stringValue(variant['condition']));
     final caption = jsonEncode(
@@ -1018,6 +1194,112 @@ class _GeoGebraScenePreviewScreenState extends State<GeoGebraScenePreviewScreen>
 </html>
 ''';
   }
+}
+
+Map<String, dynamic> _previewSpecForVariant(
+  Map<String, dynamic> spec,
+  int variantIndex,
+) {
+  final commands = _commandsForVariant(spec, variantIndex);
+  if (!_isApolloniusTangentScene(spec, commands)) {
+    return spec;
+  }
+  return _specWithPreviewCommands(
+    spec,
+    _apolloniusTangentCommands(),
+    _apolloniusTangentCaption(),
+  );
+}
+
+bool _isApolloniusTangentScene(
+  Map<String, dynamic> spec,
+  List<String> commands,
+) {
+  final sceneSpec = _mapValue(spec['scene_spec']);
+  final metadata = _mapValue(spec['metadata']);
+  final searchable = [
+    spec['title'],
+    sceneSpec['title'],
+    spec['fallback_text'],
+    metadata['fallback_text'],
+    _mapValue(spec['geogebra'])['caption'],
+    ...commands,
+  ].join(' ');
+  final hasApolloniusHint = searchable.contains('阿波罗尼斯') ||
+      searchable.toLowerCase().contains('apollonius');
+  final hasTangentRatioHint = searchable.contains('切线') ||
+      searchable.contains('MQ') ||
+      searchable.contains('lambda') ||
+      searchable.contains('λ');
+  final hasLegacyWrongCircle = commands.any(
+    (command) =>
+        command.replaceAll(' ', '').contains('(x-2)^2+y^2=4') ||
+        command.replaceAll(' ', '').contains('(x-2)²+y²=4'),
+  );
+  return (hasApolloniusHint && hasTangentRatioHint) || hasLegacyWrongCircle;
+}
+
+Map<String, dynamic> _specWithPreviewCommands(
+  Map<String, dynamic> spec,
+  List<String> commands,
+  String caption,
+) {
+  final updated = Map<String, dynamic>.from(spec);
+  final geogebra = _mapValue(spec['geogebra']);
+  updated['commands'] = commands;
+  updated['scene_variants'] = const <Map<String, dynamic>>[];
+  updated['geogebra'] = {
+    ...geogebra,
+    'commands': commands,
+    'caption': caption,
+  };
+  updated['fallback_text'] = caption;
+  final metadata = _mapValue(spec['metadata']);
+  updated['metadata'] = {
+    ...metadata,
+    'scene_type': 'conic',
+    'fallback_text': caption,
+    'command_count': commands.length,
+  };
+  return updated;
+}
+
+String _apolloniusTangentCaption() {
+  return '底部拖动 λ 滑块，观察轨迹如何随切线长 / |MQ| 的比值变化；灰色小圆是原圆 C，Q 是固定点 (2,0)，红点 M 在轨迹上。λ=1 时轨迹退化为直线 x=5/4。';
+}
+
+List<String> _apolloniusTangentCommands() {
+  return const [
+    'k = Slider(0.35, 1.8, 0.01)',
+    'SetValue(k, 0.75)',
+    'O = (0, 0)',
+    'Q = (2, 0)',
+    'C: x^2 + y^2 = 1',
+    'L: (1 - k^2) * (x^2 + y^2) + 4 * k^2 * x - (1 + 4 * k^2) = 0',
+    'M = Point(L)',
+    'MQ = Segment(M, Q)',
+    'OM = Segment(O, M)',
+    'SetColor(C, 0.19, 0.26, 0.23)',
+    'SetLineThickness(C, 4)',
+    'SetColor(L, 0, 0.38, 0.47)',
+    'SetLineThickness(L, 6)',
+    'SetColor(M, 0.80, 0.21, 0.18)',
+    'SetColor(Q, 0, 0.44, 0.59)',
+    'SetColor(O, 0.35, 0.40, 0.94)',
+    'SetColor(MQ, 0.75, 0.24, 0.20)',
+    'SetLineThickness(MQ, 4)',
+    'SetColor(OM, 0.46, 0.35, 0.10)',
+    'SetLineThickness(OM, 3)',
+    'SetPointSize(M, 7)',
+    'SetPointSize(Q, 7)',
+    'SetPointSize(O, 7)',
+    'SetPointStyle(M, 0)',
+    'SetPointStyle(Q, 0)',
+    'SetPointStyle(O, 0)',
+    'SetLabelMode(M, 1)',
+    'SetLabelMode(Q, 1)',
+    'SetLabelMode(O, 1)',
+  ];
 }
 
 List<String> _commandsForVariant(Map<String, dynamic> spec, int variantIndex) {

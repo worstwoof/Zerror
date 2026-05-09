@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
     "物理": "不要返回 interactive_html。物理题的动画由后端 Manim 视频任务统一生成，rich_artifacts 默认留空即可。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "数学题可以返回一个 chart_spec，但只能用于坐标图、函数图像、几何示意或圆锥曲线草图；不要在 rich_artifacts 中写解题步骤、核心思路、易错提醒或复习清单。",
+    "数学": "数学题不要返回 chart_spec；需要图形时由系统生成 GeoGebra 交互图和 Manim 讲解视频，不要在 rich_artifacts 中写解题步骤、核心思路、易错提醒或复习清单。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
@@ -271,12 +271,41 @@ class DiagnosticService:
             request.subject,
             time.perf_counter() - model_started_at,
         )
-        response = self._build_response(
-            request=request,
-            raw_output=raw_output,
-            default_cleaned_question=cleaned_question,
-            source="text",
-        )
+        try:
+            response = self._build_response(
+                request=request,
+                raw_output=raw_output,
+                default_cleaned_question=cleaned_question,
+                source="text",
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning(
+                "analysis text quality json parse failed; requesting json repair error=%s preview=%r",
+                exc,
+                self._log_preview(raw_output, limit=500),
+            )
+            repair_prompt = self._build_json_repair_prompt(raw_output)
+            repair_started_at = time.perf_counter()
+            repaired_output = self.client.chat_completion(
+                repair_prompt,
+                model_name=self.client.settings.vivo_quality_text_model,
+                thinking_mode=self.client.settings.vivo_quality_text_thinking_mode,
+                reasoning_effort=self.client.settings.vivo_quality_text_reasoning_effort,
+                max_tokens=self.client.settings.vivo_quality_max_tokens,
+                timeout_seconds=self.client.settings.vivo_quality_timeout_seconds,
+            )
+            logger.info(
+                "analysis text quality json repair model=%s subject=%s elapsed=%.2fs",
+                self.client.settings.vivo_quality_text_model,
+                request.subject,
+                time.perf_counter() - repair_started_at,
+            )
+            response = self._build_response(
+                request=request,
+                raw_output=repaired_output,
+                default_cleaned_question=cleaned_question,
+                source="text",
+            )
         logger.info(
             "analysis text quality total subject=%s elapsed=%.2fs",
             response.subject,
@@ -354,16 +383,9 @@ class DiagnosticService:
             else "math"
         )
         if scene_subject == "physics":
-            if "manim_job" in existing_types or "manim_video" in existing_types:
-                return []
-            artifact = self._build_physics_manim_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            return [artifact] if artifact is not None else []
+            # Keep batch image analysis lightweight. Manim rendering is queued
+            # only from the explicit /analysis/physics-animation action.
+            return []
         deterministic_math_spec = None
         if scene_subject == "math":
             deterministic_math_spec = self._build_scene_spec_from_context(
@@ -389,7 +411,14 @@ class DiagnosticService:
             )
         )
         scene_spec.setdefault("subject", scene_subject)
-        scene_spec.setdefault("render_targets", ["geogebra", "manim"])
+        raw_render_targets = scene_spec.get("render_targets", ["geogebra"])
+        if isinstance(raw_render_targets, str):
+            raw_render_targets = [raw_render_targets]
+        scene_spec["render_targets"] = [
+            str(target)
+            for target in raw_render_targets
+            if str(target).lower() != "manim"
+        ] or ["geogebra"]
         scene_spec.setdefault("fallback_text", solution_summary)
         artifacts: List[RichArtifact] = []
 
@@ -399,8 +428,8 @@ class DiagnosticService:
                 artifacts.append(
                     RichArtifact(
                         artifact_type="geogebra_scene",
-                        title=str(scene_spec.get("title") or "GeoGebra interaction"),
-                        description=str(scene_spec.get("fallback_text") or "Interactive graph rendered by GeoGebra."),
+                        title=str(scene_spec.get("title") or "GeoGebra 交互图"),
+                        description=str(scene_spec.get("fallback_text") or "已生成可拖动查看的 GeoGebra 交互图。"),
                         mime_type="application/json",
                         content=json.dumps(geogebra_payload, ensure_ascii=False),
                     )
@@ -412,8 +441,8 @@ class DiagnosticService:
                 artifacts.append(
                     RichArtifact(
                         artifact_type="manim_video",
-                        title="Manim explanation video",
-                        description="Rendered Manim explanation video.",
+                        title="Manim 讲解视频",
+                        description="已生成 Manim 讲解视频，可直接播放或复习。",
                         mime_type="application/json",
                         content=json.dumps(
                             {
@@ -437,8 +466,8 @@ class DiagnosticService:
                 artifacts.append(
                     RichArtifact(
                         artifact_type="manim_job",
-                        title="Manim explanation video",
-                        description="Background Manim render job for a short explanation video.",
+                        title="Manim 讲解视频生成中",
+                        description="后台正在生成 Manim 讲解视频。",
                         mime_type="application/json",
                         content=json.dumps(job, ensure_ascii=False),
                     )
@@ -448,8 +477,8 @@ class DiagnosticService:
             artifacts.append(
                 RichArtifact(
                     artifact_type="text_explanation",
-                    title="Render fallback",
-                    description="This question is not structured enough for a reliable graph yet.",
+                    title="补充说明",
+                    description="当前题目暂时不适合生成可靠图形，先展示文字说明。",
                     mime_type="text/plain",
                     content=str(scene_spec.get("fallback_text") or ""),
                 )
@@ -466,9 +495,9 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
-        context = " ".join(
+        subject_context = str(subject or "").lower()
+        content_context = " ".join(
             [
-                subject or "physics",
                 cleaned_question,
                 scene_brief,
                 " ".join(knowledge_points),
@@ -476,15 +505,20 @@ class DiagnosticService:
                 " ".join(solution_steps),
             ]
         ).lower()
-        is_physics = "physics" in context or "物理" in context or "鐗╃悊" in context
-        is_math = (
-            "math" in context
-            or "数学" in context
-            or "鏁板" in context
-            or self._looks_like_math_scene_context(context)
+        is_physics = (
+            "physics" in subject_context
+            or "物理" in subject_context
+            or "鐗╃悊" in subject_context
+            or self._looks_like_physics_scene_context(content_context)
+        )
+        is_math = not is_physics and (
+            "math" in subject_context
+            or "数学" in subject_context
+            or "鏁板" in subject_context
+            or self._looks_like_math_scene_context(content_context)
         )
 
-        if is_math and not (is_physics and not is_math):
+        if is_math:
             scene_spec = self._build_scene_spec_from_context(
                 subject="math",
                 cleaned_question=cleaned_question,
@@ -526,8 +560,7 @@ class DiagnosticService:
                 content=json.dumps(content, ensure_ascii=False),
             )
 
-        normalized_subject = subject or "物理"
-        if "物理" not in normalized_subject:
+        if not is_physics:
             return None
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
@@ -761,8 +794,8 @@ class DiagnosticService:
             return None
         return RichArtifact(
             artifact_type="geogebra_scene",
-            title=str(scene_spec.get("title") or "GeoGebra interaction"),
-            description=str(scene_spec.get("fallback_text") or "Interactive graph rendered by GeoGebra."),
+            title=str(scene_spec.get("title") or "GeoGebra 交互图"),
+            description=str(scene_spec.get("fallback_text") or "已生成可拖动查看的 GeoGebra 交互图。"),
             mime_type="application/json",
             content=json.dumps(payload, ensure_ascii=False),
         )
@@ -946,7 +979,7 @@ class DiagnosticService:
         objects: List[Dict[str, Any]] = []
         relations: List[Dict[str, Any]] = []
         commands: List[str] = []
-        title = "GeoGebra interaction"
+        title = "GeoGebra 交互图"
         scene_type = "geometry"
 
         point_matches = re.findall(
@@ -958,13 +991,13 @@ class DiagnosticService:
 
         if "椭圆" in text or "ellipse" in lowered or "阿波罗尼斯" in text:
             scene_type = "conic"
-            title = "Conic section"
+            title = "圆锥曲线交互图"
         if "抛物线" in text or "parabola" in lowered:
             scene_type = "conic"
-            title = "Parabola"
+            title = "抛物线交互图"
         if "双曲线" in text or "hyperbola" in lowered:
             scene_type = "conic"
-            title = "Hyperbola"
+            title = "双曲线交互图"
 
         equations = re.findall(
             r"([xy][^，。；;\n]{0,60}=[^，。；;\n]{1,60})",
@@ -994,7 +1027,7 @@ class DiagnosticService:
                 "Tangent(M, c)",
             ]
             scene_type = "conic"
-            title = "Conic section"
+            title = "圆锥曲线交互图"
 
         scene_spec = {
             "subject": "math",
@@ -1005,11 +1038,11 @@ class DiagnosticService:
             "steps": [],
             "parameters": {},
             "render_targets": ["geogebra", "manim"],
-            "fallback_text": "Use GeoGebra to inspect points, curves, and tangents.",
+            "fallback_text": "可拖动点或调节参数观察点、曲线与切线关系。",
             "geogebra": {
                 "app_name": "classic",
                 "commands": commands,
-                "caption": "Drag points on the graph to inspect the geometry.",
+                "caption": "拖动图上的点观察几何关系。",
             },
         }
         self._enrich_math_manim_spec(
@@ -1139,10 +1172,10 @@ class DiagnosticService:
                 ],
                 "parameters": params,
                 "render_targets": ["geogebra", "manim"],
-                "fallback_text": solution_summary or scene_brief or "Use GeoGebra to inspect the particle trajectory.",
+                "fallback_text": solution_summary or scene_brief or "可拖动点或调节参数观察粒子轨迹关系。",
                 "geogebra": {
                     "app_name": "classic",
-                    "caption": "Drag P or Q to inspect the field boundary and trajectory relation.",
+                    "caption": "拖动 P 或 Q，观察磁场边界与轨迹关系。",
                 },
             }
         return self._build_mechanics_geogebra_scene_spec(
@@ -1257,6 +1290,10 @@ class DiagnosticService:
         )
 
     def _build_math_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        apollonius_tangent_spec = self._build_tangent_apollonius_scene_spec_v2(text)
+        if apollonius_tangent_spec is not None:
+            return apollonius_tangent_spec
+
         ellipse_focus_chord_spec = self._build_ellipse_focus_chord_scene_spec_v2(text)
         if ellipse_focus_chord_spec is not None:
             return ellipse_focus_chord_spec
@@ -1378,6 +1415,85 @@ class DiagnosticService:
             },
         }
 
+    def _build_tangent_apollonius_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        normalized = (
+            text.replace(" ", "")
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("＝", "=")
+            .replace("²", "^2")
+        )
+        lowered = normalized.lower()
+        has_unit_circle = (
+            "x^2+y^2=1" in lowered
+            or "x^2+y^2-1=0" in lowered
+            or "圆c" in normalized.lower()
+        )
+        has_q = "Q(2,0)" in normalized or "点Q" in normalized
+        has_tangent_ratio = (
+            ("切线长" in normalized or "tangent" in lowered or "MQ" in normalized)
+            and ("MQ" in normalized or "|MQ|" in normalized)
+            and ("λ" in normalized or "lambda" in lowered or "比" in normalized or "ratio" in lowered)
+        )
+        if not (has_unit_circle and has_q and has_tangent_ratio):
+            return None
+
+        commands = [
+            "k = Slider(0.35, 1.8, 0.01)",
+            "SetValue(k, 0.75)",
+            "O = (0, 0)",
+            "Q = (2, 0)",
+            "C: x^2 + y^2 = 1",
+            "L: (1 - k^2) * (x^2 + y^2) + 4 * k^2 * x - (1 + 4 * k^2) = 0",
+            "M = Point(L)",
+            "MQ = Segment(M, Q)",
+            "OM = Segment(O, M)",
+            "SetColor(C, 0.19, 0.26, 0.23)",
+            "SetLineThickness(C, 4)",
+            "SetColor(L, 0, 0.38, 0.47)",
+            "SetLineThickness(L, 6)",
+            "SetColor(M, 0.80, 0.21, 0.18)",
+            "SetColor(Q, 0, 0.44, 0.59)",
+            "SetColor(O, 0.35, 0.40, 0.94)",
+            "SetColor(MQ, 0.75, 0.24, 0.20)",
+            "SetLineThickness(MQ, 4)",
+            "SetColor(OM, 0.46, 0.35, 0.10)",
+            "SetLineThickness(OM, 3)",
+            "SetPointSize(M, 7)",
+            "SetPointSize(Q, 7)",
+            "SetPointSize(O, 7)",
+            "SetPointStyle(M, 0)",
+            "SetPointStyle(Q, 0)",
+            "SetPointStyle(O, 0)",
+            "SetLabelMode(M, 1)",
+            "SetLabelMode(Q, 1)",
+            "SetLabelMode(O, 1)",
+        ]
+        hint = (
+            "底部拖动 λ 滑块，观察轨迹如何随切线长 / |MQ| 的比值变化；"
+            "灰色小圆是原圆 C，Q 是固定点 (2,0)，红点 M 在轨迹上。"
+            "λ=1 时轨迹退化为直线 x=5/4。"
+        )
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": "conic",
+            "title": "切线长比值轨迹图",
+            "objects": [],
+            "relations": [],
+            "parameters": {},
+            "formula_steps": [],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": hint,
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": hint,
+            },
+        }
+
     def _build_ellipse_focus_chord_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
         normalized = text.replace(" ", "")
         normalized_ascii = (
@@ -1449,24 +1565,23 @@ class DiagnosticService:
             "OB = Segment(O, B)",
             "AB = Segment(A, B)",
             "tri = Polygon(O, A, B)",
-            "axis = Segment((-a, 0), (a, 0))",
-            "SetColor(C, 0, 0, 0)",
-            "SetLineThickness(C, 5)",
-            "SetColor(l, 0, 0, 0)",
-            "SetLineThickness(l, 4)",
+            "SetColor(C, 0.19, 0.26, 0.23)",
+            "SetLineThickness(C, 4)",
+            "SetColor(l, 0.34, 0.36, 0.38)",
+            "SetLineThickness(l, 3)",
             "SetLineStyle(l, 1)",
-            "SetColor(A, 255, 0, 0)",
-            "SetColor(B, 0, 70, 255)",
-            "SetColor(OA, 0, 0, 0)",
-            "SetLineThickness(OA, 5)",
-            "SetColor(OB, 0, 0, 0)",
-            "SetLineThickness(OB, 5)",
-            "SetColor(AB, 0, 0, 0)",
-            "SetLineThickness(AB, 5)",
-            "SetColor(axis, 0, 0, 0)",
-            "SetLineThickness(axis, 3)",
-            "SetColor(tri, 85, 120, 255)",
-            "SetFilling(tri, 0.16)",
+            "SetColor(A, 0.87, 0.31, 0.26)",
+            "SetColor(B, 0.11, 0.75, 0.75)",
+            "SetColor(F, 0.35, 0.40, 0.94)",
+            "SetColor(F_prime, 0.35, 0.40, 0.94)",
+            "SetColor(OA, 0.25, 0.37, 0.70)",
+            "SetLineThickness(OA, 4)",
+            "SetColor(OB, 0.25, 0.37, 0.70)",
+            "SetLineThickness(OB, 4)",
+            "SetColor(AB, 0.25, 0.37, 0.70)",
+            "SetLineThickness(AB, 4)",
+            "SetColor(tri, 0.35, 0.49, 0.88)",
+            "SetFilling(tri, 0.12)",
             "SetPointSize(A, 6)",
             "SetPointSize(B, 6)",
             "SetPointSize(F, 5)",
@@ -1475,9 +1590,6 @@ class DiagnosticService:
             "SetLabelMode(B, 1)",
             "SetLabelMode(F, 1)",
             "SetLabelMode(F_prime, 1)",
-            'Text("a = " + a, (-6, 5))',
-            'Text("m = " + m, (-6, 4.25))',
-            'Text("拖动 a 和 m，观察焦点弦 AB 与三角形 OAB", (-3.6, -5.2))',
         ]
         return {
             "schema_version": 2,
@@ -2059,23 +2171,131 @@ class DiagnosticService:
                 raise ValueError(f"模型输出不是合法 JSON：{raw_output}")
             return self._load_json_with_repairs(match.group(0))
 
+    def _build_json_repair_prompt(self, raw_output: str) -> str:
+        return f"""
+请把下面的模型输出修复成严格合法的 JSON 对象。
+
+要求：
+1. 只输出 JSON，不要 Markdown 代码块，不要解释。
+2. 保留原有解题内容、公式和字段含义，不要重新解题，不要缩写。
+3. 缺失字段用合理空值补齐：knowledge_points、solution_steps、similar_questions、rich_artifacts 用数组，mistake_diagnosis 用空字符串。
+4. 字符串里的反斜杠、换行和英文双引号必须正确转义。
+5. 顶层字段至少包含 cleaned_question、scene_brief、subject、knowledge_points、solution_summary、solution_steps、mistake_diagnosis、review_plan、similar_questions、rich_artifacts。
+6. review_plan 必须包含 next_review_in_days、focus、schedule。
+
+原始输出：
+{raw_output}
+""".strip()
+
     def _load_json_with_repairs(self, text: str) -> dict:
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return parsed
-            raise ValueError("模型输出不是 JSON 对象。")
-        except json.JSONDecodeError:
-            repaired = self._repair_common_json_issues(text)
-            parsed = json.loads(repaired)
-            if isinstance(parsed, dict):
-                return parsed
-            raise ValueError("模型输出不是 JSON 对象。")
+        last_error: json.JSONDecodeError | None = None
+        for candidate in self._json_repair_candidates(text):
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError("模型输出不是 JSON 对象。")
+            except json.JSONDecodeError as exc:
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise ValueError("模型输出不是 JSON 对象。")
+
+    def _json_repair_candidates(self, text: str) -> List[str]:
+        candidates: List[str] = []
+        for candidate in [
+            text,
+            self._repair_common_json_issues(text),
+            self._repair_json_iteratively(self._repair_common_json_issues(text)),
+        ]:
+            if candidate not in candidates:
+                candidates.append(candidate)
+        return candidates
 
     def _repair_common_json_issues(self, text: str) -> str:
         repaired = self._escape_invalid_backslashes_in_json_strings(text)
+        repaired = self._escape_control_characters_in_json_strings(repaired)
         repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
         return repaired
+
+    def _repair_json_iteratively(self, text: str) -> str:
+        repaired = text
+        for _ in range(8):
+            try:
+                json.loads(repaired)
+                return repaired
+            except json.JSONDecodeError as exc:
+                updated = self._repair_json_decode_error(repaired, exc)
+                if updated == repaired:
+                    return repaired
+                repaired = self._repair_common_json_issues(updated)
+        return repaired
+
+    def _repair_json_decode_error(self, text: str, exc: json.JSONDecodeError) -> str:
+        if exc.msg != "Expecting ',' delimiter":
+            return text
+
+        pos = exc.pos
+        if pos < 0 or pos >= len(text):
+            return text
+
+        value_pos = pos
+        while value_pos < len(text) and text[value_pos].isspace():
+            value_pos += 1
+        prev_pos = pos - 1
+        while prev_pos >= 0 and text[prev_pos].isspace():
+            prev_pos -= 1
+
+        if value_pos >= len(text) or prev_pos < 0:
+            return text
+        if not self._looks_like_json_value_start(text[value_pos]):
+            return text
+        if text[prev_pos] not in {'"', "}", "]"} and not text[prev_pos].isdigit():
+            return text
+
+        return text[:pos] + "," + text[pos:]
+
+    def _looks_like_json_value_start(self, char: str) -> bool:
+        return char in {'"', "{", "[", "-", "t", "f", "n"} or char.isdigit()
+
+    def _escape_control_characters_in_json_strings(self, text: str) -> str:
+        result: List[str] = []
+        in_string = False
+        escape_active = False
+
+        for char in text:
+            if not in_string:
+                result.append(char)
+                if char == '"':
+                    in_string = True
+                    escape_active = False
+                continue
+
+            if escape_active:
+                result.append(char)
+                escape_active = False
+                continue
+
+            if char == "\\":
+                result.append(char)
+                escape_active = True
+                continue
+
+            if char == '"':
+                result.append(char)
+                in_string = False
+                continue
+
+            if char == "\n":
+                result.append("\\n")
+            elif char == "\r":
+                result.append("\\r")
+            elif char == "\t":
+                result.append("\\t")
+            else:
+                result.append(char)
+
+        return "".join(result)
 
     def _escape_invalid_backslashes_in_json_strings(self, text: str) -> str:
         result: List[str] = []
@@ -2260,7 +2480,7 @@ class DiagnosticService:
             )
         if subject_name == "数学":
             return (
-                "数学题如果返回 chart_spec，只允许用于坐标图、函数图像、几何示意或圆锥曲线草图；content 必须是 JSON 字符串并包含 coordinate_graph。不要在 chart_spec 中承载解题步骤、核心思路、易错提醒或复习清单。"
+                "数学题不要返回 chart_spec；图形展示由系统生成 GeoGebra 交互图和 Manim 讲解视频。不要在 rich_artifacts 中承载解题步骤、核心思路、易错提醒或复习清单。"
             )
         if subject_name == "化学":
             return (

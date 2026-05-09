@@ -211,6 +211,7 @@ async def create_analysis_image_job(
     user_answer: str = Form(""),
     wrong_reason_hint: str = Form(""),
     enable_subject_extensions: bool = Form(True),
+    client_job_id: str = Form(""),
 ) -> ImageAnalysisJobResponse:
     # Two-stage path for batch capture: create a short-lived in-memory job,
     # expose OCR partials quickly, then let the quality model finish detached
@@ -220,6 +221,7 @@ async def create_analysis_image_job(
     if not image_bytes:
         raise HTTPException(status_code=400, detail="上传图片为空。")
     return create_image_analysis_job(
+        client_job_id=client_job_id,
         image_bytes=image_bytes,
         filename=image.filename or "",
         content_type=image.content_type or "image/png",

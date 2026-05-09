@@ -63,7 +63,55 @@ def render_manim_video(
     final_path = output_dir / f"{job_id}.mp4"
     if candidates[0] != final_path:
         final_path.write_bytes(candidates[0].read_bytes())
+    optimize_mp4_for_streaming(final_path)
     return final_path
+
+
+def optimize_mp4_for_streaming(video_path: Path) -> None:
+    """Move MP4 metadata to the front when ffmpeg is available."""
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg or not video_path.exists():
+        return
+
+    temporary_path = video_path.with_name(
+        f"{video_path.stem}.faststart{video_path.suffix}"
+    )
+    try:
+        if temporary_path.exists():
+            temporary_path.unlink()
+        completed = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                str(temporary_path),
+            ],
+            cwd=video_path.parent,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        if (
+            completed.returncode == 0
+            and temporary_path.exists()
+            and temporary_path.stat().st_size > 0
+        ):
+            temporary_path.replace(video_path)
+        elif temporary_path.exists():
+            temporary_path.unlink()
+    except Exception:
+        try:
+            if temporary_path.exists():
+                temporary_path.unlink()
+        except OSError:
+            pass
 
 
 def build_manim_script(scene_spec: Dict[str, Any]) -> str:

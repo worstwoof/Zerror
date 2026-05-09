@@ -24,18 +24,21 @@ class ErrorEditScreen extends StatefulWidget {
     required this.initialText,
     this.initialAnalysis,
     this.onArchived,
+    this.onAnalysisUpdated,
   });
 
   final String imagePath;
   final String initialText;
   final AnalysisResult? initialAnalysis;
   final VoidCallback? onArchived;
+  final ValueChanged<AnalysisResult>? onAnalysisUpdated;
 
   @override
   State<ErrorEditScreen> createState() => _ErrorEditScreenState();
 }
 
-class _ErrorEditScreenState extends State<ErrorEditScreen> {
+class _ErrorEditScreenState extends State<ErrorEditScreen>
+    with SingleTickerProviderStateMixin {
   final AiApiClient _apiClient = const AiApiClient();
   final FileUploadClient _fileUploadClient = const FileUploadClient();
   final List<String> _errorReasons = const [
@@ -48,6 +51,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   late final TextEditingController _questionController;
   late final TextEditingController _reflectionController;
+  late final AnimationController _manimProgressController;
 
   bool _isAiThinking = true;
   bool _isSaving = false;
@@ -74,6 +78,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     super.initState();
     _questionController = TextEditingController(text: widget.initialText);
     _reflectionController = TextEditingController();
+    _manimProgressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
     if (widget.initialAnalysis != null) {
       _applyAnalysisResult(widget.initialAnalysis!);
       _isAiThinking = false;
@@ -86,6 +94,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   @override
   void dispose() {
     _manimPollTimer?.cancel();
+    _manimProgressController.dispose();
     _questionController.dispose();
     _reflectionController.dispose();
     super.dispose();
@@ -118,6 +127,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         _applyAnalysisResult(result);
         _isAiThinking = false;
       });
+      _notifyAnalysisUpdated();
       _syncManimPolling();
     } on AiApiException catch (error) {
       if (!mounted) return;
@@ -149,9 +159,39 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     _physicsAnimationError = null;
   }
 
+  AnalysisResult _currentAnalysisResult() {
+    return AnalysisResult(
+      subject: _subject,
+      sceneBrief: _sceneBrief,
+      knowledgePoints: List<String>.from(_knowledgePoints),
+      solutionSummary: _solutionSummary,
+      solutionSteps: List<String>.from(_solutionSteps),
+      mistakeDiagnosis: _mistakeDiagnosis,
+      reviewSchedule: List<int>.from(_reviewSchedule),
+      reviewFocus: _reviewFocus,
+      similarQuestions: List<SimilarQuestionItem>.from(_similarQuestions),
+      richArtifacts: _richArtifacts
+          .map((artifact) => Map<String, dynamic>.from(artifact))
+          .toList(growable: false),
+    );
+  }
+
+  void _notifyAnalysisUpdated() {
+    widget.onAnalysisUpdated?.call(_currentAnalysisResult());
+  }
+
   bool _supportsPhysicsAnimation() {
     final subject = _resolvedPhysicsSubject();
     return subject.contains('物理') || subject.contains('数学');
+  }
+
+  bool _isResolvedPhysicsSubject() {
+    final subject = _resolvedPhysicsSubject();
+    return subject.contains('物理') && !subject.contains('数学');
+  }
+
+  bool _isResolvedMathSubject() {
+    return _resolvedPhysicsSubject().contains('数学');
   }
 
   String _resolvedPhysicsSubject() {
@@ -161,28 +201,39 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       _knowledgePoints.join(' '),
       _solutionSummary,
     ].join(' ').toLowerCase();
+    final explicitSubject = _subject.trim();
 
-    const physicsKeywords = <String>[
+    const strongPhysicsKeywords = <String>[
       '物理',
       '力学',
-      '运动',
-      '速度',
-      '加速度',
       '受力',
       '摩擦',
       '木板',
       '物块',
       '板块',
       '斜面',
-      '平抛',
       '碰撞',
       '电路',
       '光学',
       '透镜',
       '反射',
       '折射',
+      '磁场',
+      '电场',
+      '洛伦兹',
+      '带电粒子',
+      '磁感应',
+      '安培力',
+    ];
+    const physicsKeywords = <String>[
+      ...strongPhysicsKeywords,
+      '运动',
+      '速度',
+      '加速度',
+      '平抛',
     ];
 
+    final matchesStrongPhysics = strongPhysicsKeywords.any(combined.contains);
     final matchesPhysics = physicsKeywords.any(combined.contains);
     const mathKeywords = <String>[
       '数学',
@@ -199,11 +250,17 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     ];
 
     final matchesMath = mathKeywords.any(combined.contains);
-    if (_subject.trim().contains('数学') || matchesMath) {
+    if (explicitSubject.contains('物理') || matchesStrongPhysics) {
+      return '物理';
+    }
+    if (explicitSubject.contains('数学')) {
       return '数学';
     }
-    if (_subject.trim().contains('物理') || matchesPhysics) {
+    if (matchesPhysics) {
       return '物理';
+    }
+    if (matchesMath) {
+      return '数学';
     }
     return _subject;
   }
@@ -271,6 +328,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               : result.reason;
         }
       });
+      if (result.generated && result.artifact != null) {
+        _notifyAnalysisUpdated();
+      }
       _syncManimPolling();
 
       if (result.generated && result.artifact != null && mounted) {
@@ -352,6 +412,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       }
     } on AiApiException catch (error) {
       if (!mounted) return;
+      if (error.statusCode == 404) {
+        _markManimJobMissing(jobId);
+        _manimPollTimer?.cancel();
+        _manimPollTimer = null;
+        _autoPollingManimJobId = null;
+      }
       if (showErrors) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error.message)),
@@ -410,7 +476,57 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       }
       _richArtifacts = updatedArtifacts;
     });
+    _notifyAnalysisUpdated();
     _syncManimPolling();
+  }
+
+  void _markManimJobMissing(String jobId) {
+    var changed = false;
+    setState(() {
+      final updatedArtifacts = List<Map<String, dynamic>>.from(_richArtifacts);
+      final index = updatedArtifacts.indexWhere((artifact) {
+        if ((artifact['artifact_type'] ?? '').toString() != 'manim_job') {
+          return false;
+        }
+        final parsed = _tryParseArtifactJson(
+          (artifact['mime_type'] ?? '').toString(),
+          (artifact['content'] ?? '').toString(),
+        );
+        return (parsed?['job_id'] ?? '').toString() == jobId;
+      });
+      if (index < 0) {
+        return;
+      }
+
+      final current = Map<String, dynamic>.from(updatedArtifacts[index]);
+      final parsed = _tryParseArtifactJson(
+        (current['mime_type'] ?? '').toString(),
+        (current['content'] ?? '').toString(),
+      );
+      final diagnostics = _asStringMap(parsed?['diagnostics']);
+      current['content'] = jsonEncode({
+        ...?parsed,
+        'job_id': jobId,
+        'status': 'failed',
+        'progress': 100,
+        'video_url': '',
+        'absolute_video_url': '',
+        'message': '动画生成任务已失效，请重新生成视频。',
+        'error': '动画生成任务已失效，请重新生成视频。',
+        'diagnostics': {
+          ...diagnostics,
+          'job_missing': true,
+        },
+      });
+      updatedArtifacts[index] = current;
+      _richArtifacts = updatedArtifacts;
+      _physicsAnimationError = '动画生成任务已失效，请重新生成视频。';
+      changed = true;
+    });
+    if (changed) {
+      _notifyAnalysisUpdated();
+      _syncManimPolling();
+    }
   }
 
   Future<void> _saveToArchiveWithUpload() async {
@@ -441,6 +557,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         imageUrl = uploaded.fileUrl;
       }
 
+      await _apiClient.retainManimArtifacts(_richArtifacts);
       final draft = _buildDraftWithImage(question, imageUrl: imageUrl);
       final created = store.addErrorRecord(draft);
       widget.onArchived?.call();
@@ -480,6 +597,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       tags: draft.tags,
       myAnswer: draft.myAnswer,
       aiAnalysis: draft.aiAnalysis,
+      richArtifacts: draft.richArtifacts,
       imageUrl: imageUrl,
       isFavorite: draft.isFavorite,
       isMastered: draft.isMastered,
@@ -515,6 +633,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       aiAnalysis: summaryParts.isEmpty
           ? _buildFallbackAnalysis(subject, topic)
           : summaryParts.join('\n\n'),
+      richArtifacts: _richArtifacts
+          .map((artifact) => Map<String, dynamic>.from(artifact))
+          .toList(growable: false),
       isFavorite: false,
       isMastered: false,
     );
@@ -916,10 +1037,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             const SizedBox(height: 12),
             _buildSectionLabel('学科拓展'),
             const SizedBox(height: 8),
-            if (_supportsPhysicsAnimation()) _buildPhysicsAnimationActionCard(),
-            if (_supportsPhysicsAnimation() && _visibleRichArtifacts.isNotEmpty)
-              const SizedBox(height: 12),
-            if (_visibleRichArtifacts.isNotEmpty) _buildRichArtifactsPreview(),
+            _buildSubjectExtensionContent(),
           ],
           Text(
             '归档方向：$subject · $topic',
@@ -1284,11 +1402,53 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     );
   }
 
-  Widget _buildRichArtifactsPreview() {
+  Widget _buildSubjectExtensionContent() {
+    final artifacts = _visibleRichArtifacts;
+    if (!_supportsPhysicsAnimation()) {
+      return _buildRichArtifactsPreview(artifacts);
+    }
+
+    if (_isResolvedMathSubject()) {
+      final geogebraArtifacts = artifacts.where(_isGeoGebraArtifact).toList();
+      final manimArtifacts = artifacts.where(_isManimArtifact).toList();
+      final otherArtifacts = artifacts
+          .where(
+            (artifact) =>
+                !_isGeoGebraArtifact(artifact) && !_isManimArtifact(artifact),
+          )
+          .toList();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (geogebraArtifacts.isNotEmpty)
+            _buildRichArtifactsPreview(geogebraArtifacts),
+          _buildPhysicsAnimationActionCard(),
+          if (manimArtifacts.isNotEmpty) const SizedBox(height: 12),
+          if (manimArtifacts.isNotEmpty)
+            _buildRichArtifactsPreview(manimArtifacts),
+          if (otherArtifacts.isNotEmpty) const SizedBox(height: 2),
+          if (otherArtifacts.isNotEmpty)
+            _buildRichArtifactsPreview(otherArtifacts),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ..._visibleRichArtifacts.map(_buildRichArtifactCard),
+        _buildPhysicsAnimationActionCard(),
+        if (artifacts.isNotEmpty) const SizedBox(height: 12),
+        if (artifacts.isNotEmpty) _buildRichArtifactsPreview(artifacts),
+      ],
+    );
+  }
+
+  Widget _buildRichArtifactsPreview(List<Map<String, dynamic>> artifacts) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...artifacts.map(_buildRichArtifactCard),
       ],
     );
   }
@@ -1297,11 +1457,21 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     return _richArtifacts.where(_shouldDisplayRichArtifact).toList();
   }
 
+  bool _isGeoGebraArtifact(Map<String, dynamic> artifact) {
+    final type = (artifact['artifact_type'] ?? '').toString();
+    return type == 'geogebra_scene' || type == 'physics_scene_spec';
+  }
+
+  bool _isManimArtifact(Map<String, dynamic> artifact) {
+    final type = (artifact['artifact_type'] ?? '').toString();
+    return type == 'manim_job' || type == 'manim_video';
+  }
+
   bool _shouldDisplayRichArtifact(Map<String, dynamic> artifact) {
     final type = (artifact['artifact_type'] ?? '').toString();
     final mimeType = (artifact['mime_type'] ?? '').toString().trim();
     final content = (artifact['content'] ?? '').toString().trim();
-    if (_supportsPhysicsAnimation()) {
+    if (_isResolvedPhysicsSubject()) {
       if (type == 'geogebra_scene' ||
           type == 'physics_scene_spec' ||
           type == 'interactive_html') {
@@ -1312,6 +1482,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       return false;
     }
     if (type == 'chart_spec') {
+      if (_isResolvedMathSubject()) {
+        return false;
+      }
       final parsed = _tryParseArtifactJson(mimeType, content);
       return parsed?['coordinate_graph'] is Map<String, dynamic>;
     }
@@ -1325,9 +1498,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final mimeType = (artifact['mime_type'] ?? '').toString().trim();
     final content = (artifact['content'] ?? '').toString().trim();
 
-    final displayTitle = title.isEmpty ? _fallbackArtifactTitle(type) : title;
-    final displayDescription =
-        description.isEmpty ? _fallbackArtifactDescription(type) : description;
+    final displayTitle = _localizedArtifactTitle(type, title);
+    final displayDescription = _localizedArtifactDescription(
+      type,
+      description,
+    );
     final previewText = _artifactPreviewText(type, mimeType, content);
 
     return Container(
@@ -1415,6 +1590,29 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     }
   }
 
+  String _localizedArtifactTitle(String type, String title) {
+    final cleaned = title.trim();
+    if (cleaned.isEmpty) {
+      return _fallbackArtifactTitle(type);
+    }
+    switch (cleaned) {
+      case 'Manim explanation video':
+        return type == 'manim_job' ? 'Manim 讲解视频生成中' : 'Manim 讲解视频';
+      case 'GeoGebra interaction':
+        return 'GeoGebra 交互图';
+      case 'Render fallback':
+        return '补充说明';
+      case 'Conic section':
+        return '圆锥曲线交互图';
+      case 'Parabola':
+        return '抛物线交互图';
+      case 'Hyperbola':
+        return '双曲线交互图';
+      default:
+        return cleaned;
+    }
+  }
+
   String _fallbackArtifactTitle(String type) {
     switch (type) {
       case 'geogebra_scene':
@@ -1441,6 +1639,29 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
         return '复习卡片';
       default:
         return '扩展内容';
+    }
+  }
+
+  String _localizedArtifactDescription(String type, String description) {
+    final cleaned = description.trim();
+    if (cleaned.isEmpty) {
+      return _fallbackArtifactDescription(type);
+    }
+    switch (cleaned) {
+      case 'Rendered Manim explanation video.':
+        return '已生成 Manim 讲解视频，可直接播放或复习。';
+      case 'Background Manim render job for a short explanation video.':
+        return '已创建 Manim 讲解视频任务，完成后可播放视频。';
+      case 'Interactive graph rendered by GeoGebra.':
+        return '已生成 GeoGebra 交互图，可拖动点或调节参数观察变化。';
+      case 'This question is not structured enough for a reliable graph yet.':
+        return '当前题目暂时不适合生成可靠图形，先展示文字说明。';
+      case 'Use GeoGebra to inspect points, curves, and tangents.':
+        return '可拖动点或调节参数观察点、曲线与切线关系。';
+      case 'Use GeoGebra to inspect the particle trajectory.':
+        return '可拖动点或调节参数观察粒子轨迹关系。';
+      default:
+        return cleaned;
     }
   }
 
@@ -2279,16 +2500,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: displayProgress / 100,
-              minHeight: 6,
-              backgroundColor: Colors.white.withValues(alpha: 0.08),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppPalette.matchaMist,
-              ),
-            ),
+          _buildAnimatedManimProgress(
+            displayProgress / 100,
+            isRunning: !isFinished && error.isEmpty,
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -2298,43 +2512,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
               final index = entry.key;
               final stage = entry.value;
               final isActive = index <= activeStage && error.isEmpty;
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? AppPalette.matchaMist.withValues(alpha: 0.16)
-                      : Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: isActive
-                        ? AppPalette.matchaMist.withValues(alpha: 0.42)
-                        : Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      stage.$2,
-                      color: isActive
-                          ? AppPalette.matchaMist
-                          : AppPalette.textSecondary,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      stage.$1,
-                      style: TextStyle(
-                        color: isActive
-                            ? AppPalette.textPrimary
-                            : AppPalette.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+              return _buildManimStageChip(
+                label: stage.$1,
+                icon: stage.$2,
+                isActive: isActive,
+                isCurrent: index == activeStage && !isFinished && error.isEmpty,
               );
             }).toList(),
           ),
@@ -2368,6 +2550,176 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAnimatedManimProgress(
+    double progress, {
+    required bool isRunning,
+  }) {
+    final targetProgress = progress.clamp(0.0, 1.0);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: targetProgress),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedProgress, _) {
+        return SizedBox(
+          height: 8,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final visualProgress = isRunning
+                    ? math.max(animatedProgress, 0.08)
+                    : animatedProgress;
+                final fillWidth = width * visualProgress;
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: fillWidth,
+                        child: Stack(
+                          clipBehavior: Clip.hardEdge,
+                          children: [
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppPalette.matchaMist,
+                                      AppPalette.almondCream.withValues(
+                                        alpha: 0.86,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (isRunning && fillWidth > 28)
+                              AnimatedBuilder(
+                                animation: _manimProgressController,
+                                builder: (context, _) {
+                                  final shimmerWidth = math.min(
+                                    72.0,
+                                    math.max(28.0, fillWidth * 0.48),
+                                  );
+                                  final left = _manimProgressController.value *
+                                          (fillWidth + shimmerWidth) -
+                                      shimmerWidth;
+                                  return Positioned(
+                                    left: left,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: shimmerWidth,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.white.withValues(alpha: 0),
+                                            Colors.white
+                                                .withValues(alpha: 0.34),
+                                            Colors.white.withValues(alpha: 0),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildManimStageChip({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required bool isCurrent,
+  }) {
+    Widget buildChip(double pulse) {
+      final pulseAmount = (pulse + 1) / 2;
+      final activeFillAlpha = isCurrent ? 0.16 + pulseAmount * 0.08 : 0.16;
+      final activeBorderAlpha = isCurrent ? 0.42 + pulseAmount * 0.16 : 0.42;
+      return Transform.scale(
+        scale: isCurrent ? 1.0 + pulseAmount * 0.025 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppPalette.matchaMist.withValues(alpha: activeFillAlpha)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isActive
+                  ? AppPalette.matchaMist.withValues(alpha: activeBorderAlpha)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: AppPalette.matchaMist.withValues(
+                        alpha: 0.08 + pulseAmount * 0.10,
+                      ),
+                      blurRadius: 10,
+                      spreadRadius: 0.5,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color:
+                    isActive ? AppPalette.matchaMist : AppPalette.textSecondary,
+                size: 14,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive
+                      ? AppPalette.textPrimary
+                      : AppPalette.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!isCurrent) {
+      return buildChip(0);
+    }
+    return AnimatedBuilder(
+      animation: _manimProgressController,
+      builder: (context, _) {
+        final pulse = math.sin(_manimProgressController.value * math.pi * 2);
+        return buildChip(pulse);
+      },
     );
   }
 

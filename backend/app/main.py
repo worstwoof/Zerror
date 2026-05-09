@@ -13,6 +13,7 @@ from backend.app.api.v1.render import router as render_router
 from backend.app.api.v1.upload import router as ai_router
 from backend.app.core.config import PROJECT_ROOT, settings
 from backend.app.db.session import init_db
+from backend.app.services.render_jobs import mark_interrupted_manim_jobs_after_restart
 
 
 logging.basicConfig(
@@ -29,6 +30,7 @@ app = FastAPI(
 
 init_db()
 (PROJECT_ROOT / "static" / "media" / "manim").mkdir(parents=True, exist_ok=True)
+mark_interrupted_manim_jobs_after_restart()
 mimetypes.add_type("video/mp4", ".mp4")
 
 app.include_router(ai_router)

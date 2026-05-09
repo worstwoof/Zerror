@@ -7,8 +7,9 @@ import '../core/constants.dart';
 
 class AiApiException implements Exception {
   final String message;
+  final int? statusCode;
 
-  const AiApiException(this.message);
+  const AiApiException(this.message, {this.statusCode});
 
   @override
   String toString() => message;
@@ -65,6 +66,32 @@ class AnalysisResult {
     required this.similarQuestions,
     required this.richArtifacts,
   });
+
+  AnalysisResult copyWith({
+    String? subject,
+    String? sceneBrief,
+    List<String>? knowledgePoints,
+    String? solutionSummary,
+    List<String>? solutionSteps,
+    String? mistakeDiagnosis,
+    List<int>? reviewSchedule,
+    String? reviewFocus,
+    List<SimilarQuestionItem>? similarQuestions,
+    List<Map<String, dynamic>>? richArtifacts,
+  }) {
+    return AnalysisResult(
+      subject: subject ?? this.subject,
+      sceneBrief: sceneBrief ?? this.sceneBrief,
+      knowledgePoints: knowledgePoints ?? this.knowledgePoints,
+      solutionSummary: solutionSummary ?? this.solutionSummary,
+      solutionSteps: solutionSteps ?? this.solutionSteps,
+      mistakeDiagnosis: mistakeDiagnosis ?? this.mistakeDiagnosis,
+      reviewSchedule: reviewSchedule ?? this.reviewSchedule,
+      reviewFocus: reviewFocus ?? this.reviewFocus,
+      similarQuestions: similarQuestions ?? this.similarQuestions,
+      richArtifacts: richArtifacts ?? this.richArtifacts,
+    );
+  }
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
     final reviewPlan =
@@ -188,12 +215,12 @@ class ImageAnalysisJob {
       error: AiApiClient.friendlyError((json['error'] ?? '').toString()),
       createdAt: double.tryParse((json['created_at'] ?? '0').toString()) ?? 0,
       updatedAt: double.tryParse((json['updated_at'] ?? '0').toString()) ?? 0,
-      result: rawResult.isEmpty ? null : ImageAnalysisPayload.fromJson(rawResult),
+      result:
+          rawResult.isEmpty ? null : ImageAnalysisPayload.fromJson(rawResult),
       partialResult:
           rawPartial.isEmpty ? null : ImageAnalysisPayload.fromJson(rawPartial),
     );
   }
-
 }
 
 class PhysicsAnimationPayload {
@@ -308,7 +335,6 @@ class ManimRenderJob {
       'diagnostics': diagnostics,
     };
   }
-
 }
 
 class AiApiClient {
@@ -335,7 +361,10 @@ class AiApiClient {
     final payload = _decodeJson(response);
 
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
 
     final normalizedText = (payload['normalized_text'] ?? '').toString().trim();
@@ -366,7 +395,10 @@ class AiApiClient {
 
     final payload = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
 
     return AnalysisResult.fromJson(payload);
@@ -405,7 +437,10 @@ class AiApiClient {
     final payload = _decodeJson(response);
 
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
 
     final result = ImageAnalysisPayload.fromJson(payload);
@@ -417,6 +452,7 @@ class AiApiClient {
 
   Future<ImageAnalysisJob> createImageAnalysisJob({
     required String imagePath,
+    String? clientJobId,
     String subject = '未分类',
     String wrongReasonHint = '',
     bool enableSubjectExtensions = true,
@@ -433,6 +469,10 @@ class AiApiClient {
       ..fields['enable_subject_extensions'] =
           enableSubjectExtensions ? 'true' : 'false'
       ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+    final normalizedClientJobId = clientJobId?.trim();
+    if (normalizedClientJobId != null && normalizedClientJobId.isNotEmpty) {
+      request.fields['client_job_id'] = normalizedClientJobId;
+    }
 
     final response = await _sendMultipart(
       request,
@@ -440,7 +480,10 @@ class AiApiClient {
     );
     final payload = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
     return ImageAnalysisJob.fromJson(payload);
   }
@@ -451,7 +494,10 @@ class AiApiClient {
         .timeout(const Duration(seconds: 20));
     final payload = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
     return ImageAnalysisJob.fromJson(payload);
   }
@@ -462,7 +508,10 @@ class AiApiClient {
         .timeout(const Duration(seconds: 20));
     final payload = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(payload));
+      throw AiApiException(
+        _extractErrorMessage(payload),
+        statusCode: response.statusCode,
+      );
     }
     return ImageAnalysisJob.fromJson(payload);
   }
@@ -480,7 +529,10 @@ class AiApiClient {
 
     final decoded = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(decoded));
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
     }
 
     return PhysicsAnimationResult.fromJson(decoded);
@@ -493,10 +545,33 @@ class AiApiClient {
 
     final decoded = _decodeJson(response);
     if (response.statusCode >= 400) {
-      throw AiApiException(_extractErrorMessage(decoded));
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
     }
 
     return ManimRenderJob.fromJson(decoded);
+  }
+
+  Future<void> retainManimArtifacts(
+    Iterable<Map<String, dynamic>> artifacts,
+  ) async {
+    await _postManimArtifactLifecycle(
+      endpoint: AppConstants.manimRetainEndpoint,
+      artifacts: artifacts,
+      swallowErrors: false,
+    );
+  }
+
+  Future<void> cleanupManimArtifacts(
+    Iterable<Map<String, dynamic>> artifacts,
+  ) async {
+    await _postManimArtifactLifecycle(
+      endpoint: AppConstants.manimCleanupEndpoint,
+      artifacts: artifacts,
+      swallowErrors: true,
+    );
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {
@@ -531,6 +606,89 @@ class AiApiClient {
     } on http.ClientException catch (_) {
       throw const AiApiException('网络连接中断，请检查网络后重试。');
     }
+  }
+
+  Future<void> _postManimArtifactLifecycle({
+    required String endpoint,
+    required Iterable<Map<String, dynamic>> artifacts,
+    required bool swallowErrors,
+  }) async {
+    final references = _manimArtifactReferences(artifacts);
+    if (references.jobIds.isEmpty && references.videoUrls.isEmpty) {
+      return;
+    }
+    try {
+      final response = await http
+          .post(
+            Uri.parse(endpoint),
+            headers: const {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'job_ids': references.jobIds.toList(growable: false),
+              'video_urls': references.videoUrls.toList(growable: false),
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode >= 400 && !swallowErrors) {
+        throw AiApiException(_extractErrorMessage(_decodeJson(response)));
+      }
+    } catch (error) {
+      if (!swallowErrors) {
+        rethrow;
+      }
+    }
+  }
+
+  ({Set<String> jobIds, Set<String> videoUrls}) _manimArtifactReferences(
+    Iterable<Map<String, dynamic>> artifacts,
+  ) {
+    final jobIds = <String>{};
+    final videoUrls = <String>{};
+    for (final artifact in artifacts) {
+      final type = (artifact['artifact_type'] ?? '').toString();
+      if (type != 'manim_job' && type != 'manim_video') {
+        continue;
+      }
+      final content = _artifactContentMap(artifact['content']);
+      final jobId = (content['job_id'] ?? artifact['job_id'] ?? '').toString();
+      if (jobId.trim().isNotEmpty) {
+        jobIds.add(jobId.trim());
+      }
+      for (final key in const ['video_url', 'absolute_video_url', 'url']) {
+        final value = (content[key] ?? artifact[key] ?? '').toString().trim();
+        if (value.isNotEmpty) {
+          videoUrls.add(value);
+        }
+      }
+      final rawContent = artifact['content'];
+      if (type == 'manim_video' && rawContent is String) {
+        final trimmed = rawContent.trim();
+        if (trimmed.startsWith('http') || trimmed.startsWith('/static/')) {
+          videoUrls.add(trimmed);
+        }
+      }
+    }
+    return (jobIds: jobIds, videoUrls: videoUrls);
+  }
+
+  Map<String, dynamic> _artifactContentMap(dynamic content) {
+    if (content is Map<String, dynamic>) {
+      return content;
+    }
+    if (content is Map) {
+      return _asStringMap(content);
+    }
+    if (content is String && content.trim().isNotEmpty) {
+      try {
+        final parsed = jsonDecode(content);
+        return _asStringMap(parsed);
+      } catch (_) {
+        return const {};
+      }
+    }
+    return const {};
   }
 
   String _extractErrorMessage(

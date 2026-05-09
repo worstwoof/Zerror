@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 import uuid
@@ -20,11 +21,11 @@ from backend.app.schemas.card_schema import (
 
 
 logger = logging.getLogger(__name__)
+_CLIENT_JOB_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,96}$")
 
-# Keep the default deliberately low: upstream vision/LLM calls are the slowest
-# part of the product, and a small fixed pool gives batch photo import a clear
-# speedup without turning every retry into a burst of rate-limit failures.
-ANALYSIS_JOB_MAX_WORKERS = 2
+# Run high-quality analysis serially. The upstream model is slow and rate
+# sensitive, so one-at-a-time jobs are more reliable than parallel retries.
+ANALYSIS_JOB_MAX_WORKERS = 1
 
 _executor = ThreadPoolExecutor(max_workers=ANALYSIS_JOB_MAX_WORKERS)
 _lock = threading.Lock()
@@ -33,6 +34,7 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 
 def create_image_analysis_job(
     *,
+    client_job_id: str = "",
     image_bytes: bytes,
     filename: str,
     content_type: str,
@@ -50,9 +52,17 @@ def create_image_analysis_job(
     long HTTP connection while the detailed explanation is being generated.
     """
 
-    job_id = uuid.uuid4().hex[:24]
+    normalized_client_job_id = client_job_id.strip()
+    job_id = (
+        normalized_client_job_id
+        if _CLIENT_JOB_ID_RE.fullmatch(normalized_client_job_id)
+        else uuid.uuid4().hex[:24]
+    )
     now = time.time()
     with _lock:
+        existing_job = _jobs.get(job_id)
+        if existing_job is not None:
+            return _to_response(dict(existing_job))
         _jobs[job_id] = {
             "job_id": job_id,
             "status": "pending",
@@ -272,6 +282,15 @@ def _run_quality_stage(
             status="partial_success",
             progress=80,
             message="已保留基础识别结果，完整详解生成失败，可稍后重试。",
+            error=_friendly_error(exc),
+        )
+    except Exception as exc:
+        logger.exception("image analysis job quality stage crashed job_id=%s", job_id)
+        _update_job(
+            job_id,
+            status="partial_success",
+            progress=80,
+            message="已保留基础识别结果，完整详解生成格式异常，可稍后重试。",
             error=_friendly_error(exc),
         )
 

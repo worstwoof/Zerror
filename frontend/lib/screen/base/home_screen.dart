@@ -1036,6 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BackgroundAnalysisTask task,
   ) {
     final status = _analysisTaskStatus(task);
+    final queuePosition = store.analysisTaskQueuePosition(task.id);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1085,6 +1086,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                         const Spacer(),
                         Text(
                           _formatTaskTime(task.createdAt),
@@ -1137,7 +1149,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTaskPreviewText(BackgroundAnalysisTask task, String fallback) {
     final content = task.isCompleted && task.extractedText.trim().isNotEmpty
         ? task.extractedText.trim()
-        : task.errorMessage ?? fallback;
+        : task.errorMessage ?? task.statusMessage ?? fallback;
 
     if (!task.isCompleted) {
       return Text(
@@ -1317,7 +1329,12 @@ class _HomeScreenState extends State<HomeScreen> {
           imagePath: task.imagePath,
           initialText: task.extractedText,
           initialAnalysis: analysis,
-          onArchived: () => store.dismissAnalysisTask(task.id),
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
         ),
       ),
     );
@@ -1330,7 +1347,12 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => ErrorEditScreen(
           imagePath: task.imagePath,
           initialText: task.extractedText,
-          onArchived: () => store.dismissAnalysisTask(task.id),
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
         ),
       ),
     );
@@ -1644,26 +1666,30 @@ class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
       return;
     }
     if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
-      _replaceWithEditScreen(task, hasAnalysis: true);
+      _replaceWithEditScreen(task);
     } else if (task.status == AnalysisTaskStatus.failed) {
-      _replaceWithEditScreen(task, hasAnalysis: false);
+      _replaceWithEditScreen(task);
     }
   }
 
-  void _replaceWithEditScreen(
-    BackgroundAnalysisTask task, {
-    required bool hasAnalysis,
-  }) {
+  void _replaceWithEditScreen(BackgroundAnalysisTask task) {
     final store = _store;
     if (store == null) return;
+    final initialAnalysis =
+        task.status == AnalysisTaskStatus.completed ? task.analysis : null;
     _isNavigating = true;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => ErrorEditScreen(
           imagePath: task.imagePath,
           initialText: task.extractedText,
-          initialAnalysis: hasAnalysis ? task.analysis : null,
-          onArchived: () => store.dismissAnalysisTask(task.id),
+          initialAnalysis: initialAnalysis,
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
         ),
       ),
     );

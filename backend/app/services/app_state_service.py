@@ -133,6 +133,7 @@ def build_snapshot_from_structured(db: Session, user: User) -> dict[str, Any] | 
                 "tags": [tag.tag for tag in sorted(item.tags, key=lambda entry: (entry.sort_order, entry.id))],
                 "my_answer": item.my_answer,
                 "ai_analysis": item.ai_analysis,
+                "rich_artifacts": _decode_json_list(item.rich_artifacts_json),
                 "image_url": item.image_url,
                 "is_mastered": item.is_mastered,
                 "is_favorite": item.is_favorite,
@@ -336,6 +337,7 @@ def _upsert_error_records(
         record.date_label = _normalize_text(payload.get("date_label")) or ""
         record.my_answer = _normalize_text(payload.get("my_answer")) or ""
         record.ai_analysis = _normalize_text(payload.get("ai_analysis")) or ""
+        record.rich_artifacts_json = _encode_json_list(payload.get("rich_artifacts"))
         record.image_url = _normalize_text(payload.get("image_url"))
         record.is_favorite = client_error_id in favorite_ids or _as_bool(payload.get("is_favorite"))
         record.is_mastered = client_error_id in mastered_ids or _as_bool(payload.get("is_mastered"))
@@ -451,6 +453,27 @@ def _as_bool(value: Any, *, default: bool = False) -> bool:
     if isinstance(value, (int, float)):
         return bool(value)
     return default
+
+
+def _decode_json_list(raw_value: Any) -> list[dict[str, Any]]:
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        return _as_list_of_maps(raw_value)
+    if not isinstance(raw_value, str):
+        return []
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return []
+    return _as_list_of_maps(parsed)
+
+
+def _encode_json_list(value: Any) -> str:
+    items = _as_list_of_maps(value)
+    if not items:
+        return ""
+    return json.dumps(items, ensure_ascii=False, sort_keys=True, default=str)
 
 
 def _normalize_text(value: Any) -> str | None:

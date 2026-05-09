@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
-from backend.app.services.render_jobs import create_manim_job, get_manim_job
+from backend.app.services.render_jobs import (
+    create_manim_job,
+    discard_manim_artifacts,
+    get_manim_job,
+    retain_manim_artifacts,
+)
 
 
 router = APIRouter(prefix="/api/v1/render", tags=["render"])
@@ -14,6 +19,18 @@ router = APIRouter(prefix="/api/v1/render", tags=["render"])
 
 class RenderSceneRequest(BaseModel):
     scene_spec: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ManimArtifactLifecycleRequest(BaseModel):
+    job_ids: list[str] = Field(default_factory=list)
+    video_urls: list[str] = Field(default_factory=list)
+
+
+class ManimArtifactLifecycleResponse(BaseModel):
+    retained: int = 0
+    deleted: int = 0
+    deferred: int = 0
+    job_ids: list[str] = Field(default_factory=list)
 
 
 class GeoGebraRenderResponse(BaseModel):
@@ -50,6 +67,35 @@ def create_manim_render_job(
 ) -> ManimJobResponse:
     job = create_manim_job(payload.scene_spec)
     return _job_response(job, request)
+
+
+@router.post("/manim/jobs/retain", response_model=ManimArtifactLifecycleResponse)
+def retain_manim_render_artifacts(
+    payload: ManimArtifactLifecycleRequest,
+) -> ManimArtifactLifecycleResponse:
+    result = retain_manim_artifacts(
+        job_ids=payload.job_ids,
+        video_urls=payload.video_urls,
+    )
+    return ManimArtifactLifecycleResponse(
+        retained=int(result.get("retained") or 0),
+        job_ids=list(result.get("job_ids") or []),
+    )
+
+
+@router.post("/manim/jobs/cleanup", response_model=ManimArtifactLifecycleResponse)
+def cleanup_manim_render_artifacts(
+    payload: ManimArtifactLifecycleRequest,
+) -> ManimArtifactLifecycleResponse:
+    result = discard_manim_artifacts(
+        job_ids=payload.job_ids,
+        video_urls=payload.video_urls,
+    )
+    return ManimArtifactLifecycleResponse(
+        deleted=int(result.get("deleted") or 0),
+        deferred=int(result.get("deferred") or 0),
+        job_ids=list(result.get("job_ids") or []),
+    )
 
 
 @router.get("/manim/{job_id}", response_model=ManimJobResponse)

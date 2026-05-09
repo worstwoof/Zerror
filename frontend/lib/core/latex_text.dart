@@ -102,7 +102,7 @@ class AppLatexText extends StatelessWidget {
 
   String _wrapBareLatexInPlainText(String value) {
     final pattern = RegExp(
-      r'\\(?:dfrac|tfrac|frac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|overline|vec|bar|hat)\{[^{}]+\}|\\(?:sin|cos|tan|ln|log|leq|geq|alpha|beta|gamma|theta|pi|Delta|Omega)\b',
+      r'\\(?:dfrac|tfrac|frac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|overline|vec|bar|hat)\{[^{}]+\}|\\(?:sin|cos|tan|ln|log|leq|geq|alpha|beta|gamma|lambda|mu|theta|pi|Delta|Omega)\b',
     );
     return value.replaceAllMapped(pattern, (match) {
       final body = _normalizeMathBody(match.group(0) ?? '');
@@ -130,6 +130,8 @@ class AppLatexText extends StatelessWidget {
         .replaceAll(r'\infty', '∞')
         .replaceAll(r'\geq', '≥')
         .replaceAll(r'\leq', '≤')
+        .replaceAll(r'\lambda', 'λ')
+        .replaceAll(r'\mu', 'μ')
         .replaceAll(r'\ln', 'ln')
         .replaceAll(r'\sin', 'sin')
         .replaceAll(r'\cos', 'cos')

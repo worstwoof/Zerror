@@ -38,6 +38,10 @@ class AppConstants {
   static String imageAnalysisJobRetryEndpoint(String jobId) =>
       '${imageAnalysisJobEndpoint(jobId)}/retry';
   static String get manimRenderEndpoint => '$apiBaseUrl/api/v1/render/manim';
+  static String get manimRetainEndpoint =>
+      '$apiBaseUrl/api/v1/render/manim/jobs/retain';
+  static String get manimCleanupEndpoint =>
+      '$apiBaseUrl/api/v1/render/manim/jobs/cleanup';
   static String manimJobEndpoint(String jobId) =>
       '$apiBaseUrl/api/v1/render/manim/${Uri.encodeComponent(jobId)}';
   static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';

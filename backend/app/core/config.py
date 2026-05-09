@@ -134,7 +134,7 @@ def get_settings() -> Settings:
             _get_setting(
                 "VIVO_QUALITY_TIMEOUT_SECONDS",
                 file_values,
-                _get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120"),
+                "240",
             )
         ),
         vivo_quality_max_tokens=int(

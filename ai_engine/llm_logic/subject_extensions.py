@@ -66,17 +66,15 @@ def build_subject_extension_artifacts(
     existing_types = {artifact.artifact_type for artifact in existing_artifacts}
     if profile.builder is not _build_math_chart_spec and profile.default_artifact_type in existing_types:
         return []
+    if profile.builder is _build_math_chart_spec:
+        logger.info("math subject extension skipped legacy chart_spec source=backend")
+        return []
 
     artifact = profile.builder(
         cleaned_question=cleaned_question,
         knowledge_points=list(knowledge_points),
         solution_steps=list(solution_steps),
     )
-    if profile.builder is _build_math_chart_spec:
-        logger.info(
-            "math subject extension generated artifact title=%s source=backend",
-            artifact.title,
-        )
     return [artifact]
 
 
