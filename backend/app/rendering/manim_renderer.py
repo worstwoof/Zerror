@@ -400,17 +400,10 @@ class LearningScene(Scene):
         return group
 
     def _build_board_question_block(self, board, compact=False):
-        title = cjk_text("情景与条件", font_size=15 if not compact else 12, color=GREY_A)
-        summary_title = cjk_text("板块模型", font_size=12 if not compact else 10, color=BLUE_B)
-        summary = VGroup(
-            cjk_text("光滑水平面：长木板 A，物块 B 在右端。", font_size=10 if not compact else 9, color=WHITE),
-            cjk_text("B 初速度向左，恒力 F 水平向右。", font_size=10 if not compact else 9, color=WHITE),
-        )
-        summary.arrange(DOWN, aligned_edge=LEFT, buff=0.04)
-        story_panel = VGroup(title, summary_title, summary)
-        story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
-        known_title = cjk_text("已知条件", font_size=12 if not compact else 10, color=BLUE_B)
-        known = VGroup()
+        title = cjk_text("板块模型", font_size=17 if not compact else 13, color=YELLOW)
+        summary = cjk_text("光滑水平面 · B 在 A 右端 · 相对滑动后共速", font_size=10 if not compact else 8, color=GREY_A)
+        story_panel = VGroup(title, summary)
+        story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.06)
         known_items = [
             self._value_formula("m_A", board.get("m_A"), "kg"),
             self._value_formula("m_B", board.get("m_B"), "kg"),
@@ -419,29 +412,42 @@ class LearningScene(Scene):
             self._value_formula(r"\\mu", board.get("mu")),
             self._value_formula("g", board.get("g"), "m/s^2"),
         ]
+        chips = VGroup()
         for item in known_items:
             if "?" not in item:
                 try:
-                    known.add(MathTex(item, color=WHITE).scale(0.34 if not compact else 0.28))
+                    value = MathTex(item, color=WHITE).scale(0.33 if not compact else 0.27)
+                    chip = RoundedRectangle(
+                        width=value.width + 0.30,
+                        height=0.34 if not compact else 0.28,
+                        corner_radius=0.04,
+                        color=GREY_D,
+                        stroke_width=1,
+                        fill_color=GREY_E,
+                        fill_opacity=0.22,
+                    )
+                    chip.move_to(value)
+                    chips.add(VGroup(chip, value))
                 except Exception:
-                    known.add(cjk_text(item[:16], font_size=11 if not compact else 9, color=WHITE))
-        known.arrange_in_grid(cols=6 if not compact else 3, buff=(0.22, 0.08), cell_alignment=LEFT)
-        known_panel = VGroup(known_title, known)
-        known_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.06)
-        q_title = cjk_text("求解目标", font_size=12 if not compact else 10, color=BLUE_B)
-        q_lines = []
-        for index, item in enumerate(board.get("questions") or [], start=1):
-            q_lines.append(cjk_text(str(index) + ". " + str(item)[:18], font_size=9 if not compact else 8, color=GREY_A))
-        questions = VGroup(*q_lines)
-        if len(questions) > 0:
-            questions.arrange(DOWN, aligned_edge=LEFT, buff=0.025)
-        question_panel = VGroup(q_title, questions)
-        question_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
-        row = VGroup(story_panel, known_panel, question_panel)
-        row.arrange(RIGHT, aligned_edge=UP, buff=0.48 if not compact else 0.32)
-        divider = Line(LEFT * 6.62, RIGHT * 6.62, color=GREY_E, stroke_width=1)
-        divider.next_to(row, DOWN, buff=0.10)
-        group = VGroup(row, divider)
+                    value = cjk_text(item[:14], font_size=9 if not compact else 8, color=WHITE)
+                    chip = RoundedRectangle(width=value.width + 0.28, height=0.32, corner_radius=0.04, color=GREY_D, stroke_width=1)
+                    chip.move_to(value)
+                    chips.add(VGroup(chip, value))
+        chips.arrange(RIGHT, buff=0.12)
+        known_panel = VGroup(cjk_text("已知", font_size=10 if not compact else 8, color=BLUE_B), chips)
+        known_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
+        goal_panel = VGroup(
+            cjk_text("目标", font_size=10 if not compact else 8, color=BLUE_B),
+            cjk_text("受力与加速度 · 共速时刻 · 相对位移", font_size=9 if not compact else 7, color=GREY_A),
+        )
+        goal_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
+        row = VGroup(story_panel, known_panel, goal_panel)
+        row.arrange(RIGHT, aligned_edge=UP, buff=0.54 if not compact else 0.36)
+        backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.22, 0.74), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.10)
+        backdrop.move_to(row.get_center())
+        divider = Line(LEFT * 6.34, RIGHT * 6.34, color=GREY_D, stroke_width=1)
+        divider.next_to(backdrop, DOWN, buff=0.05)
+        group = VGroup(backdrop, row, divider)
         group.to_edge(UP, buff=0.12)
         if group.width > 13.25:
             group.scale_to_fit_width(13.25)
@@ -811,8 +817,10 @@ class LearningScene(Scene):
             group.scale_to_fit_width(5.45)
         if group.height > 4.25:
             group.scale_to_fit_height(4.25)
-        group.to_corner(UR, buff=0.42)
-        group.shift(DOWN * 0.92)
+        derivation_left = 1.15
+        derivation_top = 2.58
+        group.shift(RIGHT * (derivation_left - group.get_left()[0]))
+        group.shift(UP * (derivation_top - group.get_top()[1]))
         return group
 
     def _aligned_formula_block(self, formulas):
@@ -1024,7 +1032,7 @@ class LearningScene(Scene):
     def _draw_blackboard_header(self, spec):
         params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
         question = str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
-        title = cjk_text("题目区", font_size=26, color=YELLOW).to_corner(UL, buff=0.36)
+        title = cjk_text("原题摘要", font_size=24, color=YELLOW).to_corner(UL, buff=0.36)
         self.play(FadeIn(title), run_time=0.5)
         if question:
             question_line = cjk_text(question[:58], font_size=20, color=GREY_A)
