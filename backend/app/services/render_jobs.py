@@ -24,7 +24,7 @@ from backend.app.services.manimcat_client import (
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v2"
+MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v3-blackboard"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -245,11 +245,19 @@ def _update_manimcat_progress(job_id: str, payload: Dict[str, Any]) -> None:
     elif status in {"failed", "cancelled", "canceled"}:
         progress = 100
 
-    message = "ManimCat is generating the math video."
-    if stage:
-        message = f"ManimCat stage: {stage}."
-    elif status:
-        message = f"ManimCat status: {status}."
+    message = "正在生成黑板风格数学讲解视频。"
+    if stage == "analyzing":
+        message = "正在拆解题干条件，规划片头、题干高亮和推导分镜。"
+    elif stage == "generating":
+        message = "正在编写 Manim 黑板动画脚本。"
+    elif stage == "rendering":
+        message = "正在渲染公式、图形和逐步推导动画。"
+    elif status in {"queued", "waiting", "delayed"}:
+        message = "数学讲解视频已进入后台队列。"
+    elif status == "completed":
+        message = "数学讲解视频已生成。"
+    elif status in {"failed", "cancelled", "canceled"}:
+        message = "数学讲解视频生成失败。"
 
     diagnostics = {
         "renderer_available": True,

@@ -466,6 +466,66 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
+        context = " ".join(
+            [
+                subject or "physics",
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+        ).lower()
+        is_physics = "physics" in context or "物理" in context or "鐗╃悊" in context
+        is_math = (
+            "math" in context
+            or "数学" in context
+            or "鏁板" in context
+            or self._looks_like_math_scene_context(context)
+        )
+
+        if is_math and not (is_physics and not is_math):
+            scene_spec = self._build_scene_spec_from_context(
+                subject="math",
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            scene_spec["subject"] = "math"
+            scene_spec["render_targets"] = ["manim"]
+            scene_spec.setdefault("fallback_text", solution_summary or cleaned_question)
+            job = create_manim_job(scene_spec)
+            content = {
+                "url": job.get("video_url"),
+                "video_url": job.get("video_url"),
+                "job_id": job.get("job_id"),
+                "status": job.get("status"),
+                "progress": job.get("progress"),
+                "message": job.get("message"),
+                "error": job.get("error"),
+                "updated_at": job.get("updated_at"),
+                "diagnostics": job.get("diagnostics"),
+                "duration": job.get("duration"),
+                "thumbnail_url": job.get("thumbnail_url"),
+            }
+            if job.get("status") == "succeeded" and job.get("video_url"):
+                return RichArtifact(
+                    artifact_type="manim_video",
+                    title="Manim 数学讲解视频",
+                    description="已生成黑板风格数学讲解视频。",
+                    mime_type="application/json",
+                    content=json.dumps(content, ensure_ascii=False),
+                )
+            return RichArtifact(
+                artifact_type="manim_job",
+                title="Manim 数学讲解视频",
+                description="后台 Manim 正在生成数学讲解视频。",
+                mime_type="application/json",
+                content=json.dumps(content, ensure_ascii=False),
+            )
+
         normalized_subject = subject or "物理"
         if "物理" not in normalized_subject:
             return None

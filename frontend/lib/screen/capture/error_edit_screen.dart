@@ -150,7 +150,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   bool _supportsPhysicsAnimation() {
-    return _resolvedPhysicsSubject().contains('物理');
+    final subject = _resolvedPhysicsSubject();
+    return subject.contains('物理') || subject.contains('数学');
   }
 
   String _resolvedPhysicsSubject() {
@@ -183,6 +184,24 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     ];
 
     final matchesPhysics = physicsKeywords.any(combined.contains);
+    const mathKeywords = <String>[
+      '数学',
+      '函数',
+      '导数',
+      '几何',
+      '圆锥',
+      '椭圆',
+      '双曲线',
+      '抛物线',
+      '矩阵',
+      '方程',
+      '不等式',
+    ];
+
+    final matchesMath = mathKeywords.any(combined.contains);
+    if (_subject.trim().contains('数学') || matchesMath) {
+      return '数学';
+    }
     if (_subject.trim().contains('物理') || matchesPhysics) {
       return '物理';
     }
@@ -247,8 +266,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
           _upsertManimPhysicsArtifact(result.artifact!);
           _physicsAnimationError = null;
         } else {
-          _physicsAnimationError =
-              result.reason.trim().isEmpty ? '当前题目暂时无法创建 Manim 视频任务。' : result.reason;
+          _physicsAnimationError = result.reason.trim().isEmpty
+              ? '当前题目暂时无法创建 Manim 视频任务。'
+              : result.reason;
         }
       });
       _syncManimPolling();
@@ -256,7 +276,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
       if (result.generated && result.artifact != null && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Manim 视频任务已创建，可在下方查看进度。')));
+        ).showSnackBar(
+            const SnackBar(content: Text('Manim 视频任务已创建，可在下方查看进度。')));
       }
     } on AiApiException catch (error) {
       if (!mounted) return;
@@ -882,16 +903,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: _solutionSteps
-                              .map(_buildSolutionStep)
-                              .toList(),
+                          children:
+                              _solutionSteps.map(_buildSolutionStep).toList(),
                         ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          if (_supportsPhysicsAnimation() || _visibleRichArtifacts.isNotEmpty) ...[
+          if (_supportsPhysicsAnimation() ||
+              _visibleRichArtifacts.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildSectionLabel('学科拓展'),
             const SizedBox(height: 8),
@@ -963,10 +984,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }
 
   List<_SolutionStepPart> _splitDisplayMath(String text) {
-    final normalized = text
-        .replaceAll(r'\[', r'$$')
-        .replaceAll(r'\]', r'$$')
-        .trim();
+    final normalized =
+        text.replaceAll(r'\[', r'$$').replaceAll(r'\]', r'$$').trim();
     final parts = <_SolutionStepPart>[];
     final pattern = RegExp(r'\$\$(.*?)\$\$', dotAll: true);
     var cursor = 0;
@@ -1145,6 +1164,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
 
   Widget _buildPhysicsAnimationActionCard() {
     final hasArtifact = _hasManimPhysicsArtifact();
+    final isMath = _resolvedPhysicsSubject().contains('数学');
 
     return Container(
       width: double.infinity,
@@ -1166,19 +1186,31 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Manim 物理动画',
-                      style: TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    if (isMath)
+                      const Text(
+                        'Manim 数学讲解',
+                        style: TextStyle(
+                          color: AppPalette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
+                    if (!isMath)
+                      const Text(
+                        'Manim 物理动画',
+                        style: TextStyle(
+                          color: AppPalette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Text(
                       hasArtifact
-                          ? '已创建当前题目的 Manim 视频任务，可重新生成刷新动画脚本。'
-                          : '物理题将直接使用 Manim 生成动画视频；数学题继续使用 GeoGebra。',
+                          ? '已创建当前题目的 Manim 视频任务，可重新生成刷新分镜脚本。'
+                          : isMath
+                              ? '数学题将生成黑底 Manim 讲解视频：题干逐步呈现、红框高亮条件、左侧作图、右侧公式推导。'
+                              : '物理题将直接使用 Manim 生成动画视频，展示受力、运动和关键状态变化。',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 13,
@@ -2062,7 +2094,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
   }) {
     final templateId = (spec['template_id'] ?? '').toString().trim();
     final field = spec['field'] is Map ? spec['field'] as Map : const {};
-    final particle = spec['particle'] is Map ? spec['particle'] as Map : const {};
+    final particle =
+        spec['particle'] is Map ? spec['particle'] as Map : const {};
     final parameters = spec['parameters'] is Map
         ? (spec['parameters'] as Map).cast<dynamic, dynamic>()
         : const <dynamic, dynamic>{};
@@ -2082,7 +2115,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
             runSpacing: 8,
             children: [
               _buildArtifactMetaChip('类型', 'GeoGebra 交互'),
-              if (templateId.isNotEmpty) _buildArtifactMetaChip('模板', templateId),
+              if (templateId.isNotEmpty)
+                _buildArtifactMetaChip('模板', templateId),
               _buildArtifactMetaChip(
                 '场区',
                 (field['direction_label'] ?? '物理场景').toString(),
@@ -2163,14 +2197,177 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final message = (data['message'] ?? '讲解视频正在等待后台生成。').toString();
     final isFinished = status == 'succeeded' || status == 'failed';
     final displayProgress = progress.clamp(0, 100);
-    return _buildArtifactStatusBox(
-      icon: Icons.movie_filter_rounded,
-      title: 'Manim 任务：$status',
-      message: error.isNotEmpty ? error : '$message 进度 $displayProgress%',
-      actionLabel: jobId.isEmpty || isFinished ? null : '$displayProgress%',
-      onAction: jobId.isEmpty || isFinished || _isPollingManimJob
-          ? null
-          : () => _pollManimJob(jobId, showErrors: true),
+    final displayMessage = error.isNotEmpty ? error : message;
+    const stages = [
+      ('题干', Icons.subject_rounded),
+      ('高亮', Icons.highlight_alt_rounded),
+      ('作图', Icons.timeline_rounded),
+      ('推导', Icons.functions_rounded),
+      ('渲染', Icons.movie_creation_rounded),
+    ];
+    final activeStage = displayProgress >= 88
+        ? 4
+        : displayProgress >= 68
+            ? 3
+            : displayProgress >= 46
+                ? 2
+                : displayProgress >= 24
+                    ? 1
+                    : 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF050505),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppPalette.almondCream.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: AppPalette.matchaMist.withValues(alpha: 0.64),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_graph_rounded,
+                  color: AppPalette.matchaMist,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Zerror Math Studio',
+                  style: TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              Text(
+                '$displayProgress%',
+                style: const TextStyle(
+                  color: AppPalette.almondCream,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            displayMessage,
+            style: TextStyle(
+              color: error.isNotEmpty
+                  ? const Color(0xFFFFC3B8)
+                  : AppPalette.textPrimary,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: displayProgress / 100,
+              minHeight: 6,
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppPalette.matchaMist,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: stages.asMap().entries.map((entry) {
+              final index = entry.key;
+              final stage = entry.value;
+              final isActive = index <= activeStage && error.isEmpty;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppPalette.matchaMist.withValues(alpha: 0.16)
+                      : Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: isActive
+                        ? AppPalette.matchaMist.withValues(alpha: 0.42)
+                        : Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      stage.$2,
+                      color: isActive
+                          ? AppPalette.matchaMist
+                          : AppPalette.textSecondary,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      stage.$1,
+                      style: TextStyle(
+                        color: isActive
+                            ? AppPalette.textPrimary
+                            : AppPalette.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          if (jobId.isNotEmpty && !isFinished) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: _isPollingManimJob
+                    ? null
+                    : () => _pollManimJob(jobId, showErrors: true),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: AppPalette.almondCream,
+                  size: 18,
+                ),
+                label: const Text(
+                  '刷新进度',
+                  style: TextStyle(color: AppPalette.almondCream),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: AppPalette.almondCream.withValues(alpha: 0.45),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -2182,7 +2379,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen> {
     final url = parsed == null
         ? content
         : (parsed['url'] ?? parsed['video_url'] ?? '').toString();
-    final diagnostics = parsed == null ? const <String, dynamic>{} : _asStringMap(parsed['diagnostics']);
+    final diagnostics = parsed == null
+        ? const <String, dynamic>{}
+        : _asStringMap(parsed['diagnostics']);
     final progress = parsed == null
         ? null
         : int.tryParse((parsed['progress'] ?? '').toString());
@@ -2521,7 +2720,8 @@ class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
   }
 
   void _saveAndClose() {
-    Navigator.of(context).pop(_sanitizeQuestionTextForPreview(_controller.text).trim());
+    Navigator.of(context)
+        .pop(_sanitizeQuestionTextForPreview(_controller.text).trim());
   }
 
   @override
@@ -2891,4 +3091,3 @@ bool _looksLikeRealMathSegment(String text) {
   }
   return RegExp(r'(\\[A-Za-z]+|[_^=<>+\-*/]|[A-Za-z]\s*\(|\d)').hasMatch(body);
 }
-

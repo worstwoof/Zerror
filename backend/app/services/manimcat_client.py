@@ -114,12 +114,16 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "要求：视频时长约 60-80 秒，节奏慢一点；先还原题意和图形/坐标/函数关系，再按详解步骤逐步动画化推导，最后给出结论回顾。",
             "如果题目有多个小问，请保留第(1)问、第(2)问等标签，不要合并为一问。",
             "视觉重点：坐标轴、函数图像、几何对象、关键点、辅助线、变化过程和公式对应关系要逐步出现。",
+            "目标风格：参考黑底 Manim 数学讲解视频，而不是应用卡片 UI。画面保持 16:9 黑色背景、白色细线、白色数学排版、少量红框/青色/黄色高亮，整体像课堂黑板动画。",
+            "固定分镜流程：1) 0-3 秒显示一个简洁片头标识（可用文字 Zerror Math Studio + 几何小图标，不要使用第三方品牌名或水印）；2) 题干逐字或分段出现；3) 用红色矩形框依次高亮关键条件；4) 用“首先，画出符合题意的图形”一类过渡语进入图形；5) 左侧画坐标轴/圆锥曲线/函数图像/几何图，右侧逐行显示公式推导；6) 用箭头、虚线、彩色点连接图形和公式；7) 最后给出结论并保留关键图形。",
+            "版式规范：题干阶段居中偏上；进入推导后使用左图右式或上题干下图式布局；公式不要堆满屏幕，每屏保留 3-5 行；每次只突出一个条件或一个等式变形。",
+            "动画规范：使用 Write、Create、FadeIn、TransformMatchingTex、Indicate、Circumscribe 等 Manim 动画；避免花哨转场、3D 镜头和装饰背景；数学对象要随着推导一步一步生长。",
             f"知识点：{'；'.join(focus_points)}" if focus_points else "",
             "详解步骤：\n" + "\n".join(f"{index + 1}. {step}" for index, step in enumerate(steps)) if steps else "",
             "关键公式：\n" + "\n".join(f"- {formula}" for formula in formulas) if formulas else "",
             "Zerror video contract:\n"
             "- Build a fresh Manim scene for this exact problem, not a generic reusable template.\n"
-            "- Start with a clean problem framing, then animate the geometry/algebra relation, then show the conclusion.\n"
+            "- Start with a compact branded intro, then reveal the exact problem, then animate the geometry/algebra relation, then show the conclusion.\n"
             "- Keep all labels readable on mobile: large fonts, high contrast, no overlapping formulas.\n"
             "- For conic/geometry problems, verify point coordinates and helper lines before rendering.\n"
             "- Never call Manim Mobject intersection helpers such as get_intersections; compute conic-line points analytically.\n"
@@ -130,7 +134,7 @@ def _build_math_concept(scene_spec: Dict[str, Any]) -> str:
             "- Never put dollar-delimited math such as `$x^2$` inside Text/MarkupText. Strip `$` from prose, and render every formula as a separate MathTex object.\n"
             "- Do not place the full OCR problem statement as one Text line when it contains formulas. Use a short Chinese Text title plus separate MathTex formulas like `x^2+y^2=1`, `|MQ|`, and `\\lambda>0`.\n"
             "- Use one coherent color vocabulary: original objects, derived helpers, moving point, final result.\n"
-            "- Avoid decorative intro slides; the first frame should already show the math object.",
+            "- Do not imitate or display external platform watermarks, usernames, or third-party channel names.",
             "Storyboard beats:\n" + "\n".join(f"{index + 1}. {beat}" for index, beat in enumerate(storyboard))
             if storyboard
             else "",
@@ -149,34 +153,36 @@ def _build_storyboard_beats(
     scene_type = str(scene_spec.get("scene_type") or "").lower()
     beats = []
     if question:
-        beats.append(f"Frame the exact problem statement: {question[:140]}")
+        beats.append("Show a short Zerror Math Studio intro on black background, then fade into the problem.")
+        beats.append(f"Reveal the exact problem statement in two or three readable lines: {question[:140]}")
+        beats.append("Use thin red rectangles to highlight the key givens before drawing the figure.")
     if scene_type in {"conic", "ellipse", "parabola", "hyperbola"}:
         beats.extend(
             [
-                "Draw the coordinate axes, the conic, focal points, and all named points from the problem.",
+                "Draw the coordinate axes, the conic, focal points, and all named points from the problem on the left.",
                 "Animate the line/point movement and keep the invariant relation visible near the object.",
-                "Use dashed helper lines or highlighted chords to connect the visual relation to the algebra.",
+                "Use dashed helper lines or highlighted chords, while the right side derives the equations line by line.",
             ]
         )
     elif scene_type == "function_graph":
         beats.extend(
             [
-                "Draw axes and the function graph with scale marks before any formula manipulation.",
-                "Animate the key point, tangent, intercept, interval, or area that drives the solution.",
+                "Draw axes and the function graph with scale marks on the left before any formula manipulation.",
+                "Animate the key point, tangent, intercept, interval, or area, and mirror each change with a right-side formula line.",
             ]
         )
     elif scene_type == "geometry":
         beats.extend(
             [
-                "Draw the base figure first, then add auxiliary lines one by one.",
-                "Highlight congruent/similar/angle/length relations only when they are used.",
+                "Draw the base figure first, then add auxiliary lines one by one on the left.",
+                "Highlight congruent/similar/angle/length relations only when the corresponding right-side reasoning uses them.",
             ]
         )
     for step in steps[:5]:
         beats.append(f"Animate reasoning step: {step[:110]}")
     for formula in formulas[:3]:
         beats.append(f"Show formula as a short MathTex checkpoint only if it is pure LaTeX; put any Chinese explanation in Text: {formula[:90]}")
-    beats.append("End with a compact recap: condition, transformation, answer.")
+    beats.append("End with a compact recap: condition, transformation, answer, leaving the final diagram visible.")
     return beats[:10]
 
 
@@ -302,6 +308,7 @@ def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
         "formula_steps": scene_spec.get("formula_steps") or [],
         "objects": scene_spec.get("objects") or [],
         "relations": scene_spec.get("relations") or [],
+        "style_version": "blackboard_kindergarten_v1",
     }
     digest = hashlib.sha256(
         json.dumps(identity_payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
