@@ -472,10 +472,10 @@ class LearningScene(Scene):
         self.wait(2.0)
 
     def _play_apollonius_section(self, model, section):
-        left = 1.02
+        panel_x = 0.82
         top = 1.58
         title = cjk_text(section.get("title") or "", font_size=22, color=YELLOW)
-        title.move_to(LEFT * left + UP * top, aligned_edge=UL)
+        title.move_to(RIGHT * panel_x + UP * top, aligned_edge=UL)
         notes = VGroup(*[cjk_text(text, font_size=16, color=GREY_A) for text in section.get("notes") or []])
         notes.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
         notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.18)
