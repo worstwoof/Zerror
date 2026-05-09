@@ -1062,16 +1062,16 @@ class LearningScene(Scene):
         block.move_to(board.get_right() + LEFT * 0.74 + UP * 0.76)
         board_label = self._label("A", board.get_center(), 30)
         block_label = self._label("B", block.get_center(), 30)
-        v_arrow = Arrow(block.get_top() + UP * 0.72 + RIGHT * 0.20, block.get_top() + UP * 0.72 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
+        v_arrow = Arrow(block.get_left() + UP * 0.20 + RIGHT * 0.08, block.get_left() + UP * 0.20 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
         v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.05)
         f_formula = self._value_formula("F", board_data.get("F"), "N")
         force_arrow = Arrow(block.get_right() + UP * 0.20, block.get_right() + RIGHT * 1.30 + UP * 0.20, buff=0, color=WHITE, stroke_width=3.4)
         force_label = MathTex(f_formula, color=WHITE).scale(0.55).next_to(force_arrow, UP, buff=0.10)
         board_motion = Arrow(board.get_center() + DOWN * 0.60, board.get_center() + LEFT * 1.16 + DOWN * 0.60, buff=0, color=GREY_A, stroke_width=2.4)
-        block_motion = Arrow(block.get_top() + UP * 0.28 + RIGHT * 0.12, block.get_top() + UP * 0.28 + LEFT * 1.20, buff=0, color=GREY_A, stroke_width=2.4)
+        block_motion = Arrow(block.get_bottom() + DOWN * 0.10 + LEFT * 0.06, block.get_bottom() + DOWN * 0.10 + LEFT * 1.28, buff=0, color=GREY_A, stroke_width=2.4)
         motion_labels = VGroup(
             cjk_text("A 的运动趋势", font_size=15, color=GREY_A).next_to(board_motion, DOWN, buff=0.06),
-            cjk_text("B 的相对滑动", font_size=14, color=GREY_A).next_to(block_motion, DOWN, buff=0.05).shift(LEFT * 0.10),
+            cjk_text("B 相对 A 滑动", font_size=13, color=GREY_A).next_to(block_motion, DOWN, buff=0.03).shift(LEFT * 0.05),
         )
         board_final_center = board.get_center()
         block_final_center = block.get_center()
