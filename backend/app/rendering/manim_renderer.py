@@ -842,7 +842,8 @@ class LearningScene(Scene):
         self._play_local_response(model, section.get("focus") or "", scene_type)
         self.wait(0.20)
         for formula_line in formula_lines:
-            self.play(Write(formula_line), run_time=0.62)
+            self.play(FadeIn(formula_line, shift=UP * 0.05), run_time=0.36)
+            self.play(Indicate(formula_line, scale_factor=1.025, color=YELLOW), run_time=0.34)
             self.wait(0.24)
         self.wait(0.90)
         self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
