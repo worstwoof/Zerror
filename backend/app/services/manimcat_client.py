@@ -91,6 +91,8 @@ def render_math_video_with_manimcat(
     remote_job_id = str(submit_response.get("jobId") or "").strip()
     if not remote_job_id:
         raise ManimCatUnavailable("ManimCat did not return a jobId.")
+    if on_progress is not None:
+        on_progress({"status": "queued", "stage": "queued", "jobId": remote_job_id})
 
     remote_result = _poll_job(
         base_url=base_url,
