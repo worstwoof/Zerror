@@ -17,12 +17,15 @@ from backend.app.rendering.manim_renderer import (
 )
 from backend.app.services.manimcat_client import (
     ManimCatUnavailable,
+    download_manimcat_video,
+    get_manimcat_job,
     is_manimcat_configured,
     render_math_video_with_manimcat,
 )
 
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
+JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = "/static/media/manim"
 MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v3-blackboard"
 
@@ -42,16 +45,28 @@ def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
             status="pending",
             progress=0,
             message="Manim render job is queued.",
+            scene_spec=dict(scene_spec),
         )
         _jobs[job_id] = job
+        _save_job(job)
         _executor.submit(_run_manim_job, job_id, scene_hash, dict(scene_spec))
-        return dict(job)
+        return _public_job(job)
 
 
 def get_manim_job(job_id: str) -> Dict[str, Any] | None:
+    loaded_from_disk = False
     with _lock:
         job = _jobs.get(job_id)
-        return dict(job) if job else None
+        if job is None:
+            job = _load_job(job_id)
+            if job is not None:
+                _jobs[job_id] = job
+                loaded_from_disk = True
+    if job is None:
+        return None
+    if loaded_from_disk:
+        job = _refresh_recovered_manimcat_job(job)
+    return _public_job(job)
 
 
 def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> None:
@@ -146,6 +161,7 @@ def _build_job(
     message: str = "",
     error: str = "",
     diagnostics: Dict[str, Any] | None = None,
+    scene_spec: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     return {
         "job_id": job_id,
@@ -166,6 +182,7 @@ def _build_job(
             "file_size_bytes": 0,
             "error_summary": "",
         },
+        "scene_spec": scene_spec or {},
         "updated_at": time.time(),
     }
 
@@ -177,6 +194,132 @@ def _update_job(job_id: str, **updates: Any) -> None:
             return
         job.update(updates)
         job["updated_at"] = time.time()
+        _save_job(job)
+
+
+def _public_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    payload = dict(job)
+    payload.pop("scene_spec", None)
+    return payload
+
+
+def _job_path(job_id: str) -> Path:
+    safe_id = "".join(character for character in str(job_id) if character.isalnum() or character in {"-", "_"})
+    return JOBS_ROOT / f"{safe_id}.json"
+
+
+def _save_job(job: Dict[str, Any]) -> None:
+    job_id = str(job.get("job_id") or "")
+    if not job_id:
+        return
+    try:
+        JOBS_ROOT.mkdir(parents=True, exist_ok=True)
+        path = _job_path(job_id)
+        temporary_path = path.with_suffix(".json.tmp")
+        temporary_path.write_text(
+            json.dumps(job, ensure_ascii=False, sort_keys=True, default=str),
+            encoding="utf-8",
+        )
+        temporary_path.replace(path)
+    except OSError:
+        pass
+
+
+def _load_job(job_id: str) -> Dict[str, Any] | None:
+    path = _job_path(job_id)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _refresh_recovered_manimcat_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    if job.get("status") not in {"pending", "running"}:
+        return job
+    scene_spec = job.get("scene_spec") if isinstance(job.get("scene_spec"), dict) else {}
+    if not _is_math_scene(scene_spec):
+        return job
+    diagnostics = job.get("diagnostics") if isinstance(job.get("diagnostics"), dict) else {}
+    remote_job_id = str(diagnostics.get("manimcat_remote_job_id") or "").strip()
+    if not remote_job_id:
+        return job
+    try:
+        payload = get_manimcat_job(remote_job_id)
+    except ManimCatUnavailable as exc:
+        recovered = dict(job)
+        recovered["diagnostics"] = {
+            **diagnostics,
+            "error_summary": _error_summary(exc),
+            "recovery_failed_at": time.time(),
+        }
+        return recovered
+
+    status = str(payload.get("status") or "").lower()
+    if status == "completed":
+        video_url = str(payload.get("video_url") or payload.get("videoUrl") or "").strip()
+        if not video_url:
+            _update_job(
+                str(job.get("job_id") or ""),
+                status="failed",
+                progress=100,
+                error="数学讲解视频生成失败，可稍后重试。",
+                message="数学讲解视频生成失败。",
+                diagnostics={
+                    **diagnostics,
+                    "manimcat_status": status,
+                    "error_summary": "ManimCat completed without a video URL.",
+                },
+            )
+            return _jobs.get(str(job.get("job_id") or ""), job)
+        output_path = MEDIA_ROOT / f"{job.get('job_id')}.mp4"
+        try:
+            download_manimcat_video(video_url, output_path)
+        except ManimCatUnavailable as exc:
+            _update_job(
+                str(job.get("job_id") or ""),
+                status="failed",
+                progress=100,
+                error="数学讲解视频下载失败，可稍后重试。",
+                message="数学讲解视频下载失败。",
+                diagnostics={**diagnostics, "manimcat_status": status, "error_summary": _error_summary(exc)},
+            )
+            return _jobs.get(str(job.get("job_id") or ""), job)
+        local_video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
+        recovered_diagnostics = _video_diagnostics(local_video_url)
+        recovered_diagnostics.update(
+            {
+                **diagnostics,
+                "renderer_available": True,
+                "renderer_backend": "manimcat",
+                "manimcat_status": status,
+                "manimcat_recovered": True,
+                "error_summary": "",
+            }
+        )
+        _update_job(
+            str(job.get("job_id") or ""),
+            status="succeeded",
+            progress=100,
+            video_url=local_video_url,
+            message="Manim video is ready.",
+            diagnostics=recovered_diagnostics,
+        )
+        return _jobs.get(str(job.get("job_id") or ""), job)
+
+    if status in {"failed", "cancelled", "canceled"}:
+        _update_job(
+            str(job.get("job_id") or ""),
+            status="failed",
+            progress=100,
+            error="数学讲解视频生成失败，可稍后重试。",
+            message="数学讲解视频生成失败。",
+            diagnostics={**diagnostics, "manimcat_status": status, "error_summary": _error_summary_text(payload)},
+        )
+        return _jobs.get(str(job.get("job_id") or ""), job)
+
+    _update_manimcat_progress(str(job.get("job_id") or ""), payload)
+    return _jobs.get(str(job.get("job_id") or ""), job)
 
 
 def _scene_hash(scene_spec: Dict[str, Any]) -> str:
@@ -306,3 +449,11 @@ def _error_summary(exc: Exception) -> str:
     if len(message) > 300:
         return f"{message[:297]}..."
     return message
+
+
+def _error_summary_text(payload: Dict[str, Any]) -> str:
+    for key in ("error", "message", "details"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value[:300]
+    return "ManimCat render failed."

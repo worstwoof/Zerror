@@ -34,6 +34,34 @@ def is_manimcat_configured() -> bool:
     return bool(_base_url() and _api_key())
 
 
+def get_manimcat_job(remote_job_id: str) -> Dict[str, Any]:
+    base_url = _base_url()
+    api_key = _api_key()
+    if not base_url or not api_key:
+        raise ManimCatUnavailable("ManimCat is not configured.")
+    remote_job_id = str(remote_job_id or "").strip()
+    if not remote_job_id:
+        raise ManimCatUnavailable("ManimCat job id is missing.")
+    return _request_json(
+        "GET",
+        f"{base_url}/api/jobs/{urllib.parse.quote(remote_job_id)}",
+        api_key=api_key,
+        timeout=_request_timeout(),
+    )
+
+
+def download_manimcat_video(video_url: str, output_path: Path) -> None:
+    base_url = _base_url()
+    api_key = _api_key()
+    if not base_url or not api_key:
+        raise ManimCatUnavailable("ManimCat is not configured.")
+    video_url = str(video_url or "").strip()
+    if not video_url:
+        raise ManimCatUnavailable("ManimCat video URL is missing.")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _download_video(video_url, output_path, base_url=base_url, api_key=api_key)
+
+
 def render_math_video_with_manimcat(
     *,
     scene_spec: Dict[str, Any],

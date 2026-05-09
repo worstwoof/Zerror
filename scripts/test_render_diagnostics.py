@@ -24,6 +24,9 @@ class RenderDiagnosticsTest(unittest.TestCase):
     def setUp(self) -> None:
         render_jobs._jobs.clear()
         render_jobs._renderer_available_cache = True
+        self._jobs_temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(self._jobs_temp_dir.cleanup)
+        render_jobs.JOBS_ROOT = Path(self._jobs_temp_dir.name)
 
     def test_geogebra_magnetic_particle_scene_has_commands_and_variants(self) -> None:
         scene = {
@@ -405,6 +408,51 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("ManimCat missing", completed["diagnostics"]["error_summary"])
         self.assertGreaterEqual(manimcat_render.call_count, 1)
         local_render.assert_not_called()
+
+    def test_recovered_manimcat_job_downloads_completed_remote_video(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = Path(temp_dir)
+            job_id = "abc123recovered"
+            persisted_job = {
+                "job_id": job_id,
+                "scene_hash": "abc123",
+                "status": "running",
+                "progress": 60,
+                "video_url": "",
+                "duration": None,
+                "thumbnail_url": None,
+                "message": "Rendering",
+                "error": "",
+                "scene_spec": {"subject": "math", "scene_type": "conic"},
+                "diagnostics": {
+                    "renderer_backend": "manimcat",
+                    "manimcat_remote_job_id": "remote-1",
+                },
+                "updated_at": time.time(),
+            }
+            render_jobs._job_path(job_id).write_text(
+                json.dumps(persisted_job, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            def fake_download(video_url, output_path):
+                self.assertEqual(video_url, "/video/remote.mp4")
+                output_path.write_bytes(b"fake mp4")
+
+            render_jobs._jobs.clear()
+            with patch.object(render_jobs, "MEDIA_ROOT", media_root), patch.object(
+                render_jobs,
+                "get_manimcat_job",
+                return_value={"status": "completed", "video_url": "/video/remote.mp4"},
+            ), patch.object(render_jobs, "download_manimcat_video", side_effect=fake_download):
+                recovered = render_jobs.get_manim_job(job_id)
+
+            self.assertIsNotNone(recovered)
+            self.assertEqual(recovered["status"], "succeeded")
+            self.assertEqual(recovered["video_url"], f"/static/media/manim/{job_id}.mp4")
+            self.assertTrue((media_root / f"{job_id}.mp4").exists())
+            self.assertTrue(recovered["diagnostics"]["manimcat_recovered"])
+            self.assertNotIn("scene_spec", recovered)
 
     def test_manimcat_cache_key_includes_math_problem_identity(self) -> None:
         base_scene = {
