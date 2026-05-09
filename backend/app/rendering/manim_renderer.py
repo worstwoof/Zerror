@@ -1073,10 +1073,8 @@ class LearningScene(Scene):
             cjk_text("A 的运动趋势", font_size=15, color=GREY_A).next_to(board_motion, DOWN, buff=0.06),
             cjk_text("B 的相对滑动", font_size=15, color=GREY_A).next_to(block_motion, UP, buff=0.06),
         )
-        preview_board_shift = LEFT * 0.86
-        preview_block_shift = LEFT * 2.10
-        board_final_center = board.get_center() + preview_board_shift
-        block_final_center = block.get_center() + preview_block_shift
+        board_final_center = board.get_center()
+        block_final_center = block.get_center()
         b_fbd_dot = Dot(block_final_center, color=YELLOW, radius=0.045)
         a_fbd_dot = Dot(board_final_center, color=YELLOW, radius=0.045)
         force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.28, buff=0, color=WHITE, stroke_width=3.2)
@@ -1092,20 +1090,22 @@ class LearningScene(Scene):
             MathTex("f_A", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.13),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
+        forces.set_opacity(0)
         relative_y = board.get_top()[1] + 0.72
-        relative_right = block.get_left() + preview_block_shift
-        relative_left = board.get_left() + preview_board_shift
+        relative_right = block.get_left() + LEFT * 0.04
+        relative_left = relative_right + LEFT * 2.20
         relative_right[1] = relative_y
         relative_left[1] = relative_y
         relative_arrow = DoubleArrow(relative_right, relative_left, buff=0.05, color=YELLOW, stroke_width=3)
         relative_label = MathTex("s_{{rel}}", color=YELLOW).scale(0.54).next_to(relative_arrow, UP, buff=0.03)
         relative = VGroup(relative_arrow, relative_label)
+        relative.set_opacity(0)
         board_group = VGroup(board, board_label)
         block_group = VGroup(block, block_label, v_arrow, v_label, force_arrow, force_label)
         motion = VGroup(board_motion, block_motion, motion_labels)
         full_group = VGroup(ground, board_group, block_group)
         moving = VGroup(board_group, block_group, motion)
-        layout_group = VGroup(ground, board_group, block_group, motion, forces, relative)
+        layout_group = VGroup(ground, board_group, block_group, motion)
         moving.save_state()
         return {{
             "type": "board_block",
@@ -1179,15 +1179,18 @@ class LearningScene(Scene):
                 rate_func=linear,
             )
             self.play(
-                model["board_group"].animate.shift(LEFT * 0.38),
-                model["block_group"].animate.shift(LEFT * 0.38),
-                model["motion"].animate.shift(LEFT * 0.44),
+                model["board_group"].animate.shift(RIGHT * 0.42),
+                model["block_group"].animate.shift(RIGHT * 0.42),
+                model["motion"].animate.shift(RIGHT * 0.42),
                 FadeOut(start_ghost),
                 FadeOut(VGroup(board_trace, block_trace)),
                 run_time=2.2,
                 rate_func=linear,
             )
             self.play(model["layout_group"].animate.shift(-preview_shift), run_time=0.85, rate_func=smooth)
+            self.play(Restore(model["moving"]), run_time=0.55, rate_func=smooth)
+            model["forces"].set_opacity(0)
+            model["relative"].set_opacity(0)
             model["moving"].save_state()
             return
         self.play(Create(VGroup(model["base"], model["body"], model["velocity"], model["force"], model["labels"])), run_time=1.4)
@@ -1205,10 +1208,10 @@ class LearningScene(Scene):
                 self.play(FadeOut(step_header, shift=UP * 0.08), run_time=0.28)
 
     def _build_board_step_header(self, index, section):
-        label = cjk_text("当前小问", font_size=15, color=BLUE_B)
+        label = cjk_text("当前小问", font_size=16, color=BLUE_A)
         title_text = str(section.get("title") or "板块模型分析")
         title_text = title_text.replace("小问一：", "").replace("小问二：", "").replace("小问三：", "")
-        title = cjk_text(str(index) + ". " + title_text, font_size=21, color=YELLOW)
+        title = cjk_text(str(index) + ". " + title_text, font_size=23, color=YELLOW)
         content = VGroup(label, title)
         content.arrange(RIGHT, aligned_edge=DOWN, buff=0.20)
         if content.width > 12.4:
@@ -1221,7 +1224,7 @@ class LearningScene(Scene):
             color=GREY_E,
             stroke_width=1,
             fill_color=GREY_E,
-            fill_opacity=0.12,
+            fill_opacity=0.24,
         )
         backdrop.move_to(content.get_center())
         group = VGroup(backdrop, content)
@@ -1467,6 +1470,22 @@ class LearningScene(Scene):
             return
         if model.get("type") == "board_block":
             if focus == "objects":
+                cleanup = []
+                if model.get("forces_shown"):
+                    cleanup.append(FadeOut(model["forces"]))
+                    model["forces_shown"] = False
+                if model.get("relative_shown"):
+                    cleanup.append(FadeOut(model["relative"]))
+                    model["relative_shown"] = False
+                if model.get("vectors_hidden"):
+                    model["initial_vectors"].set_opacity(1)
+                    model["motion"].set_opacity(1)
+                    cleanup.extend([FadeIn(model["initial_vectors"]), FadeIn(model["motion"])])
+                    model["vectors_hidden"] = False
+                if cleanup:
+                    self.play(*cleanup, run_time=0.42)
+                model["forces"].set_opacity(0)
+                model["relative"].set_opacity(0)
                 self.play(
                     Circumscribe(model["board"], color=YELLOW, time_width=0.55),
                     Circumscribe(model["block"], color=YELLOW, time_width=0.55),
@@ -1480,11 +1499,17 @@ class LearningScene(Scene):
                 )
                 self.play(Indicate(model["initial_vectors"], color=YELLOW, scale_factor=1.05), run_time=1.0)
             elif focus == "forces":
+                if model.get("relative_shown"):
+                    self.play(FadeOut(model["relative"]), run_time=0.35)
+                    model["relative"].set_opacity(0)
+                    model["relative_shown"] = False
                 if not model.get("vectors_hidden"):
                     self.play(FadeOut(model["initial_vectors"]), FadeOut(model["motion"]), run_time=0.45)
                     model["initial_vectors"].set_opacity(0)
+                    model["motion"].set_opacity(0)
                     model["vectors_hidden"] = True
                 if not model.get("forces_shown"):
+                    model["forces"].set_opacity(1)
                     self.play(FadeIn(model["forces"]), run_time=0.9)
                     model["forces_shown"] = True
                 self.play(
@@ -1495,11 +1520,15 @@ class LearningScene(Scene):
             else:
                 if model.get("forces_shown"):
                     self.play(FadeOut(model["forces"]), run_time=0.45)
+                    model["forces"].set_opacity(0)
                     model["forces_shown"] = False
                 if model.get("vectors_hidden"):
-                    self.play(FadeIn(model["motion"]), run_time=0.35)
+                    model["initial_vectors"].set_opacity(1)
+                    model["motion"].set_opacity(1)
+                    self.play(FadeIn(model["initial_vectors"]), FadeIn(model["motion"]), run_time=0.35)
                     model["vectors_hidden"] = False
                 if not model.get("relative_shown"):
+                    model["relative"].set_opacity(1)
                     self.play(FadeIn(model["relative"]), run_time=0.65)
                     model["relative_shown"] = True
                 model["moving"].save_state()
