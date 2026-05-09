@@ -208,7 +208,10 @@ class LearningScene(Scene):
             model = self._build_generic_teaching_model(scene_type)
         self._play_global_physics_preview(model, scene_type)
         self.wait(0.8)
-        self.play(question_block.animate.scale(0.88).to_corner(UL, buff=0.24), run_time=0.55)
+        if scene_type == "board_block":
+            self.play(question_block.animate.scale(0.96).to_edge(UP, buff=0.10), run_time=0.55)
+        else:
+            self.play(question_block.animate.scale(0.88).to_corner(UL, buff=0.24), run_time=0.55)
         self._play_step_breakdown(spec, model, scene_type, board_data=board_data)
 
     def _professional_scene_type(self, spec):
@@ -397,14 +400,16 @@ class LearningScene(Scene):
         return group
 
     def _build_board_question_block(self, board, compact=False):
-        title = cjk_text("情景与条件", font_size=18 if not compact else 14, color=GREY_A)
-        summary_title = cjk_text("板块模型", font_size=14 if not compact else 12, color=BLUE_B)
+        title = cjk_text("情景与条件", font_size=15 if not compact else 12, color=GREY_A)
+        summary_title = cjk_text("板块模型", font_size=12 if not compact else 10, color=BLUE_B)
         summary = VGroup(
-            cjk_text("光滑水平面：长木板 A，物块 B 在右端。", font_size=12 if not compact else 10, color=WHITE),
-            cjk_text("B 初速度向左，恒力 F 水平向右。", font_size=12 if not compact else 10, color=WHITE),
+            cjk_text("光滑水平面：长木板 A，物块 B 在右端。", font_size=10 if not compact else 9, color=WHITE),
+            cjk_text("B 初速度向左，恒力 F 水平向右。", font_size=10 if not compact else 9, color=WHITE),
         )
-        summary.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
-        known_title = cjk_text("已知条件", font_size=14 if not compact else 12, color=BLUE_B)
+        summary.arrange(DOWN, aligned_edge=LEFT, buff=0.04)
+        story_panel = VGroup(title, summary_title, summary)
+        story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
+        known_title = cjk_text("已知条件", font_size=12 if not compact else 10, color=BLUE_B)
         known = VGroup()
         known_items = [
             self._value_formula("m_A", board.get("m_A"), "kg"),
@@ -417,24 +422,30 @@ class LearningScene(Scene):
         for item in known_items:
             if "?" not in item:
                 try:
-                    known.add(MathTex(item, color=WHITE).scale(0.36 if not compact else 0.30))
+                    known.add(MathTex(item, color=WHITE).scale(0.34 if not compact else 0.28))
                 except Exception:
                     known.add(cjk_text(item[:16], font_size=11 if not compact else 9, color=WHITE))
-        known.arrange_in_grid(cols=3 if not compact else 2, buff=(0.16, 0.10), cell_alignment=LEFT)
-        q_title = cjk_text("求解目标", font_size=14 if not compact else 12, color=BLUE_B)
+        known.arrange_in_grid(cols=6 if not compact else 3, buff=(0.22, 0.08), cell_alignment=LEFT)
+        known_panel = VGroup(known_title, known)
+        known_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.06)
+        q_title = cjk_text("求解目标", font_size=12 if not compact else 10, color=BLUE_B)
         q_lines = []
         for index, item in enumerate(board.get("questions") or [], start=1):
-            q_lines.append(cjk_text(str(index) + ". " + str(item)[:20], font_size=11 if not compact else 9, color=GREY_A))
+            q_lines.append(cjk_text(str(index) + ". " + str(item)[:18], font_size=9 if not compact else 8, color=GREY_A))
         questions = VGroup(*q_lines)
         if len(questions) > 0:
-            questions.arrange(DOWN, aligned_edge=LEFT, buff=0.04)
-        group = VGroup(title, summary_title, summary, known_title, known, q_title, questions)
-        group.arrange(DOWN, aligned_edge=LEFT, buff=0.08 if not compact else 0.05)
-        group.to_corner(UL, buff=0.24)
-        if group.width > 6.0:
-            group.scale_to_fit_width(6.0)
-        if group.height > 2.78:
-            group.scale_to_fit_height(2.78)
+            questions.arrange(DOWN, aligned_edge=LEFT, buff=0.025)
+        question_panel = VGroup(q_title, questions)
+        question_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.05)
+        row = VGroup(story_panel, known_panel, question_panel)
+        row.arrange(RIGHT, aligned_edge=UP, buff=0.48 if not compact else 0.32)
+        divider = Line(LEFT * 6.62, RIGHT * 6.62, color=GREY_E, stroke_width=1)
+        divider.next_to(row, DOWN, buff=0.10)
+        group = VGroup(row, divider)
+        group.to_edge(UP, buff=0.12)
+        if group.width > 13.25:
+            group.scale_to_fit_width(13.25)
+            group.to_edge(UP, buff=0.12)
         return group
 
     def _build_em_teaching_model(self):
@@ -526,17 +537,17 @@ class LearningScene(Scene):
         block_final_center = block.get_center() + preview_block_shift
         b_fbd_dot = Dot(block_final_center, color=YELLOW, radius=0.045)
         a_fbd_dot = Dot(board_final_center, color=YELLOW, radius=0.045)
-        force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.08 + UP * 0.16, buff=0, color=WHITE, stroke_width=3)
-        f_on_b = Arrow(block_final_center, block_final_center + RIGHT * 0.90 + DOWN * 0.18, buff=0, color=YELLOW, stroke_width=3)
+        force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.18, buff=0, color=WHITE, stroke_width=3)
+        f_on_b = Arrow(block_final_center, block_final_center + RIGHT * 0.82, buff=0, color=YELLOW, stroke_width=3)
         n_arrow = Arrow(block_final_center, block_final_center + UP * 1.05, buff=0, color=BLUE_B, stroke_width=3)
         g_arrow = Arrow(block_final_center, block_final_center + DOWN * 1.05, buff=0, color=BLUE_B, stroke_width=3)
         f_on_a = Arrow(board_final_center, board_final_center + LEFT * 0.95, buff=0, color=YELLOW, stroke_width=3)
         force_labels = VGroup(
-            MathTex(f_formula, color=WHITE).scale(0.48).next_to(force_arrow_centered, UP, buff=0.03),
-            MathTex("f_B", color=YELLOW).scale(0.52).next_to(f_on_b, DOWN, buff=0.03),
-            MathTex("N", color=BLUE_B).scale(0.52).next_to(n_arrow, RIGHT, buff=0.03),
-            MathTex("m_B g", color=BLUE_B).scale(0.52).next_to(g_arrow, RIGHT, buff=0.03),
-            MathTex("f_A", color=YELLOW).scale(0.52).next_to(f_on_a, UP, buff=0.03),
+            MathTex(f_formula, color=WHITE).scale(0.46).move_to(force_arrow_centered.get_end() + RIGHT * 0.20 + UP * 0.20),
+            MathTex("f_B", color=YELLOW).scale(0.48).move_to(f_on_b.get_end() + RIGHT * 0.14 + DOWN * 0.20),
+            MathTex("N", color=BLUE_B).scale(0.50).move_to(n_arrow.get_end() + UP * 0.18 + RIGHT * 0.14),
+            MathTex("m_B g", color=BLUE_B).scale(0.50).move_to(g_arrow.get_end() + DOWN * 0.18 + RIGHT * 0.22),
+            MathTex("f_A", color=YELLOW).scale(0.48).move_to(f_on_a.get_end() + LEFT * 0.18 + UP * 0.18),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
         relative_y = board.get_top()[1] + 0.58
@@ -609,6 +620,9 @@ class LearningScene(Scene):
             start_ghost.set_opacity(0.20)
             start_ghost.set_color(GREY_B)
             self.add(start_ghost)
+            board_trace = TracedPath(model["board"].get_center, stroke_color=GREY_B, stroke_width=3, dissipating_time=2.2)
+            block_trace = TracedPath(model["block"].get_center, stroke_color=BLUE_B, stroke_width=5, dissipating_time=2.2)
+            self.add(board_trace, block_trace)
             self.play(FadeIn(model["motion"]), run_time=0.65)
             self.play(
                 model["board_group"].animate.shift(LEFT * 0.42),
@@ -622,6 +636,7 @@ class LearningScene(Scene):
                 model["block_group"].animate.shift(LEFT * 0.57),
                 model["motion"].animate.shift(LEFT * 0.44),
                 FadeOut(start_ghost),
+                FadeOut(VGroup(board_trace, block_trace)),
                 run_time=1.8,
                 rate_func=linear,
             )
@@ -792,11 +807,12 @@ class LearningScene(Scene):
         if formula is not None:
             group.add(formula)
         group.arrange(DOWN, aligned_edge=LEFT, buff=0.28)
-        group.move_to(RIGHT * 3.35 + DOWN * 0.18)
         if group.width > 5.45:
             group.scale_to_fit_width(5.45)
         if group.height > 4.25:
             group.scale_to_fit_height(4.25)
+        group.to_corner(UR, buff=0.42)
+        group.shift(DOWN * 0.92)
         return group
 
     def _aligned_formula_block(self, formulas):
@@ -855,6 +871,7 @@ class LearningScene(Scene):
             elif focus == "forces":
                 if not model.get("vectors_hidden"):
                     self.play(FadeOut(model["initial_vectors"]), FadeOut(model["motion"]), run_time=0.45)
+                    model["initial_vectors"].set_opacity(0)
                     model["vectors_hidden"] = True
                 if not model.get("forces_shown"):
                     self.play(FadeIn(model["forces"]), run_time=0.9)
@@ -876,9 +893,9 @@ class LearningScene(Scene):
                     model["relative_shown"] = True
                 model["moving"].save_state()
                 self.play(
-                    model["board_group"].animate.shift(RIGHT * 0.35),
-                    model["block_group"].animate.shift(LEFT * 0.85),
-                    model["relative"].animate.set_color(YELLOW),
+                    model["board_group"].animate.shift(LEFT * 0.34),
+                    model["block_group"].animate.shift(LEFT * 0.92),
+                    model["relative"].animate.shift(LEFT * 0.26).set_color(YELLOW),
                     run_time=3.2,
                     rate_func=smooth,
                 )
