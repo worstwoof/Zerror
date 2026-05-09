@@ -6,6 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+ARG DEBIAN_APT_MIRROR=http://mirrors.tencentyun.com
+
+RUN sed -i \
+        -e "s|http://deb.debian.org/debian|${DEBIAN_APT_MIRROR}/debian|g" \
+        -e "s|http://deb.debian.org/debian-security|${DEBIAN_APT_MIRROR}/debian-security|g" \
+        /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
