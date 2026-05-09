@@ -1445,6 +1445,7 @@ class LearningScene(Scene):
         return group, title, notes, formula_lines
 
     def _play_board_chalk_sequence(self, index, section, model):
+        self._prepare_board_chalk_focus(model, section.get("focus") or "")
         derivation, title, notes, formula_lines = self._build_board_chalk_parts(index, section)
         self.play(FadeIn(title, shift=RIGHT * 0.08), run_time=0.38)
         for note in notes:
@@ -1453,10 +1454,30 @@ class LearningScene(Scene):
         self._play_local_response(model, section.get("focus") or "", "board_block")
         self.wait(0.15)
         for formula_line in formula_lines:
-            self.play(Write(formula_line), run_time=0.62)
-            self.wait(0.28)
-        self.wait(1.00)
+            self.play(Write(formula_line), run_time=0.78)
+            self.wait(0.42)
+        self.wait(1.35)
         self.play(FadeOut(derivation, shift=UP * 0.10), run_time=0.42)
+
+    def _prepare_board_chalk_focus(self, model, focus):
+        cleanup = []
+        if model.get("forces_shown") and focus != "forces":
+            cleanup.append(FadeOut(model["forces"]))
+            model["forces_shown"] = False
+        if model.get("relative_shown") and focus != "relative":
+            cleanup.append(FadeOut(model["relative"]))
+            model["relative_shown"] = False
+        if focus == "objects" and model.get("vectors_hidden"):
+            model["initial_vectors"].set_opacity(1)
+            model["motion"].set_opacity(1)
+            cleanup.extend([FadeIn(model["initial_vectors"]), FadeIn(model["motion"])])
+            model["vectors_hidden"] = False
+        if cleanup:
+            self.play(*cleanup, run_time=0.34)
+        if focus != "forces":
+            model["forces"].set_opacity(0)
+        if focus != "relative":
+            model["relative"].set_opacity(0)
 
     def _clean_formula_items(self, formulas, limit=7):
         cleaned = []

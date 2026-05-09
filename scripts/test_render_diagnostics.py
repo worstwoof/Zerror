@@ -282,6 +282,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("_play_derivation_sequence", source)
         self.assertIn("_play_board_chalk_sequence", source)
         self.assertIn("_build_board_chalk_parts", source)
+        self.assertIn("_prepare_board_chalk_focus", source)
         self.assertIn("Write(formula_line)", source)
         self.assertIn("_build_derivation_parts", source)
         self.assertIn("_formula_lines_group", source)
