@@ -400,16 +400,14 @@ class LearningScene(Scene):
         return group
 
     def _build_board_question_block(self, board, compact=False):
-        title = cjk_text("原题", font_size=24 if not compact else 17, color=YELLOW)
+        header_font_size = 15 if not compact else 11
+        title = cjk_text("原题", font_size=header_font_size, color=YELLOW)
         question_source = " ".join(str(board.get("question") or "光滑水平面上，物块 B 位于长木板 A 右端并相对滑动。").replace("\\n", " ").split())
-        max_question_chars = 108 if not compact else 72
-        if len(question_source) > max_question_chars:
-            question_source = question_source[:max_question_chars - 3] + "..."
-        question_line_chars = 40 if not compact else 36
-        question_lines = [question_source[i:i + question_line_chars] for i in range(0, len(question_source), question_line_chars)][:3]
+        question_line_chars = 66 if not compact else 52
+        question_lines = [question_source[i:i + question_line_chars] for i in range(0, len(question_source), question_line_chars)]
         if len(question_lines) == 0:
             question_lines = ["光滑水平面 · B 在 A 右端 · 相对滑动后共速"]
-        question_body = VGroup(*[cjk_text(line, font_size=15 if not compact else 11, color=GREY_A) for line in question_lines])
+        question_body = VGroup(*[cjk_text(line, font_size=header_font_size, color=GREY_A) for line in question_lines])
         question_body.arrange(DOWN, aligned_edge=LEFT, buff=0.07 if not compact else 0.05)
         question_row = VGroup(title, question_body)
         question_row.arrange(RIGHT, aligned_edge=UP, buff=0.24 if not compact else 0.18)
@@ -428,10 +426,10 @@ class LearningScene(Scene):
         for item in known_items:
             if "?" not in item:
                 try:
-                    value = MathTex(item, color=WHITE).scale(0.43 if not compact else 0.32)
+                    value = MathTex(item, color=WHITE).scale(0.46 if not compact else 0.34)
                     chip = RoundedRectangle(
                         width=value.width + 0.42,
-                        height=0.48 if not compact else 0.35,
+                        height=0.52 if not compact else 0.38,
                         corner_radius=0.04,
                         color=GREY_D,
                         stroke_width=1,
@@ -441,14 +439,14 @@ class LearningScene(Scene):
                     chip.move_to(value)
                     chips.add(VGroup(chip, value))
                 except Exception:
-                    value = cjk_text(item[:14], font_size=12 if not compact else 9, color=WHITE)
+                    value = cjk_text(item[:14], font_size=header_font_size, color=WHITE)
                     chip = RoundedRectangle(width=value.width + 0.40, height=0.44, corner_radius=0.04, color=GREY_D, stroke_width=1)
                     chip.move_to(value)
                     chips.add(VGroup(chip, value))
         chips.arrange(RIGHT, buff=0.10)
-        known_label = cjk_text("已知", font_size=15 if not compact else 10, color=BLUE_B)
-        goal_label = cjk_text("目标", font_size=15 if not compact else 10, color=BLUE_B)
-        goal_text = cjk_text("受力与加速度 · 共速时刻 · 相对位移", font_size=13 if not compact else 9, color=GREY_A)
+        known_label = cjk_text("已知", font_size=header_font_size, color=BLUE_B)
+        goal_label = cjk_text("目标", font_size=header_font_size, color=BLUE_B)
+        goal_text = cjk_text("受力与加速度 · 共速时刻 · 相对位移", font_size=header_font_size, color=GREY_A)
         meta_row = VGroup(known_label, chips, goal_label, goal_text)
         meta_row.arrange(RIGHT, aligned_edge=DOWN, buff=0.18 if not compact else 0.12)
         if meta_row.width > 12.65:
@@ -830,7 +828,7 @@ class LearningScene(Scene):
         if group.height > 4.25:
             group.scale_to_fit_height(4.25)
         derivation_left = 1.05
-        derivation_top = 1.92
+        derivation_top = 1.72
         group.shift(RIGHT * (derivation_left - group.get_left()[0]))
         group.shift(UP * (derivation_top - group.get_top()[1]))
         return group
