@@ -682,6 +682,7 @@ class LearningScene(Scene):
             self._value_formula("v_0", board.get("v0"), "m/s"),
             self._value_formula("F", board.get("F"), "N"),
             self._value_formula(r"\\mu", board.get("mu")),
+            self._value_formula("g", board.get("g"), "m/s^2"),
         ]
         known_formulas = [item for item in known_formulas if "?" not in item]
         complete = not board.get("missing")
@@ -717,7 +718,7 @@ class LearningScene(Scene):
                 "title": "小问一：" + str(first_question)[:22],
                 "focus": "objects",
                 "notes": ["B 初始位于木板 A 的右端。", "v0 向左，恒力 F 向右，先把初态画对。"],
-                "formulas": [r"v_B(0)=-v_0", r"F\\rightarrow"] + known_formulas[:5],
+                "formulas": [r"v_B(0)=-v_0"] + known_formulas,
             }},
             {{
                 "title": "小问二：" + str(second_question)[:22],
@@ -844,7 +845,7 @@ class LearningScene(Scene):
             cleaned.append(value)
         if not cleaned:
             return None
-        body = r"\\begin{{aligned}}" + r"\\\\".join(cleaned[:5]) + r"\\end{{aligned}}"
+        body = r"\\begin{{aligned}}" + r"\\\\".join(cleaned[:7]) + r"\\end{{aligned}}"
         try:
             mob = MathTex(body, color=WHITE).scale(0.66)
         except Exception:
