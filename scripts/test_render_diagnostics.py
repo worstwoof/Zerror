@@ -251,7 +251,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("RoundedRectangle(width=13.15", source)
         self.assertIn("group.to_edge(UP", source)
         self.assertIn("derivation_left = 1.05", source)
-        self.assertIn("derivation_top = 2.34", source)
+        self.assertIn("derivation_top = 1.92", source)
         self.assertNotIn("题目区", source)
         self.assertIn("RoundedRectangle", source)
         self.assertIn("fill_opacity=0.82", source)

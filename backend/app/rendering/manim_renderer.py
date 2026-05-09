@@ -830,7 +830,7 @@ class LearningScene(Scene):
         if group.height > 4.25:
             group.scale_to_fit_height(4.25)
         derivation_left = 1.05
-        derivation_top = 2.34
+        derivation_top = 1.92
         group.shift(RIGHT * (derivation_left - group.get_left()[0]))
         group.shift(UP * (derivation_top - group.get_top()[1]))
         return group
