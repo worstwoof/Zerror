@@ -737,11 +737,8 @@ class LearningScene(Scene):
         elif focus == "final":
             vertical = DashedLine(model["axes"].c2p(1, -2.1), model["axes"].c2p(1, 2.1), color=TEAL, stroke_width=3)
             vertical_label = MathTex(r"k=\\infty", color=TEAL).scale(0.45).next_to(vertical, UP, buff=0.05)
-            result_box = MathTex(r"a>\\sqrt{{\\frac{{3+\\sqrt5}}{{2}}}}", color=YELLOW).scale(0.74)
-            result_box.next_to(model["inequality"], DOWN, aligned_edge=LEFT, buff=0.18)
             self.play(Create(vertical), FadeIn(vertical_label), run_time=0.8)
-            self.play(FadeIn(result_box, shift=UP * 0.05), run_time=0.5)
-            self.play(Indicate(result_box, color=YELLOW, scale_factor=1.03), run_time=1.1)
+            self.wait(0.8)
 
     def _professional_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics").strip().lower()
