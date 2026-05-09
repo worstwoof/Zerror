@@ -664,12 +664,7 @@ class LearningScene(Scene):
     def _play_step_breakdown(self, spec, model, scene_type, board_data=None):
         sections = self._breakdown_sections(spec, scene_type, board_data=board_data)
         for index, section in enumerate(sections, start=1):
-            derivation = self._build_derivation_group(index, section)
-            self.play(FadeIn(derivation, shift=LEFT * 0.12), run_time=0.55)
-            self.wait(1.10)
-            self._play_local_response(model, section.get("focus") or "", scene_type)
-            self.wait(3.10)
-            self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
+            self._play_derivation_sequence(index, section, model, scene_type)
 
     def _board_block_sections(self, board):
         questions = board.get("questions") or []
@@ -813,11 +808,15 @@ class LearningScene(Scene):
         return fallback
 
     def _build_derivation_group(self, index, section):
+        group, _, _, _ = self._build_derivation_parts(index, section)
+        return group
+
+    def _build_derivation_parts(self, index, section):
         title = cjk_text(str(index) + ". " + str(section.get("title") or "关键小问"), font_size=22, color=YELLOW)
         notes = VGroup(*[cjk_text(str(item), font_size=17, color=GREY_A) for item in section.get("notes") or []])
         if len(notes) > 0:
             notes.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
-        formula = self._aligned_formula_block(section.get("formulas") or [])
+        formula = self._formula_lines_group(section.get("formulas") or [])
         group = VGroup(title)
         if len(notes) > 0:
             group.add(notes)
@@ -832,9 +831,23 @@ class LearningScene(Scene):
         derivation_top = 1.72
         group.shift(RIGHT * (derivation_left - group.get_left()[0]))
         group.shift(UP * (derivation_top - group.get_top()[1]))
-        return group
+        return group, title, notes, formula
 
-    def _aligned_formula_block(self, formulas):
+    def _play_derivation_sequence(self, index, section, model, scene_type):
+        derivation, title, notes, formula_lines = self._build_derivation_parts(index, section)
+        self.play(FadeIn(title, shift=LEFT * 0.10), run_time=0.42)
+        for note in notes:
+            self.play(FadeIn(note, shift=UP * 0.06), run_time=0.34)
+            self.wait(0.12)
+        self._play_local_response(model, section.get("focus") or "", scene_type)
+        self.wait(0.20)
+        for formula_line in formula_lines:
+            self.play(Write(formula_line), run_time=0.62)
+            self.wait(0.24)
+        self.wait(0.90)
+        self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
+
+    def _clean_formula_items(self, formulas, limit=7):
         cleaned = []
         for formula in formulas:
             value = str(formula).replace("$$", "").replace("$", "").strip()
@@ -843,9 +856,25 @@ class LearningScene(Scene):
             if "=" in value and "&=" not in value:
                 value = value.replace("=", "&=", 1)
             cleaned.append(value)
+        return cleaned[:limit]
+
+    def _formula_lines_group(self, formulas):
+        cleaned = self._clean_formula_items(formulas, limit=7)
+        lines = VGroup()
+        for item in cleaned:
+            try:
+                lines.add(MathTex(r"\\begin{{aligned}}" + item + r"\\end{{aligned}}", color=WHITE).scale(0.60))
+            except Exception:
+                lines.add(MathTex(item.replace("&", ""), color=WHITE).scale(0.56))
+        if len(lines) > 0:
+            lines.arrange(DOWN, aligned_edge=LEFT, buff=0.16)
+        return lines
+
+    def _aligned_formula_block(self, formulas):
+        cleaned = self._clean_formula_items(formulas, limit=7)
         if not cleaned:
             return None
-        body = r"\\begin{{aligned}}" + r"\\\\".join(cleaned[:7]) + r"\\end{{aligned}}"
+        body = r"\\begin{{aligned}}" + r"\\\\".join(cleaned) + r"\\end{{aligned}}"
         try:
             mob = MathTex(body, color=WHITE).scale(0.66)
         except Exception:
