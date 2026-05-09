@@ -2,9 +2,7 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_INDEX_URL=http://mirrors.tencentyun.com/pypi/simple \
-    PIP_TRUSTED_HOST=mirrors.tencentyun.com
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
@@ -30,6 +28,9 @@ RUN apt-get update \
         texlive-latex-base \
         texlive-latex-extra \
     && rm -rf /var/lib/apt/lists/*
+
+ENV PIP_INDEX_URL=http://mirrors.tencentyun.com/pypi/simple \
+    PIP_TRUSTED_HOST=mirrors.tencentyun.com
 
 COPY backend/requirements.txt /tmp/backend-requirements.txt
 COPY ai_engine/requirements.txt /tmp/ai-engine-requirements.txt
