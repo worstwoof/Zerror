@@ -152,9 +152,19 @@ class LearningScene(Scene):
             "standing_wave",
             "linear_wave",
         }}
+        is_math_scene = str(spec.get("subject") or "").lower() == "math" or scene_type in {{
+            "conic",
+            "function_graph",
+            "geometry",
+        }}
         if is_physics_scene:
             self.camera.background_color = BLACK
             self._draw_professional_physics_scene(spec)
+            self.wait(1.2)
+            return
+        if is_math_scene:
+            self.camera.background_color = BLACK
+            self._draw_professional_math_scene(spec)
             self.wait(1.2)
             return
 
@@ -213,6 +223,316 @@ class LearningScene(Scene):
         else:
             self.play(question_block.animate.scale(0.88).to_corner(UL, buff=0.24), run_time=0.55)
         self._play_step_breakdown(spec, model, scene_type, board_data=board_data)
+
+    def _draw_professional_math_scene(self, spec):
+        math_type = self._professional_math_scene_type(spec)
+        math_data = self._math_problem_data(spec)
+        question_block = self._build_math_question_block(math_data)
+        self.play(FadeIn(question_block, shift=DOWN * 0.12), run_time=0.65)
+        if math_type == "apollonius_tangent_circle":
+            model = self._build_apollonius_model()
+            self._play_apollonius_global_preview(model)
+            self.wait(0.8)
+            self.play(question_block.animate.scale(0.92).to_edge(UP, buff=0.08), run_time=0.55)
+            self._play_apollonius_derivation(model)
+            return
+        self.play(question_block.animate.scale(0.90).to_edge(UP, buff=0.10), run_time=0.55)
+        self._draw_math_story_scene(spec)
+        self._show_solution_walkthrough(spec)
+        self._show_formula_review(spec)
+
+    def _professional_math_scene_type(self, spec):
+        scene_type = str(spec.get("scene_type") or "").strip().lower()
+        question = self._question_text(spec)
+        source = " ".join([
+            str(spec.get("title") or ""),
+            str(spec.get("fallback_text") or ""),
+            question,
+        ])
+        apollonius_hits = ["阿波罗尼斯", "切线长", "|MQ|", "MQ", "x^2+y^2=1", "x²+y²=1", "Q(2,0)", "Q（2，0）"]
+        if any(token in source for token in apollonius_hits) and scene_type in {{"", "conic", "geometry", "generic"}}:
+            return "apollonius_tangent_circle"
+        if scene_type in {{"conic", "function_graph", "geometry"}}:
+            return scene_type
+        return "generic_math"
+
+    def _math_problem_data(self, spec):
+        question = self._question_text(spec)
+        if not question:
+            question = "已知点 Q(2,0) 和圆 C:x^2+y^2=1，动点 M 到圆 C 的切线长与 |MQ| 的比等于常数 λ(λ>0)，求 M 的轨迹方程并说明曲线类型。"
+        return dict(
+            question=question,
+            chips=[
+                r"Q(2,0)",
+                r"C:x^2+y^2=1",
+                r"\\frac{{MT}}{{MQ}}=\\lambda",
+                r"\\lambda>0",
+            ],
+            goal="轨迹方程 · 曲线类型",
+        )
+
+    def _math_wrap_lines(self, text, max_chars=58):
+        cleaned = " ".join(str(text).replace("\\n", " ").split())
+        if not cleaned:
+            return []
+        lines = []
+        current = ""
+        for char in cleaned:
+            current += char
+            if len(current) >= max_chars or char in "。；;":
+                lines.append(current.strip())
+                current = ""
+        if current.strip():
+            lines.append(current.strip())
+        return lines
+
+    def _build_math_question_block(self, data):
+        header_font_size = 15
+        title = cjk_text("原题", font_size=header_font_size, color=YELLOW)
+        lines = self._math_wrap_lines(data.get("question") or "", max_chars=72)
+        if len(lines) == 0:
+            lines = ["已知点 Q(2,0)、圆 C:x^2+y^2=1 与切线长比例条件，求动点 M 的轨迹。"]
+        question_body = VGroup(*[cjk_text(line, font_size=header_font_size, color=GREY_A) for line in lines[:2]])
+        question_body.arrange(DOWN, aligned_edge=LEFT, buff=0.07)
+        question_row = VGroup(title, question_body)
+        question_row.arrange(RIGHT, aligned_edge=UP, buff=0.24)
+        if question_row.width > 12.65:
+            question_body.scale_to_fit_width(max(1.0, 12.65 - title.width - 0.28))
+            question_row.arrange(RIGHT, aligned_edge=UP, buff=0.24)
+        chips = VGroup()
+        for item in data.get("chips") or []:
+            try:
+                value = MathTex(item, color=WHITE).scale(0.46)
+                chip = RoundedRectangle(
+                    width=value.width + 0.42,
+                    height=0.52,
+                    corner_radius=0.04,
+                    color=GREY_D,
+                    stroke_width=1,
+                    fill_color=GREY_E,
+                    fill_opacity=0.22,
+                )
+                chip.move_to(value)
+                chips.add(VGroup(chip, value))
+            except Exception:
+                value = cjk_text(str(item)[:14], font_size=header_font_size, color=WHITE)
+                chip = RoundedRectangle(width=value.width + 0.40, height=0.44, corner_radius=0.04, color=GREY_D, stroke_width=1)
+                chip.move_to(value)
+                chips.add(VGroup(chip, value))
+        chips.arrange(RIGHT, buff=0.10)
+        known_label = cjk_text("已知", font_size=header_font_size, color=BLUE_B)
+        goal_label = cjk_text("目标", font_size=header_font_size, color=BLUE_B)
+        goal_text = cjk_text(str(data.get("goal") or "轨迹方程 · 曲线类型"), font_size=header_font_size, color=GREY_A)
+        meta_row = VGroup(known_label, chips, goal_label, goal_text)
+        meta_row.arrange(RIGHT, aligned_edge=DOWN, buff=0.18)
+        if meta_row.width > 12.65:
+            meta_row.scale_to_fit_width(12.65)
+        content = VGroup(question_row, meta_row)
+        content.arrange(DOWN, aligned_edge=LEFT, buff=0.16)
+        backdrop = RoundedRectangle(width=13.15, height=max(content.height + 0.36, 1.38), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.12)
+        backdrop.move_to(content.get_center())
+        divider = Line(LEFT * 6.34, RIGHT * 6.34, color=GREY_D, stroke_width=1)
+        divider.next_to(backdrop, DOWN, buff=0.05)
+        group = VGroup(backdrop, content, divider)
+        group.to_edge(UP, buff=0.12)
+        if group.width > 13.25:
+            group.scale_to_fit_width(13.25)
+            group.to_edge(UP, buff=0.12)
+        return group
+
+    def _build_apollonius_model(self):
+        axes = Axes(
+            x_range=[-4.5, 4.6, 1],
+            y_range=[-3.0, 3.0, 1],
+            x_length=6.2,
+            y_length=4.05,
+            tips=True,
+            axis_config=dict(color=GREY_B, stroke_width=2),
+        ).move_to(LEFT * 3.35 + DOWN * 0.86)
+        origin = Dot(axes.c2p(0, 0), color=WHITE, radius=0.045)
+        q_dot = Dot(axes.c2p(2, 0), color=ORANGE, radius=0.065)
+        origin_label = MathTex("O", color=WHITE).scale(0.46).next_to(origin, DOWN + LEFT, buff=0.05)
+        q_label = MathTex("Q(2,0)", color=ORANGE).scale(0.48).next_to(q_dot, DOWN + RIGHT, buff=0.05)
+        circle = ParametricFunction(lambda t: axes.c2p(np.cos(t), np.sin(t)), t_range=[0, TAU], color=BLUE_B, stroke_width=4)
+        circle_label = MathTex("C:x^2+y^2=1", color=BLUE_B).scale(0.46).next_to(circle, UP, buff=0.12)
+        lambda_demo = 0.55
+        center_x = -2 * lambda_demo * lambda_demo / (1 - lambda_demo * lambda_demo)
+        radius = np.sqrt(1 + 3 * lambda_demo * lambda_demo) / abs(1 - lambda_demo * lambda_demo)
+        theta = ValueTracker(0.34)
+        def m_xy():
+            return (center_x + radius * np.cos(theta.get_value()), radius * np.sin(theta.get_value()))
+        def tangent_xy():
+            return self._apollonius_tangent_point(*m_xy())
+        locus_demo = ParametricFunction(
+            lambda t: axes.c2p(center_x + radius * np.cos(t), radius * np.sin(t)),
+            t_range=[0, TAU],
+            color=YELLOW,
+            stroke_width=3,
+        ).set_opacity(0.32)
+        m_dot = always_redraw(lambda: Dot(axes.c2p(*m_xy()), color=YELLOW, radius=0.07))
+        m_label = always_redraw(lambda: MathTex("M(x,y)", color=YELLOW).scale(0.46).next_to(m_dot, UP + RIGHT, buff=0.06))
+        t_dot = always_redraw(lambda: Dot(axes.c2p(*tangent_xy()), color=TEAL, radius=0.045))
+        t_label = always_redraw(lambda: MathTex("T", color=TEAL).scale(0.44).next_to(t_dot, UP + LEFT, buff=0.04))
+        tangent = always_redraw(lambda: Line(axes.c2p(*m_xy()), axes.c2p(*tangent_xy()), color=TEAL, stroke_width=4))
+        radius_line = always_redraw(lambda: Line(axes.c2p(0, 0), axes.c2p(*tangent_xy()), color=BLUE_B, stroke_width=3))
+        mq_line = always_redraw(lambda: DashedLine(axes.c2p(*m_xy()), axes.c2p(2, 0), color=ORANGE, stroke_width=3, dash_length=0.12))
+        mo_line = always_redraw(lambda: DashedLine(axes.c2p(*m_xy()), axes.c2p(0, 0), color=GREY_B, stroke_width=2, dash_length=0.12))
+        tangent_label = always_redraw(lambda: MathTex("MT", color=TEAL).scale(0.46).move_to((axes.c2p(*m_xy()) + axes.c2p(*tangent_xy())) / 2 + UP * 0.18))
+        mq_label = always_redraw(lambda: MathTex("MQ", color=ORANGE).scale(0.46).move_to((axes.c2p(*m_xy()) + axes.c2p(2, 0)) / 2 + DOWN * 0.24))
+        moving_group = VGroup(m_dot, m_label, t_dot, t_label, tangent, radius_line, mq_line, mo_line, tangent_label, mq_label)
+        trace = TracedPath(m_dot.get_center, stroke_color=YELLOW, stroke_width=4, dissipating_time=2.8)
+        return dict(
+            axes=axes,
+            origin=origin,
+            q_dot=q_dot,
+            origin_label=origin_label,
+            q_label=q_label,
+            circle=circle,
+            circle_label=circle_label,
+            theta=theta,
+            locus_demo=locus_demo,
+            moving_group=moving_group,
+            trace=trace,
+            m_dot=m_dot,
+            tangent=tangent,
+            mq_line=mq_line,
+            mo_line=mo_line,
+            radius_line=radius_line,
+        )
+
+    def _apollonius_tangent_point(self, x, y):
+        rho2 = max(x * x + y * y, 1.0001)
+        scale = 1 / rho2
+        offset = np.sqrt(max(rho2 - 1, 0)) / rho2
+        return (scale * x - offset * y, scale * y + offset * x)
+
+    def _play_apollonius_global_preview(self, model):
+        title = cjk_text("先看完整几何关系", font_size=24, color=YELLOW).to_edge(LEFT, buff=0.70).shift(UP * 1.72)
+        note = cjk_text("M 改变时，切线长 MT 与距离 MQ 的比例保持为常数", font_size=16, color=GREY_A)
+        note.next_to(title, DOWN, aligned_edge=LEFT, buff=0.10)
+        base_group = VGroup(model["axes"], model["origin"], model["q_dot"], model["origin_label"], model["q_label"], model["circle"], model["circle_label"])
+        self.play(FadeIn(title, shift=RIGHT * 0.12), FadeIn(note, shift=RIGHT * 0.12), run_time=0.70)
+        self.play(Create(model["axes"]), FadeIn(model["origin"]), FadeIn(model["q_dot"]), FadeIn(model["origin_label"]), FadeIn(model["q_label"]), run_time=1.1)
+        self.play(Create(model["circle"]), FadeIn(model["circle_label"]), run_time=1.2)
+        self.add(model["trace"])
+        self.play(FadeIn(model["moving_group"]), run_time=0.9)
+        self.wait(0.6)
+        self.play(model["theta"].animate.set_value(1.75), run_time=6.2, rate_func=smooth)
+        self.wait(0.8)
+        self.play(Create(model["locus_demo"]), run_time=1.8)
+        self.wait(2.3)
+        self.play(FadeOut(title), FadeOut(note), run_time=0.45)
+        model["base_group"] = base_group
+
+    def _play_apollonius_derivation(self, model):
+        sections = [
+            dict(
+                title="1. 把切线长转成直角三角形",
+                notes=["设 M(x,y)，T 为切点。", "半径 OT 垂直切线 MT，所以可以用勾股定理。"],
+                formulas=[
+                    r"OM^2=x^2+y^2",
+                    r"MT^2=OM^2-1=x^2+y^2-1",
+                    r"MQ^2=(x-2)^2+y^2",
+                ],
+                focus="tangent",
+            ),
+            dict(
+                title="2. 把比例条件平方",
+                notes=["题目给出 MT 与 MQ 的比为 λ。", "长度为正，平方后不会改变轨迹条件。"],
+                formulas=[
+                    r"\\frac{{MT}}{{MQ}}=\\lambda",
+                    r"x^2+y^2-1=\\lambda^2[(x-2)^2+y^2]",
+                    r"(1-\\lambda^2)(x^2+y^2)+4\\lambda^2x-(4\\lambda^2+1)=0",
+                ],
+                focus="ratio",
+            ),
+            dict(
+                title="3. 配方得到轨迹方程",
+                notes=["λ 不等于 1 时，方程可以整理成标准圆。", "λ 等于 1 时，二次项消失，轨迹退化为直线。"],
+                formulas=[
+                    r"\\lambda\\ne1:",
+                    r"\\left(x+\\frac{{2\\lambda^2}}{{1-\\lambda^2}}\\right)^2+y^2=\\frac{{1+3\\lambda^2}}{{(1-\\lambda^2)^2}}",
+                    r"\\lambda=1:\\quad x=\\frac{{5}}{{4}}",
+                ],
+                focus="locus",
+            ),
+            dict(
+                title="4. 结论",
+                notes=["轨迹是阿波罗尼斯型条件得到的圆族。", "特别地，λ=1 时为一条直线。"],
+                formulas=[
+                    r"\\lambda>0,\\ \\lambda\\ne1\\Rightarrow \\mathrm{{circle}}",
+                    r"\\lambda=1\\Rightarrow x=\\frac{{5}}{{4}}",
+                    r"x^2+y^2\\ge1",
+                ],
+                focus="final",
+            ),
+        ]
+        for section in sections:
+            self._play_apollonius_section(model, section)
+        self.wait(2.0)
+
+    def _play_apollonius_section(self, model, section):
+        left = 1.02
+        top = 1.58
+        title = cjk_text(section.get("title") or "", font_size=22, color=YELLOW)
+        title.move_to(LEFT * left + UP * top, aligned_edge=UL)
+        notes = VGroup(*[cjk_text(text, font_size=16, color=GREY_A) for text in section.get("notes") or []])
+        notes.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
+        notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.18)
+        formula_lines = self._formula_lines_group(section.get("formulas") or [])
+        formula_lines.next_to(notes, DOWN, aligned_edge=LEFT, buff=0.26)
+        derivation = VGroup(title, notes, formula_lines)
+        self.play(FadeIn(title, shift=LEFT * 0.10), run_time=0.40)
+        for note in notes:
+            self.play(FadeIn(note, shift=UP * 0.05), run_time=0.32)
+            self.wait(0.28)
+        self._play_apollonius_focus(model, section.get("focus") or "")
+        for formula_line in formula_lines:
+            self.play(FadeIn(formula_line, shift=UP * 0.05), run_time=0.38)
+            self.play(Indicate(formula_line, scale_factor=1.025, color=YELLOW), run_time=0.36)
+            self.wait(0.55)
+        self.wait(2.35)
+        if section.get("focus") != "final":
+            self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.48)
+
+    def _play_apollonius_focus(self, model, focus):
+        if focus == "tangent":
+            self.play(
+                Indicate(model["tangent"], color=TEAL, scale_factor=1.03),
+                Indicate(model["radius_line"], color=BLUE_B, scale_factor=1.03),
+                run_time=1.1,
+            )
+            self.play(model["theta"].animate.set_value(0.92), run_time=1.6, rate_func=smooth)
+        elif focus == "ratio":
+            self.play(
+                Indicate(model["tangent"], color=TEAL, scale_factor=1.03),
+                Indicate(model["mq_line"], color=ORANGE, scale_factor=1.03),
+                run_time=1.1,
+            )
+            self.play(model["theta"].animate.set_value(1.28), run_time=1.7, rate_func=smooth)
+        elif focus == "locus":
+            locus_less = model["locus_demo"].copy().set_opacity(0.85).set_color(YELLOW)
+            line_equal = DashedLine(model["axes"].c2p(1.25, -2.55), model["axes"].c2p(1.25, 2.55), color=TEAL, stroke_width=3)
+            line_label = MathTex(r"\\lambda=1:\\ x=\\frac{{5}}{{4}}", color=TEAL).scale(0.46).next_to(line_equal, UP, buff=0.08)
+            locus_more = self._apollonius_locus_curve(model["axes"], 1.35, ORANGE).set_opacity(0.65)
+            self.play(Create(locus_less), run_time=1.0)
+            self.play(Create(line_equal), FadeIn(line_label), run_time=0.9)
+            self.play(Create(locus_more), run_time=1.0)
+            model["classification_curves"] = VGroup(locus_less, line_equal, line_label, locus_more)
+        elif focus == "final":
+            if "classification_curves" in model:
+                self.play(Indicate(model["classification_curves"], color=YELLOW, scale_factor=1.01), run_time=1.1)
+            self.wait(0.4)
+
+    def _apollonius_locus_curve(self, axes, lambda_value, color):
+        center_x = -2 * lambda_value * lambda_value / (1 - lambda_value * lambda_value)
+        radius = np.sqrt(1 + 3 * lambda_value * lambda_value) / abs(1 - lambda_value * lambda_value)
+        return ParametricFunction(
+            lambda t: axes.c2p(center_x + radius * np.cos(t), radius * np.sin(t)),
+            t_range=[0, TAU],
+            color=color,
+            stroke_width=3,
+        )
 
     def _professional_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics").strip().lower()

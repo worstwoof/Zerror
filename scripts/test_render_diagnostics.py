@@ -322,6 +322,37 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertNotIn(r"f=m_2g", board_section)
         self.assertNotIn(r"\mu=0.2", board_section)
 
+    def test_math_apollonius_manim_uses_local_professional_template(self) -> None:
+        question = (
+            "例1(阿波罗尼斯圆) 已知直角坐标平面上点 Q(2,0) 和圆 C:x^2+y^2=1，"
+            "动点 M 到圆 C 的切线长与 |MQ| 的比等于常数 λ(λ>0)，"
+            "求动点 M 的轨迹方程，说明它表示什么曲线。"
+        )
+        script = build_manim_script(
+            {
+                "subject": "math",
+                "scene_type": "conic",
+                "fallback_text": question,
+                "parameters": {"question_excerpt": question},
+            }
+        )
+
+        self.assertIn("_draw_professional_math_scene", script)
+        self.assertIn("apollonius_tangent_circle", script)
+        self.assertIn("_build_apollonius_model", script)
+        self.assertIn("_play_apollonius_global_preview", script)
+        self.assertIn("_play_apollonius_derivation", script)
+        self.assertIn("ValueTracker", script)
+        self.assertIn("TracedPath", script)
+        self.assertIn(r"\frac{MT}{MQ}=\lambda", script)
+        self.assertIn(r"MT^2=OM^2-1=x^2+y^2-1", script)
+        self.assertIn(r"x^2+y^2-1=\lambda^2[(x-2)^2+y^2]", script)
+        self.assertIn(
+            r"\left(x+\frac{2\lambda^2}{1-\lambda^2}\right)^2+y^2=\frac{1+3\lambda^2}{(1-\lambda^2)^2}",
+            script,
+        )
+        self.assertIn(r"\lambda=1:\quad x=\frac{5}{4}", script)
+
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "geogebra_scene_preview_screen.dart").read_text(
             encoding="utf-8"
@@ -389,25 +420,37 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertFalse(completed["diagnostics"]["output_path_exists"])
         self.assertIn("Manim missing", completed["diagnostics"]["error_summary"])
 
-    def test_math_manim_requires_manimcat_without_local_fallback(self) -> None:
-        with patch.object(
+    def test_math_manim_uses_local_renderer_without_manimcat(self) -> None:
+        def fake_local_render(*, scene_spec, job_id, output_dir):
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{job_id}.mp4"
+            output_path.write_bytes(b"local math mp4")
+            return output_path
+
+        scene = {
+            "subject": "math",
+            "scene_type": "function_graph",
+            "parameters": {"question_excerpt": "y=x^2"},
+        }
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            render_jobs,
+            "MEDIA_ROOT",
+            Path(temp_dir),
+        ), patch.object(
             render_jobs,
             "render_math_video_with_manimcat",
             side_effect=render_jobs.ManimCatUnavailable("ManimCat missing"),
-        ) as manimcat_render, patch.object(render_jobs, "render_manim_video") as local_render:
-            job = render_jobs.create_manim_job(
-                {
-                    "subject": "math",
-                    "scene_type": "function_graph",
-                    "parameters": {"question_excerpt": "y=x^2"},
-                }
-            )
-            completed = self._wait_for_job(job["job_id"])
+        ) as manimcat_render, patch.object(
+            render_jobs,
+            "render_manim_video",
+            side_effect=fake_local_render,
+        ) as local_render:
+            expected_root = Path(temp_dir)
+            output_path = render_jobs._render_scene_video(scene_spec=scene, job_id="math-local")
 
-        self.assertEqual(completed["status"], "failed")
-        self.assertIn("ManimCat missing", completed["diagnostics"]["error_summary"])
-        self.assertGreaterEqual(manimcat_render.call_count, 1)
-        local_render.assert_not_called()
+        self.assertEqual(output_path.name, "math-local.mp4")
+        manimcat_render.assert_not_called()
+        local_render.assert_any_call(scene_spec=scene, job_id="math-local", output_dir=expected_root)
 
     def test_recovered_manimcat_job_downloads_completed_remote_video(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

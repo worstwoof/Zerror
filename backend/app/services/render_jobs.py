@@ -27,7 +27,7 @@ from backend.app.services.manimcat_client import (
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "math-manimcat-adapter-v3-blackboard"
+MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v4"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -82,17 +82,8 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
         },
     )
     try:
-        renderer_backend = "manimcat" if _is_math_scene(scene_spec) else "local_manim"
-        try:
-            output_path = _render_scene_video(scene_spec=scene_spec, job_id=job_id)
-        except ManimCatUnavailable:
-            if _is_math_scene(scene_spec):
-                raise
-            output_path = render_manim_video(
-                scene_spec=scene_spec,
-                job_id=job_id,
-                output_dir=MEDIA_ROOT,
-            )
+        renderer_backend = "local_manim"
+        output_path = _render_scene_video(scene_spec=scene_spec, job_id=job_id)
         video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
         elapsed = time.perf_counter() - started_at
         diagnostics = _video_diagnostics(video_url)
@@ -347,13 +338,6 @@ def _renderer_available() -> bool:
 
 
 def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
-    if _is_math_scene(scene_spec):
-        return render_math_video_with_manimcat(
-            scene_spec=scene_spec,
-            job_id=job_id,
-            output_dir=MEDIA_ROOT,
-            on_progress=lambda payload: _update_manimcat_progress(job_id, payload),
-        )
     return render_manim_video(
         scene_spec=scene_spec,
         job_id=job_id,
