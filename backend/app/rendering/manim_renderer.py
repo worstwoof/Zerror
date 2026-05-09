@@ -400,8 +400,8 @@ class LearningScene(Scene):
         return group
 
     def _build_board_question_block(self, board, compact=False):
-        title = cjk_text("板块模型", font_size=17 if not compact else 13, color=YELLOW)
-        summary = cjk_text("光滑水平面 · B 在 A 右端 · 相对滑动后共速", font_size=10 if not compact else 8, color=GREY_A)
+        title = cjk_text("板块模型", font_size=21 if not compact else 15, color=YELLOW)
+        summary = cjk_text("光滑水平面 · B 在 A 右端 · 相对滑动后共速", font_size=12 if not compact else 9, color=GREY_A)
         story_panel = VGroup(title, summary)
         story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.06)
         known_items = [
@@ -416,10 +416,10 @@ class LearningScene(Scene):
         for item in known_items:
             if "?" not in item:
                 try:
-                    value = MathTex(item, color=WHITE).scale(0.33 if not compact else 0.27)
+                    value = MathTex(item, color=WHITE).scale(0.39 if not compact else 0.30)
                     chip = RoundedRectangle(
-                        width=value.width + 0.30,
-                        height=0.34 if not compact else 0.28,
+                        width=value.width + 0.38,
+                        height=0.43 if not compact else 0.32,
                         corner_radius=0.04,
                         color=GREY_D,
                         stroke_width=1,
@@ -429,21 +429,21 @@ class LearningScene(Scene):
                     chip.move_to(value)
                     chips.add(VGroup(chip, value))
                 except Exception:
-                    value = cjk_text(item[:14], font_size=9 if not compact else 8, color=WHITE)
-                    chip = RoundedRectangle(width=value.width + 0.28, height=0.32, corner_radius=0.04, color=GREY_D, stroke_width=1)
+                    value = cjk_text(item[:14], font_size=10 if not compact else 8, color=WHITE)
+                    chip = RoundedRectangle(width=value.width + 0.34, height=0.38, corner_radius=0.04, color=GREY_D, stroke_width=1)
                     chip.move_to(value)
                     chips.add(VGroup(chip, value))
         chips.arrange(RIGHT, buff=0.12)
-        known_panel = VGroup(cjk_text("已知", font_size=10 if not compact else 8, color=BLUE_B), chips)
+        known_panel = VGroup(cjk_text("已知", font_size=12 if not compact else 9, color=BLUE_B), chips)
         known_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
         goal_panel = VGroup(
-            cjk_text("目标", font_size=10 if not compact else 8, color=BLUE_B),
-            cjk_text("受力与加速度 · 共速时刻 · 相对位移", font_size=9 if not compact else 7, color=GREY_A),
+            cjk_text("目标", font_size=12 if not compact else 9, color=BLUE_B),
+            cjk_text("受力与加速度 · 共速时刻 · 相对位移", font_size=11 if not compact else 8, color=GREY_A),
         )
         goal_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
         row = VGroup(story_panel, known_panel, goal_panel)
         row.arrange(RIGHT, aligned_edge=UP, buff=0.54 if not compact else 0.36)
-        backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.22, 0.74), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.10)
+        backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.30, 0.96), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.12)
         backdrop.move_to(row.get_center())
         divider = Line(LEFT * 6.34, RIGHT * 6.34, color=GREY_D, stroke_width=1)
         divider.next_to(backdrop, DOWN, buff=0.05)
@@ -503,60 +503,60 @@ class LearningScene(Scene):
 
     def _build_board_block_teaching_model(self, board_data=None):
         board_data = board_data or {{}}
-        ground = Line(LEFT * 6.05 + DOWN * 2.35, LEFT * 0.40 + DOWN * 2.35, color=GREY_A, stroke_width=3)
+        ground = Line(LEFT * 6.45 + DOWN * 1.42, LEFT * 0.05 + DOWN * 1.42, color=GREY_A, stroke_width=3)
         board = RoundedRectangle(
-            width=4.35,
-            height=0.38,
+            width=5.25,
+            height=0.48,
             corner_radius=0.04,
             color=WHITE,
-            stroke_width=3,
+            stroke_width=3.4,
             fill_color=GREY_E,
             fill_opacity=0.72,
         )
-        board.move_to(LEFT * 3.25 + DOWN * 2.06)
+        board.move_to(LEFT * 3.35 + DOWN * 1.08)
         block = RoundedRectangle(
-            width=0.78,
-            height=0.72,
+            width=0.96,
+            height=0.88,
             corner_radius=0.04,
             color=WHITE,
-            stroke_width=3,
+            stroke_width=3.4,
             fill_color=BLUE_E,
             fill_opacity=0.82,
         )
-        block.move_to(board.get_right() + LEFT * 0.55 + UP * 0.55)
-        board_label = self._label("A", board.get_center(), 24)
-        block_label = self._label("B", block.get_center(), 24)
-        v_arrow = Arrow(block.get_top() + UP * 0.30 + RIGHT * 0.18, block.get_top() + UP * 0.30 + LEFT * 1.05, buff=0, color=WHITE, stroke_width=3)
-        v_label = MathTex("v_0", color=WHITE).scale(0.55).next_to(v_arrow, UP, buff=0.03)
+        block.move_to(board.get_right() + LEFT * 0.68 + UP * 0.68)
+        board_label = self._label("A", board.get_center(), 30)
+        block_label = self._label("B", block.get_center(), 30)
+        v_arrow = Arrow(block.get_top() + UP * 0.36 + RIGHT * 0.20, block.get_top() + UP * 0.36 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
+        v_label = MathTex("v_0", color=WHITE).scale(0.62).next_to(v_arrow, UP, buff=0.04)
         f_formula = self._value_formula("F", board_data.get("F"), "N")
-        force_arrow = Arrow(block.get_right() + UP * 0.18, block.get_right() + RIGHT * 1.05 + UP * 0.18, buff=0, color=WHITE, stroke_width=3)
-        force_label = MathTex(f_formula, color=WHITE).scale(0.48).next_to(force_arrow, UP, buff=0.03)
-        board_motion = Arrow(board.get_center() + DOWN * 0.46, board.get_center() + LEFT * 0.95 + DOWN * 0.46, buff=0, color=GREY_A, stroke_width=2)
-        block_motion = Arrow(block.get_center() + UP * 0.64, block.get_center() + LEFT * 1.10 + UP * 0.64, buff=0, color=GREY_A, stroke_width=2)
+        force_arrow = Arrow(block.get_right() + UP * 0.20, block.get_right() + RIGHT * 1.30 + UP * 0.20, buff=0, color=WHITE, stroke_width=3.4)
+        force_label = MathTex(f_formula, color=WHITE).scale(0.55).next_to(force_arrow, UP, buff=0.04)
+        board_motion = Arrow(board.get_center() + DOWN * 0.60, board.get_center() + LEFT * 1.16 + DOWN * 0.60, buff=0, color=GREY_A, stroke_width=2.4)
+        block_motion = Arrow(block.get_center() + UP * 0.82, block.get_center() + LEFT * 1.32 + UP * 0.82, buff=0, color=GREY_A, stroke_width=2.4)
         motion_labels = VGroup(
-            cjk_text("A 的运动趋势", font_size=13, color=GREY_A).next_to(board_motion, DOWN, buff=0.04),
-            cjk_text("B 的相对滑动", font_size=13, color=GREY_A).next_to(block_motion, UP, buff=0.04),
+            cjk_text("A 的运动趋势", font_size=15, color=GREY_A).next_to(board_motion, DOWN, buff=0.06),
+            cjk_text("B 的相对滑动", font_size=15, color=GREY_A).next_to(block_motion, UP, buff=0.06),
         )
-        preview_board_shift = LEFT * 0.88
-        preview_block_shift = LEFT * 2.05
+        preview_board_shift = LEFT * 0.86
+        preview_block_shift = LEFT * 2.10
         board_final_center = board.get_center() + preview_board_shift
         block_final_center = block.get_center() + preview_block_shift
         b_fbd_dot = Dot(block_final_center, color=YELLOW, radius=0.045)
         a_fbd_dot = Dot(board_final_center, color=YELLOW, radius=0.045)
-        force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.18, buff=0, color=WHITE, stroke_width=3)
-        f_on_b = Arrow(block_final_center, block_final_center + RIGHT * 0.82, buff=0, color=YELLOW, stroke_width=3)
-        n_arrow = Arrow(block_final_center, block_final_center + UP * 1.05, buff=0, color=BLUE_B, stroke_width=3)
-        g_arrow = Arrow(block_final_center, block_final_center + DOWN * 1.05, buff=0, color=BLUE_B, stroke_width=3)
-        f_on_a = Arrow(board_final_center, board_final_center + LEFT * 0.95, buff=0, color=YELLOW, stroke_width=3)
+        force_arrow_centered = Arrow(block_final_center, block_final_center + RIGHT * 1.28, buff=0, color=WHITE, stroke_width=3.2)
+        f_on_b = Arrow(block_final_center, block_final_center + RIGHT * 0.90, buff=0, color=YELLOW, stroke_width=3.2)
+        n_arrow = Arrow(block_final_center, block_final_center + UP * 1.18, buff=0, color=BLUE_B, stroke_width=3.2)
+        g_arrow = Arrow(block_final_center, block_final_center + DOWN * 0.98, buff=0, color=BLUE_B, stroke_width=3.2)
+        f_on_a = Arrow(board_final_center, board_final_center + LEFT * 1.12, buff=0, color=YELLOW, stroke_width=3.2)
         force_labels = VGroup(
-            MathTex(f_formula, color=WHITE).scale(0.46).move_to(force_arrow_centered.get_end() + RIGHT * 0.20 + UP * 0.20),
-            MathTex("f_B", color=YELLOW).scale(0.48).move_to(f_on_b.get_end() + RIGHT * 0.14 + DOWN * 0.20),
-            MathTex("N", color=BLUE_B).scale(0.50).move_to(n_arrow.get_end() + UP * 0.18 + RIGHT * 0.14),
-            MathTex("m_B g", color=BLUE_B).scale(0.50).move_to(g_arrow.get_end() + DOWN * 0.18 + RIGHT * 0.22),
-            MathTex("f_A", color=YELLOW).scale(0.48).move_to(f_on_a.get_end() + LEFT * 0.18 + UP * 0.18),
+            MathTex(f_formula, color=WHITE).scale(0.50).move_to(force_arrow_centered.get_end() + RIGHT * 0.26 + UP * 0.24),
+            MathTex("f_B", color=YELLOW).scale(0.52).move_to(f_on_b.get_end() + RIGHT * 0.22 + DOWN * 0.28),
+            MathTex("N", color=BLUE_B).scale(0.54).move_to(n_arrow.get_end() + UP * 0.24 + RIGHT * 0.18),
+            MathTex("m_B g", color=BLUE_B).scale(0.54).move_to(g_arrow.get_end() + RIGHT * 0.50 + DOWN * 0.04),
+            MathTex("f_A", color=YELLOW).scale(0.52).move_to(f_on_a.get_end() + LEFT * 0.22 + UP * 0.24),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
-        relative_y = board.get_top()[1] + 0.58
+        relative_y = board.get_top()[1] + 0.72
         relative_right = block.get_left() + preview_block_shift
         relative_left = board.get_left() + preview_board_shift
         relative_right[1] = relative_y
@@ -817,8 +817,8 @@ class LearningScene(Scene):
             group.scale_to_fit_width(5.45)
         if group.height > 4.25:
             group.scale_to_fit_height(4.25)
-        derivation_left = 1.15
-        derivation_top = 2.58
+        derivation_left = 1.05
+        derivation_top = 2.34
         group.shift(RIGHT * (derivation_left - group.get_left()[0]))
         group.shift(UP * (derivation_top - group.get_top()[1]))
         return group
