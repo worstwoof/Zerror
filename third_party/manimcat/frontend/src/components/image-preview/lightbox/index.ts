@@ -1,1 +1,0 @@
-export { ImageLightbox } from './ImageLightbox'

@@ -15,7 +15,6 @@ if str(ROOT) not in sys.path:
 
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
 from backend.app.rendering.manim_renderer import ManimUnavailable, build_manim_script
-from backend.app.services import manimcat_client
 from backend.app.services import render_jobs
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 
@@ -27,6 +26,19 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self._jobs_temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self._jobs_temp_dir.cleanup)
         render_jobs.JOBS_ROOT = Path(self._jobs_temp_dir.name)
+        self._diagnostic_manim_job_patch = patch(
+            "ai_engine.llm_logic.diagnostic_chain.create_manim_job",
+            return_value={
+                "job_id": "job-render-diagnostics",
+                "status": "pending",
+                "progress": 0,
+                "message": "queued",
+                "error": "",
+                "diagnostics": {},
+            },
+        )
+        self._diagnostic_manim_job_patch.start()
+        self.addCleanup(self._diagnostic_manim_job_patch.stop)
 
     def test_geogebra_magnetic_particle_scene_has_commands_and_variants(self) -> None:
         scene = {
@@ -152,42 +164,32 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertIn("B = Intersect(C, l, 2)", commands)
         self.assertNotEqual(payload["metadata"]["object_count"], 1)
 
-    def test_math_apollonius_locus_creates_manim_job_over_text_fallback(self) -> None:
+    def test_math_apollonius_locus_keeps_analysis_lightweight(self) -> None:
         service = object.__new__(DiagnosticService)
-        with patch(
-            "ai_engine.llm_logic.diagnostic_chain.create_manim_job",
-            return_value={
-                "job_id": "job-apollonius",
-                "status": "pending",
-                "progress": 0,
-                "message": "queued",
-                "error": "",
-                "diagnostics": {},
+        artifacts = service._build_structured_render_artifacts(
+            subject="math",
+            cleaned_question=(
+                "已知直角坐标平面上点 Q(2,0) 和圆 C:x²+y²=1，"
+                "动点 M 到圆 C 的切线长与 |MQ| 的比为 λ，求 M 的轨迹方程。"
+            ),
+            scene_brief="",
+            knowledge_points=["阿波罗尼斯圆", "圆的切线长公式", "轨迹方程"],
+            solution_summary="利用圆的切线长公式和两点距离公式建立方程。",
+            solution_steps=[],
+            existing_artifacts=[],
+            model_scene_spec={
+                "subject": "math",
+                "scene_type": "generic",
+                "objects": [],
+                "relations": [],
+                "render_targets": [],
+                "fallback_text": "当前题目暂时不适合生成可靠图形。",
             },
-        ):
-            artifacts = service._build_structured_render_artifacts(
-                subject="math",
-                cleaned_question=(
-                    "已知直角坐标平面上点 Q(2,0) 和圆 C:x²+y²=1，"
-                    "动点 M 到圆 C 的切线长与 |MQ| 的比为 λ，求 M 的轨迹方程。"
-                ),
-                scene_brief="",
-                knowledge_points=["阿波罗尼斯圆", "圆的切线长公式", "轨迹方程"],
-                solution_summary="利用圆的切线长公式和两点距离公式建立方程。",
-                solution_steps=[],
-                existing_artifacts=[],
-                model_scene_spec={
-                    "subject": "math",
-                    "scene_type": "generic",
-                    "objects": [],
-                    "relations": [],
-                    "render_targets": [],
-                    "fallback_text": "This question is not structured enough for a reliable graph yet.",
-                },
-            )
+        )
 
         artifact_types = {artifact.artifact_type for artifact in artifacts}
-        self.assertIn("manim_job", artifact_types)
+        self.assertIn("geogebra_scene", artifact_types)
+        self.assertNotIn("manim_job", artifact_types)
         self.assertNotIn("text_explanation", artifact_types)
 
     def test_frontend_physics_card_uses_manim_artifacts(self) -> None:
@@ -462,7 +464,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
         self.assertFalse(completed["diagnostics"]["output_path_exists"])
         self.assertIn("Manim missing", completed["diagnostics"]["error_summary"])
 
-    def test_math_manim_uses_local_renderer_without_manimcat(self) -> None:
+    def test_math_manim_uses_local_renderer(self) -> None:
         def fake_local_render(*, scene_spec, job_id, output_dir):
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"{job_id}.mp4"
@@ -480,10 +482,6 @@ class RenderDiagnosticsTest(unittest.TestCase):
             Path(temp_dir),
         ), patch.object(
             render_jobs,
-            "render_math_video_with_manimcat",
-            side_effect=render_jobs.ManimCatUnavailable("ManimCat missing"),
-        ) as manimcat_render, patch.object(
-            render_jobs,
             "render_manim_video",
             side_effect=fake_local_render,
         ) as local_render:
@@ -491,105 +489,68 @@ class RenderDiagnosticsTest(unittest.TestCase):
             output_path = render_jobs._render_scene_video(scene_spec=scene, job_id="math-local")
 
         self.assertEqual(output_path.name, "math-local.mp4")
-        manimcat_render.assert_not_called()
         local_render.assert_any_call(scene_spec=scene, job_id="math-local", output_dir=expected_root)
 
-    def test_recovered_manimcat_job_downloads_completed_remote_video(self) -> None:
+    def test_discard_manim_artifacts_deletes_unretained_video_and_job(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             media_root = Path(temp_dir)
-            job_id = "abc123recovered"
-            persisted_job = {
-                "job_id": job_id,
-                "scene_hash": "abc123",
-                "status": "running",
-                "progress": 60,
-                "video_url": "",
-                "duration": None,
-                "thumbnail_url": None,
-                "message": "Rendering",
-                "error": "",
-                "scene_spec": {"subject": "math", "scene_type": "conic"},
-                "diagnostics": {
-                    "renderer_backend": "manimcat",
-                    "manimcat_remote_job_id": "remote-1",
-                },
-                "updated_at": time.time(),
-            }
-            render_jobs._job_path(job_id).write_text(
-                json.dumps(persisted_job, ensure_ascii=False),
-                encoding="utf-8",
-            )
 
-            def fake_download(video_url, output_path):
-                self.assertEqual(video_url, "/video/remote.mp4")
-                output_path.write_bytes(b"fake mp4")
+            def fake_render(*, scene_spec, job_id, output_dir):
+                output = output_dir / f"{job_id}.mp4"
+                output.write_bytes(b"temporary mp4")
+                return output
 
-            render_jobs._jobs.clear()
             with patch.object(render_jobs, "MEDIA_ROOT", media_root), patch.object(
                 render_jobs,
-                "get_manimcat_job",
-                return_value={"status": "completed", "video_url": "/video/remote.mp4"},
-            ), patch.object(render_jobs, "download_manimcat_video", side_effect=fake_download):
-                recovered = render_jobs.get_manim_job(job_id)
+                "render_manim_video",
+                side_effect=fake_render,
+            ):
+                job = render_jobs.create_manim_job({"scene_type": "generic"})
+                completed = self._wait_for_job(job["job_id"])
+                video_path = media_root / f"{completed['job_id']}.mp4"
+                self.assertTrue(video_path.exists())
+                self.assertTrue(render_jobs._job_path(completed["job_id"]).exists())
 
-            self.assertIsNotNone(recovered)
-            self.assertEqual(recovered["status"], "succeeded")
-            self.assertEqual(recovered["video_url"], f"/static/media/manim/{job_id}.mp4")
-            self.assertTrue((media_root / f"{job_id}.mp4").exists())
-            self.assertTrue(recovered["diagnostics"]["manimcat_recovered"])
-            self.assertNotIn("scene_spec", recovered)
+                result = render_jobs.discard_manim_artifacts(
+                    job_ids=[completed["job_id"]],
+                    video_urls=[completed["video_url"]],
+                )
 
-    def test_manimcat_cache_key_includes_math_problem_identity(self) -> None:
-        base_scene = {
-            "subject": "math",
-            "scene_type": "function_graph",
-            "title": "Function graph",
-            "fallback_text": "Use Manim to explain the graph.",
-        }
-        first = {
-            **base_scene,
-            "parameters": {"question_excerpt": "Find the vertex of y=x^2-2x+1."},
-            "steps": ["Complete the square."],
-        }
-        second = {
-            **base_scene,
-            "parameters": {"question_excerpt": "Find the zeros of y=x^2-4."},
-            "steps": ["Factor the polynomial."],
-        }
+                self.assertGreaterEqual(result["deleted"], 1)
+                self.assertFalse(video_path.exists())
+                self.assertFalse(render_jobs._job_path(completed["job_id"]).exists())
+                self.assertIsNone(render_jobs.get_manim_job(completed["job_id"]))
 
-        self.assertNotEqual(
-            manimcat_client._render_cache_key(first),
-            manimcat_client._render_cache_key(second),
-        )
+    def test_retained_manim_artifacts_survive_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = Path(temp_dir)
 
-    def test_manimcat_cache_key_is_stable_for_same_math_problem(self) -> None:
-        scene = {
-            "subject": "math",
-            "scene_type": "function_graph",
-            "parameters": {"question_excerpt": "Draw y=x^2."},
-        }
+            def fake_render(*, scene_spec, job_id, output_dir):
+                output = output_dir / f"{job_id}.mp4"
+                output.write_bytes(b"retained mp4")
+                return output
 
-        self.assertEqual(
-            manimcat_client._render_cache_key(scene),
-            manimcat_client._render_cache_key(dict(scene)),
-        )
+            with patch.object(render_jobs, "MEDIA_ROOT", media_root), patch.object(
+                render_jobs,
+                "render_manim_video",
+                side_effect=fake_render,
+            ):
+                job = render_jobs.create_manim_job({"scene_type": "generic"})
+                completed = self._wait_for_job(job["job_id"])
+                video_path = media_root / f"{completed['job_id']}.mp4"
 
-    def test_manimcat_concept_strips_inline_math_delimiters_from_question(self) -> None:
-        concept = manimcat_client._build_math_concept(
-            {
-                "subject": "math",
-                "scene_type": "conic",
-                "title": "阿波罗尼斯圆",
-                "parameters": {
-                    "question_excerpt": "圆C:$x^2+y^2=1$，动点M满足$|MQ|$与$\\lambda>0$。",
-                },
-            }
-        )
+                render_jobs.retain_manim_artifacts(
+                    job_ids=[completed["job_id"]],
+                    video_urls=[completed["video_url"]],
+                )
+                result = render_jobs.discard_manim_artifacts(
+                    job_ids=[completed["job_id"]],
+                    video_urls=[completed["video_url"]],
+                )
 
-        self.assertNotIn("$x^2+y^2=1$", concept)
-        self.assertNotIn("$|MQ|$", concept)
-        self.assertIn("x^2+y^2=1", concept)
-        self.assertIn("Never put dollar-delimited math", concept)
+                self.assertEqual(result["deleted"], 0)
+                self.assertTrue(video_path.exists())
+                self.assertIsNotNone(render_jobs.get_manim_job(completed["job_id"]))
 
     def test_mp4_mime_type_is_registered(self) -> None:
         main_source = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
+from urllib.parse import unquote, urlparse
 
 from backend.app.core.config import PROJECT_ROOT
 from backend.app.rendering.manim_renderer import (
@@ -15,14 +17,6 @@ from backend.app.rendering.manim_renderer import (
     is_manim_available,
     render_manim_video,
 )
-from backend.app.services.manimcat_client import (
-    ManimCatUnavailable,
-    download_manimcat_video,
-    get_manimcat_job,
-    is_manimcat_configured,
-    render_math_video_with_manimcat,
-)
-
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
@@ -33,6 +27,17 @@ _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
 _renderer_available_cache: bool | None = None
+_INTERRUPTED_JOB_STATUSES = {"pending", "running"}
+_LOCAL_MANIM_PROGRESS_CHECKPOINTS = (
+    (0.0, 15),
+    (4.0, 22),
+    (10.0, 31),
+    (18.0, 43),
+    (30.0, 58),
+    (48.0, 72),
+    (75.0, 84),
+    (110.0, 91),
+)
 
 
 def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
@@ -54,19 +59,94 @@ def create_manim_job(scene_spec: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_manim_job(job_id: str) -> Dict[str, Any] | None:
-    loaded_from_disk = False
     with _lock:
         job = _jobs.get(job_id)
         if job is None:
             job = _load_job(job_id)
             if job is not None:
+                job = _mark_interrupted_job_after_restart(job)
                 _jobs[job_id] = job
-                loaded_from_disk = True
+                _save_job(job)
     if job is None:
         return None
-    if loaded_from_disk:
-        job = _refresh_recovered_manimcat_job(job)
     return _public_job(job)
+
+
+def mark_interrupted_manim_jobs_after_restart() -> int:
+    marked_count = 0
+    with _lock:
+        if not JOBS_ROOT.exists():
+            return 0
+        for path in JOBS_ROOT.glob("*.json"):
+            job = _load_job(path.stem)
+            if job is None:
+                continue
+            updated_job = _mark_interrupted_job_after_restart(job)
+            if updated_job is job:
+                continue
+            _jobs[str(updated_job.get("job_id") or path.stem)] = updated_job
+            _save_job(updated_job)
+            marked_count += 1
+    return marked_count
+
+
+def retain_manim_artifacts(
+    *,
+    job_ids: Iterable[str] = (),
+    video_urls: Iterable[str] = (),
+) -> Dict[str, Any]:
+    retained_ids = _collect_job_ids(job_ids=job_ids, video_urls=video_urls)
+    retained_count = 0
+    with _lock:
+        for job_id in retained_ids:
+            job = _jobs.get(job_id) or _load_job(job_id)
+            if job is None:
+                continue
+            job["retained"] = True
+            job["discarded"] = False
+            job["updated_at"] = time.time()
+            _jobs[job_id] = job
+            _save_job(job)
+            retained_count += 1
+    return {
+        "retained": retained_count,
+        "job_ids": sorted(retained_ids),
+    }
+
+
+def discard_manim_artifacts(
+    *,
+    job_ids: Iterable[str] = (),
+    video_urls: Iterable[str] = (),
+) -> Dict[str, Any]:
+    target_ids = _collect_job_ids(job_ids=job_ids, video_urls=video_urls)
+    deleted_count = 0
+    deferred_count = 0
+    with _lock:
+        for job_id in target_ids:
+            job = _jobs.get(job_id) or _load_job(job_id)
+            if job is not None and job.get("retained"):
+                continue
+            status = str(job.get("status") or "") if isinstance(job, dict) else ""
+            if status in {"pending", "running"}:
+                # Old clients may call cleanup when a preview screen is closed
+                # while the renderer is still working. Do not mark active jobs
+                # for deletion, or a successful video can disappear immediately
+                # after rendering completes.
+                deferred_count += 1
+                continue
+            if _delete_job_artifacts_locked(job_id, job=job):
+                deleted_count += 1
+
+        for video_url in video_urls:
+            if _delete_orphan_video_url_locked(str(video_url)):
+                deleted_count += 1
+
+    return {
+        "deleted": deleted_count,
+        "deferred": deferred_count,
+        "job_ids": sorted(target_ids),
+    }
 
 
 def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> None:
@@ -80,6 +160,10 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
             "renderer_available": _renderer_available(),
             "render_started_at": time.time(),
         },
+    )
+    progress_stop, progress_thread = _start_local_manim_progress_heartbeat(
+        job_id,
+        started_at,
     )
     try:
         renderer_backend = "local_manim"
@@ -140,6 +224,10 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
                 "error_summary": _error_summary(exc),
             },
         )
+    finally:
+        progress_stop.set()
+        progress_thread.join(timeout=0.2)
+        _cleanup_discarded_job(job_id)
 
 
 def _build_job(
@@ -164,11 +252,12 @@ def _build_job(
         "thumbnail_url": None,
         "message": message,
         "error": error,
+        "retained": False,
+        "discarded": False,
         "diagnostics": diagnostics
         if diagnostics is not None
         else {
             "renderer_available": _renderer_available(),
-            "manimcat_configured": is_manimcat_configured(),
             "output_path_exists": False,
             "file_size_bytes": 0,
             "error_summary": "",
@@ -186,6 +275,90 @@ def _update_job(job_id: str, **updates: Any) -> None:
         job.update(updates)
         job["updated_at"] = time.time()
         _save_job(job)
+
+
+def _start_local_manim_progress_heartbeat(
+    job_id: str,
+    started_at: float,
+) -> tuple[threading.Event, threading.Thread]:
+    stop_event = threading.Event()
+    thread = threading.Thread(
+        target=_run_local_manim_progress_heartbeat,
+        args=(job_id, started_at, stop_event),
+        daemon=True,
+    )
+    thread.start()
+    return stop_event, thread
+
+
+def _run_local_manim_progress_heartbeat(
+    job_id: str,
+    started_at: float,
+    stop_event: threading.Event,
+) -> None:
+    while not stop_event.wait(2.0):
+        elapsed = time.perf_counter() - started_at
+        progress = _estimated_local_manim_progress(elapsed)
+        if not _update_local_manim_progress(job_id, progress, elapsed):
+            return
+
+
+def _estimated_local_manim_progress(elapsed_seconds: float) -> int:
+    previous_elapsed, previous_progress = _LOCAL_MANIM_PROGRESS_CHECKPOINTS[0]
+    for next_elapsed, next_progress in _LOCAL_MANIM_PROGRESS_CHECKPOINTS[1:]:
+        if elapsed_seconds <= next_elapsed:
+            span = max(next_elapsed - previous_elapsed, 0.001)
+            ratio = max(
+                0.0,
+                min(1.0, (elapsed_seconds - previous_elapsed) / span),
+            )
+            return int(previous_progress + (next_progress - previous_progress) * ratio)
+        previous_elapsed, previous_progress = next_elapsed, next_progress
+    return _LOCAL_MANIM_PROGRESS_CHECKPOINTS[-1][1]
+
+
+def _local_manim_progress_message(progress: int) -> str:
+    if progress < 25:
+        return "正在准备 Manim 场景脚本。"
+    if progress < 45:
+        return "正在绘制题干、高亮和基础图形。"
+    if progress < 65:
+        return "正在生成推导动画和过渡分镜。"
+    if progress < 85:
+        return "正在渲染视频帧，请稍等。"
+    return "正在封装 MP4 视频。"
+
+
+def _update_local_manim_progress(
+    job_id: str,
+    progress: int,
+    elapsed_seconds: float,
+) -> bool:
+    with _lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("status") != "running":
+            return False
+        current_progress = int(job.get("progress") or 0)
+        if progress <= current_progress:
+            return True
+        diagnostics = (
+            job.get("diagnostics")
+            if isinstance(job.get("diagnostics"), dict)
+            else {}
+        )
+        job.update(
+            progress=progress,
+            message=_local_manim_progress_message(progress),
+            diagnostics={
+                **diagnostics,
+                "renderer_backend": "local_manim",
+                "estimated_progress": True,
+                "render_elapsed_seconds": round(elapsed_seconds, 3),
+            },
+            updated_at=time.time(),
+        )
+        _save_job(job)
+    return True
 
 
 def _public_job(job: Dict[str, Any]) -> Dict[str, Any]:
@@ -225,92 +398,158 @@ def _load_job(job_id: str) -> Dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _refresh_recovered_manimcat_job(job: Dict[str, Any]) -> Dict[str, Any]:
-    if job.get("status") not in {"pending", "running"}:
+def _mark_interrupted_job_after_restart(job: Dict[str, Any]) -> Dict[str, Any]:
+    status = str(job.get("status") or "")
+    if status not in _INTERRUPTED_JOB_STATUSES:
         return job
-    scene_spec = job.get("scene_spec") if isinstance(job.get("scene_spec"), dict) else {}
-    if not _is_math_scene(scene_spec):
-        return job
-    diagnostics = job.get("diagnostics") if isinstance(job.get("diagnostics"), dict) else {}
-    remote_job_id = str(diagnostics.get("manimcat_remote_job_id") or "").strip()
-    if not remote_job_id:
-        return job
-    try:
-        payload = get_manimcat_job(remote_job_id)
-    except ManimCatUnavailable as exc:
-        recovered = dict(job)
-        recovered["diagnostics"] = {
+
+    diagnostics = (
+        job.get("diagnostics")
+        if isinstance(job.get("diagnostics"), dict)
+        else {}
+    )
+    return {
+        **job,
+        "status": "failed",
+        "progress": 100,
+        "message": "动画生成进程已中断，可重新生成视频。",
+        "error": "动画生成进程已中断，请重新生成。",
+        "diagnostics": {
             **diagnostics,
-            "error_summary": _error_summary(exc),
-            "recovery_failed_at": time.time(),
-        }
-        return recovered
+            "interrupted_after_restart": True,
+            "error_summary": "Manim job was pending or running when the backend process restarted.",
+        },
+        "updated_at": time.time(),
+    }
 
-    status = str(payload.get("status") or "").lower()
-    if status == "completed":
-        video_url = str(payload.get("video_url") or payload.get("videoUrl") or "").strip()
-        if not video_url:
-            _update_job(
-                str(job.get("job_id") or ""),
-                status="failed",
-                progress=100,
-                error="数学讲解视频生成失败，可稍后重试。",
-                message="数学讲解视频生成失败。",
-                diagnostics={
-                    **diagnostics,
-                    "manimcat_status": status,
-                    "error_summary": "ManimCat completed without a video URL.",
-                },
-            )
-            return _jobs.get(str(job.get("job_id") or ""), job)
-        output_path = MEDIA_ROOT / f"{job.get('job_id')}.mp4"
-        try:
-            download_manimcat_video(video_url, output_path)
-        except ManimCatUnavailable as exc:
-            _update_job(
-                str(job.get("job_id") or ""),
-                status="failed",
-                progress=100,
-                error="数学讲解视频下载失败，可稍后重试。",
-                message="数学讲解视频下载失败。",
-                diagnostics={**diagnostics, "manimcat_status": status, "error_summary": _error_summary(exc)},
-            )
-            return _jobs.get(str(job.get("job_id") or ""), job)
-        local_video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
-        recovered_diagnostics = _video_diagnostics(local_video_url)
-        recovered_diagnostics.update(
-            {
-                **diagnostics,
-                "renderer_available": True,
-                "renderer_backend": "manimcat",
-                "manimcat_status": status,
-                "manimcat_recovered": True,
-                "error_summary": "",
-            }
-        )
-        _update_job(
-            str(job.get("job_id") or ""),
-            status="succeeded",
-            progress=100,
-            video_url=local_video_url,
-            message="Manim video is ready.",
-            diagnostics=recovered_diagnostics,
-        )
-        return _jobs.get(str(job.get("job_id") or ""), job)
 
-    if status in {"failed", "cancelled", "canceled"}:
-        _update_job(
-            str(job.get("job_id") or ""),
-            status="failed",
-            progress=100,
-            error="数学讲解视频生成失败，可稍后重试。",
-            message="数学讲解视频生成失败。",
-            diagnostics={**diagnostics, "manimcat_status": status, "error_summary": _error_summary_text(payload)},
-        )
-        return _jobs.get(str(job.get("job_id") or ""), job)
+def _safe_job_id(value: str) -> str:
+    return "".join(
+        character
+        for character in str(value)
+        if character.isalnum() or character in {"-", "_"}
+    )
 
-    _update_manimcat_progress(str(job.get("job_id") or ""), payload)
-    return _jobs.get(str(job.get("job_id") or ""), job)
+
+def _collect_job_ids(
+    *,
+    job_ids: Iterable[str],
+    video_urls: Iterable[str],
+) -> set[str]:
+    collected: set[str] = set()
+    for job_id in job_ids:
+        safe_id = _safe_job_id(str(job_id))
+        if safe_id:
+            collected.add(safe_id)
+    for video_url in video_urls:
+        job_id = _job_id_from_video_url(str(video_url))
+        if job_id:
+            collected.add(job_id)
+    return collected
+
+
+def _job_id_from_video_url(video_url: str) -> str:
+    path = _path_for_video_url(video_url)
+    if path is None:
+        parsed = urlparse(video_url)
+        candidate_path = unquote(parsed.path if parsed.scheme else video_url)
+        prefix = f"{MEDIA_URL_PREFIX}/"
+        if prefix not in candidate_path:
+            return ""
+        path = MEDIA_ROOT / Path(candidate_path.split(prefix, 1)[1]).name
+    if path.suffix.lower() != ".mp4":
+        return ""
+    return _safe_job_id(path.stem)
+
+
+def _cleanup_discarded_job(job_id: str) -> None:
+    with _lock:
+        job = _jobs.get(job_id) or _load_job(job_id)
+        if not isinstance(job, dict):
+            return
+        if job.get("discarded") and not job.get("retained"):
+            _delete_job_artifacts_locked(job_id, job=job)
+
+
+def _delete_job_artifacts_locked(
+    job_id: str,
+    *,
+    job: Dict[str, Any] | None,
+) -> bool:
+    safe_id = _safe_job_id(job_id)
+    if not safe_id:
+        return False
+
+    deleted = False
+    deleted = _unlink_safe(_job_path(safe_id), roots=(JOBS_ROOT,)) or deleted
+    for path in (
+        MEDIA_ROOT / f"{safe_id}.py",
+        MEDIA_ROOT / f"{safe_id}.mp4",
+        MEDIA_ROOT / f"{safe_id}.faststart.mp4",
+    ):
+        deleted = _unlink_safe(path) or deleted
+
+    diagnostics = job.get("diagnostics") if isinstance(job, dict) else {}
+    output_path = diagnostics.get("output_path") if isinstance(diagnostics, dict) else ""
+    if output_path:
+        deleted = _unlink_safe(Path(str(output_path))) or deleted
+
+    for directory_name in ("videos", "images", "texts", "__pycache__"):
+        deleted = _remove_tree_safe(MEDIA_ROOT / directory_name / safe_id) or deleted
+
+    _jobs.pop(safe_id, None)
+    return deleted
+
+
+def _delete_orphan_video_url_locked(video_url: str) -> bool:
+    path = _path_for_video_url(video_url)
+    if path is None:
+        parsed = urlparse(video_url)
+        candidate_path = unquote(parsed.path if parsed.scheme else video_url)
+        prefix = f"{MEDIA_URL_PREFIX}/"
+        if prefix not in candidate_path:
+            return False
+        path = MEDIA_ROOT / Path(candidate_path.split(prefix, 1)[1]).name
+    job_id = _safe_job_id(path.stem)
+    job = _jobs.get(job_id) or _load_job(job_id)
+    if isinstance(job, dict) and job.get("retained"):
+        return False
+    return _unlink_safe(path)
+
+
+def _unlink_safe(path: Path, *, roots: tuple[Path, ...] | None = None) -> bool:
+    try:
+        resolved = path.resolve()
+        resolved_roots = [root.resolve() for root in (roots or (MEDIA_ROOT,))]
+    except OSError:
+        return False
+    if not any(resolved != root and root in resolved.parents for root in resolved_roots):
+        return False
+    try:
+        if resolved.is_file() or resolved.is_symlink():
+            resolved.unlink()
+            return True
+    except OSError:
+        return False
+    return False
+
+
+def _remove_tree_safe(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+        media_root = MEDIA_ROOT.resolve()
+    except OSError:
+        return False
+    if resolved == media_root or media_root not in resolved.parents:
+        return False
+    try:
+        if resolved.is_dir():
+            shutil.rmtree(resolved)
+            return True
+    except OSError:
+        return False
+    return False
+
 
 
 def _scene_hash(scene_spec: Dict[str, Any]) -> str:
@@ -345,76 +584,16 @@ def _render_scene_video(*, scene_spec: Dict[str, Any], job_id: str) -> Path:
     )
 
 
-def _is_math_scene(scene_spec: Dict[str, Any]) -> bool:
-    subject = str(scene_spec.get("subject") or "").lower()
-    scene_type = str(scene_spec.get("scene_type") or "").lower()
-    if subject:
-        return subject == "math"
-    return scene_type in {"conic", "function_graph", "geometry"}
-
-
-def _update_manimcat_progress(job_id: str, payload: Dict[str, Any]) -> None:
-    status = str(payload.get("status") or "").lower()
-    stage = str(payload.get("stage") or "").lower()
-    revision = payload.get("revision")
-    attempt = payload.get("attempt")
-    progress = 25
-    if status in {"queued", "waiting", "delayed"}:
-        progress = 10
-    elif stage == "analyzing":
-        progress = 30
-    elif stage in {"generating", "rendering"}:
-        progress = 60
-    elif status == "processing":
-        progress = 45
-    elif status == "completed":
-        progress = 95
-    elif status in {"failed", "cancelled", "canceled"}:
-        progress = 100
-
-    message = "正在生成黑板风格数学讲解视频。"
-    if stage == "analyzing":
-        message = "正在拆解题干条件，规划片头、题干高亮和推导分镜。"
-    elif stage == "generating":
-        message = "正在编写 Manim 黑板动画脚本。"
-    elif stage == "rendering":
-        message = "正在渲染公式、图形和逐步推导动画。"
-    elif status in {"queued", "waiting", "delayed"}:
-        message = "数学讲解视频已进入后台队列。"
-    elif status == "completed":
-        message = "数学讲解视频已生成。"
-    elif status in {"failed", "cancelled", "canceled"}:
-        message = "数学讲解视频生成失败。"
-
-    diagnostics = {
-        "renderer_available": True,
-        "renderer_backend": "manimcat",
-        "manimcat_remote_job_id": payload.get("jobId") or payload.get("job_id"),
-        "manimcat_status": status,
-        "manimcat_stage": stage,
-        "manimcat_revision": revision,
-        "manimcat_attempt": attempt,
-        "manimcat_updated_at": payload.get("updated_at"),
-    }
-    _update_job(
-        job_id,
-        status="running",
-        progress=progress,
-        message=message,
-        diagnostics={key: value for key, value in diagnostics.items() if value not in (None, "")},
-    )
-
-
 def _video_diagnostics(video_url: str) -> Dict[str, Any]:
     path = _path_for_video_url(video_url)
     exists = path.exists() if path else False
     size = path.stat().st_size if path and exists else 0
     return {
         "renderer_available": _renderer_available(),
-        "manimcat_configured": is_manimcat_configured(),
         "output_path_exists": exists,
         "output_path": str(path) if path else "",
         "file_size_bytes": size,
+        "mp4_faststart": _mp4_faststart_ready(path) if path and exists else False,
         "error_summary": "",
     }
 
@@ -428,16 +607,19 @@ def _path_for_video_url(video_url: str) -> Path | None:
     return MEDIA_ROOT / name
 
 
+def _mp4_faststart_ready(path: Path) -> bool:
+    try:
+        with path.open("rb") as file:
+            header = file.read(4096)
+    except OSError:
+        return False
+    moov_offset = header.find(b"moov")
+    mdat_offset = header.find(b"mdat")
+    return moov_offset != -1 and (mdat_offset == -1 or moov_offset < mdat_offset)
+
+
 def _error_summary(exc: Exception) -> str:
     message = str(exc).strip()
     if len(message) > 300:
         return f"{message[:297]}..."
     return message
-
-
-def _error_summary_text(payload: Dict[str, Any]) -> str:
-    for key in ("error", "message", "details"):
-        value = str(payload.get(key) or "").strip()
-        if value:
-            return value[:300]
-    return "ManimCat render failed."
