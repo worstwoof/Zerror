@@ -368,7 +368,7 @@ class LearningScene(Scene):
             t_range=[0, TAU],
             color=YELLOW,
             stroke_width=3,
-        ).set_opacity(0.32)
+        ).set_stroke(opacity=0.32).set_fill(opacity=0)
         m_dot = always_redraw(lambda: Dot(axes.c2p(*m_xy()), color=YELLOW, radius=0.07))
         m_label = always_redraw(lambda: MathTex("M(x,y)", color=YELLOW).scale(0.46).next_to(m_dot, UP + RIGHT, buff=0.06))
         t_dot = always_redraw(lambda: Dot(axes.c2p(*tangent_xy()), color=TEAL, radius=0.045))
@@ -511,18 +511,16 @@ class LearningScene(Scene):
             )
             self.play(model["theta"].animate.set_value(1.28), run_time=1.7, rate_func=smooth)
         elif focus == "locus":
-            locus_less = model["locus_demo"].copy().set_opacity(0.85).set_color(YELLOW)
+            locus_less = model["locus_demo"].copy().set_stroke(color=YELLOW, opacity=0.85).set_fill(opacity=0)
             line_equal = DashedLine(model["axes"].c2p(1.25, -2.55), model["axes"].c2p(1.25, 2.55), color=TEAL, stroke_width=3)
             line_label = MathTex(r"\\lambda=1:\\ x=\\frac{{5}}{{4}}", color=TEAL).scale(0.46).next_to(line_equal, UP, buff=0.08)
-            locus_more = self._apollonius_locus_curve(model["axes"], 1.35, ORANGE).set_opacity(0.65)
+            locus_more = self._apollonius_locus_curve(model["axes"], 1.35, ORANGE).set_stroke(opacity=0.65).set_fill(opacity=0)
             self.play(Create(locus_less), run_time=1.0)
             self.play(Create(line_equal), FadeIn(line_label), run_time=0.9)
             self.play(Create(locus_more), run_time=1.0)
             model["classification_curves"] = VGroup(locus_less, line_equal, line_label, locus_more)
         elif focus == "final":
-            if "classification_curves" in model:
-                self.play(Indicate(model["classification_curves"], color=YELLOW, scale_factor=1.01), run_time=1.1)
-            self.wait(0.4)
+            self.wait(1.2)
 
     def _apollonius_locus_curve(self, axes, lambda_value, color):
         center_x = -2 * lambda_value * lambda_value / (1 - lambda_value * lambda_value)
@@ -532,7 +530,7 @@ class LearningScene(Scene):
             t_range=[0, TAU],
             color=color,
             stroke_width=3,
-        )
+        ).set_fill(opacity=0)
 
     def _professional_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics").strip().lower()
