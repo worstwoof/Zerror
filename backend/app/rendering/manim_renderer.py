@@ -226,7 +226,7 @@ class LearningScene(Scene):
 
     def _draw_professional_math_scene(self, spec):
         math_type = self._professional_math_scene_type(spec)
-        math_data = self._math_problem_data(spec)
+        math_data = self._math_problem_data(spec, math_type)
         question_block = self._build_math_question_block(math_data)
         self.play(FadeIn(question_block, shift=DOWN * 0.12), run_time=0.65)
         if math_type == "apollonius_tangent_circle":
@@ -235,6 +235,13 @@ class LearningScene(Scene):
             self.wait(0.8)
             self.play(question_block.animate.scale(0.92).to_edge(UP, buff=0.08), run_time=0.55)
             self._play_apollonius_derivation(model)
+            return
+        if math_type == "ellipse_focus_chord":
+            model = self._build_ellipse_focus_chord_model()
+            self._play_ellipse_focus_chord_global_preview(model)
+            self.wait(0.8)
+            self.play(question_block.animate.scale(0.92).to_edge(UP, buff=0.08), run_time=0.55)
+            self._play_ellipse_focus_chord_derivation(model)
             return
         self.play(question_block.animate.scale(0.90).to_edge(UP, buff=0.10), run_time=0.55)
         self._draw_math_story_scene(spec)
@@ -249,6 +256,9 @@ class LearningScene(Scene):
             str(spec.get("fallback_text") or ""),
             question,
         ])
+        ellipse_hits = ["椭圆", "焦点", "F(1,0)", "F（1，0）", "|OA|", "|OB|", "|AB|", "a>b", "a＞b"]
+        if any(token in source for token in ellipse_hits) and all(token in source for token in ["|OA|", "|OB|", "|AB|"]):
+            return "ellipse_focus_chord"
         apollonius_hits = ["阿波罗尼斯", "切线长", "|MQ|", "MQ", "x^2+y^2=1", "x²+y²=1", "Q(2,0)", "Q（2，0）"]
         if any(token in source for token in apollonius_hits) and scene_type in {{"", "conic", "geometry", "generic"}}:
             return "apollonius_tangent_circle"
@@ -256,8 +266,21 @@ class LearningScene(Scene):
             return scene_type
         return "generic_math"
 
-    def _math_problem_data(self, spec):
+    def _math_problem_data(self, spec, math_type="generic_math"):
         question = self._question_text(spec)
+        if math_type == "ellipse_focus_chord":
+            if not question:
+                question = "椭圆 x^2/a^2+y^2/b^2=1(a>b>0) 的一个焦点为 F(1,0)，过 F 的直线交椭圆于 A、B。若恒有 |OA|^2+|OB|^2<|AB|^2，求 a 的范围。"
+            return dict(
+                question=question,
+                chips=[
+                    r"\\frac{{x^2}}{{a^2}}+\\frac{{y^2}}{{b^2}}=1",
+                    r"F(1,0)",
+                    r"c^2=a^2-b^2=1",
+                    r"|OA|^2+|OB|^2<|AB|^2",
+                ],
+                goal="求 a 的取值范围",
+            )
         if not question:
             question = "已知点 Q(2,0) 和圆 C:x^2+y^2=1，动点 M 到圆 C 的切线长与 |MQ| 的比等于常数 λ(λ>0)，求 M 的轨迹方程并说明曲线类型。"
         return dict(
@@ -531,6 +554,194 @@ class LearningScene(Scene):
             color=color,
             stroke_width=3,
         ).set_fill(opacity=0)
+
+    def _build_ellipse_focus_chord_model(self):
+        axes = Axes(
+            x_range=[-3.4, 3.4, 1],
+            y_range=[-2.4, 2.4, 1],
+            x_length=6.15,
+            y_length=4.25,
+            tips=True,
+            axis_config=dict(color=GREY_B, stroke_width=2),
+        ).move_to(LEFT * 3.35 + DOWN * 0.82)
+        a_demo = 1.82
+        b_demo = np.sqrt(a_demo * a_demo - 1)
+        slope = ValueTracker(-0.85)
+
+        def ellipse_point(t):
+            return axes.c2p(a_demo * np.cos(t), b_demo * np.sin(t))
+
+        def chord_points():
+            k = slope.get_value()
+            a2 = a_demo * a_demo
+            b2 = b_demo * b_demo
+            denominator = b2 + a2 * k * k
+            x_sum = 2 * a2 * k * k / denominator
+            x_product = a2 * (k * k - b2) / denominator
+            discriminant = max(x_sum * x_sum - 4 * x_product, 0)
+            x1 = (x_sum - np.sqrt(discriminant)) / 2
+            x2 = (x_sum + np.sqrt(discriminant)) / 2
+            y1 = k * (x1 - 1)
+            y2 = k * (x2 - 1)
+            return (x1, y1), (x2, y2)
+
+        ellipse = ParametricFunction(lambda t: ellipse_point(t), t_range=[0, TAU], color=YELLOW, stroke_width=4).set_fill(opacity=0)
+        focus = Dot(axes.c2p(1, 0), color=ORANGE, radius=0.065)
+        focus_label = MathTex("F(1,0)", color=ORANGE).scale(0.48).next_to(focus, DOWN + RIGHT, buff=0.06)
+        origin = Dot(axes.c2p(0, 0), color=WHITE, radius=0.045)
+        origin_label = MathTex("O", color=WHITE).scale(0.46).next_to(origin, DOWN + LEFT, buff=0.05)
+        ellipse_label = MathTex(r"\\frac{{x^2}}{{a^2}}+\\frac{{y^2}}{{b^2}}=1", color=YELLOW).scale(0.48).next_to(ellipse, UP, buff=0.10)
+        chord = always_redraw(lambda: Line(axes.c2p(*chord_points()[0]), axes.c2p(*chord_points()[1]), color=BLUE_B, stroke_width=4))
+        point_a = always_redraw(lambda: Dot(axes.c2p(*chord_points()[0]), color=TEAL, radius=0.060))
+        point_b = always_redraw(lambda: Dot(axes.c2p(*chord_points()[1]), color=TEAL, radius=0.060))
+        label_a = always_redraw(lambda: MathTex("A", color=TEAL).scale(0.45).next_to(point_a, DOWN + LEFT, buff=0.04))
+        label_b = always_redraw(lambda: MathTex("B", color=TEAL).scale(0.45).next_to(point_b, UP + RIGHT, buff=0.04))
+        oa_line = always_redraw(lambda: DashedLine(axes.c2p(0, 0), axes.c2p(*chord_points()[0]), color=GREY_B, stroke_width=2, dash_length=0.12))
+        ob_line = always_redraw(lambda: DashedLine(axes.c2p(0, 0), axes.c2p(*chord_points()[1]), color=GREY_B, stroke_width=2, dash_length=0.12))
+        chord_label = always_redraw(lambda: MathTex("AB", color=BLUE_B).scale(0.46).move_to((axes.c2p(*chord_points()[0]) + axes.c2p(*chord_points()[1])) / 2 + UP * 0.18))
+        inequality = MathTex(r"|OA|^2+|OB|^2<|AB|^2", color=WHITE).scale(0.50)
+        inequality.next_to(axes, DOWN, buff=0.12).align_to(axes, LEFT)
+        moving_group = VGroup(chord, point_a, point_b, label_a, label_b, oa_line, ob_line, chord_label)
+        return dict(
+            axes=axes,
+            ellipse=ellipse,
+            focus=focus,
+            focus_label=focus_label,
+            origin=origin,
+            origin_label=origin_label,
+            ellipse_label=ellipse_label,
+            slope=slope,
+            moving_group=moving_group,
+            chord=chord,
+            oa_line=oa_line,
+            ob_line=ob_line,
+            inequality=inequality,
+        )
+
+    def _play_ellipse_focus_chord_global_preview(self, model):
+        title = cjk_text("先看焦点弦如何转动", font_size=24, color=YELLOW).to_edge(LEFT, buff=0.70).shift(UP * 1.72)
+        note = cjk_text("直线过焦点 F 转动，A、B 是与椭圆的两个交点", font_size=16, color=GREY_A)
+        note.next_to(title, DOWN, aligned_edge=LEFT, buff=0.10)
+        self.play(FadeIn(title, shift=RIGHT * 0.12), FadeIn(note, shift=RIGHT * 0.12), run_time=0.70)
+        self.play(Create(model["axes"]), Create(model["ellipse"]), FadeIn(model["origin"]), FadeIn(model["focus"]), run_time=1.35)
+        self.play(FadeIn(model["origin_label"]), FadeIn(model["focus_label"]), FadeIn(model["ellipse_label"]), run_time=0.65)
+        self.play(FadeIn(model["moving_group"]), FadeIn(model["inequality"]), run_time=1.0)
+        self.play(model["slope"].animate.set_value(1.08), run_time=5.2, rate_func=smooth)
+        self.play(model["slope"].animate.set_value(-0.35), run_time=3.0, rate_func=smooth)
+        self.wait(1.3)
+        self.play(FadeOut(title), FadeOut(note), run_time=0.45)
+
+    def _play_ellipse_focus_chord_derivation(self, model):
+        sections = [
+            dict(
+                title="1. 把长度不等式改写成内积",
+                notes=["把 A、B 看成从原点 O 出发的向量。", "这样题目的恒成立条件会变成一个符号判断。"],
+                formulas=[
+                    r"|AB|^2=|OA|^2+|OB|^2-2A\\cdot B",
+                    r"|OA|^2+|OB|^2<|AB|^2",
+                    r"A\\cdot B<0",
+                ],
+                focus="inequality",
+            ),
+            dict(
+                title="2. 写出焦点条件与过焦点直线",
+                notes=["焦点为 F(1,0)，所以 c=1。", "设过 F 的直线为 y=k(x-1)，让 k 表示转动角度。"],
+                formulas=[
+                    r"c^2=a^2-b^2=1",
+                    r"b^2=a^2-1",
+                    r"l:y=k(x-1)",
+                ],
+                focus="focus",
+            ),
+            dict(
+                title="3. 代入椭圆并用韦达定理",
+                notes=["设 A(x_1,y_1)，B(x_2,y_2)。", "只需要 x_1+x_2 与 x_1x_2，不必显式解两个交点。"],
+                formulas=[
+                    r"\\frac{{x^2}}{{a^2}}+\\frac{{k^2(x-1)^2}}{{b^2}}=1",
+                    r"D=b^2+a^2k^2",
+                    r"x_1+x_2=\\frac{{2a^2k^2}}{{D}}",
+                    r"x_1x_2=\\frac{{a^2(k^2-b^2)}}{{D}}",
+                ],
+                focus="vieta",
+            ),
+            dict(
+                title="4. 化简 A 与 B 的内积",
+                notes=["令 u=a^2，分母始终大于 0。", "于是问题变成让分子对所有方向都为负。"],
+                formulas=[
+                    r"A\\cdot B=x_1x_2+y_1y_2",
+                    r"A\\cdot B=\\frac{{(-u^2+3u-1)k^2-u(u-1)}}{{u-1+uk^2}}",
+                    r"u=a^2>1",
+                ],
+                focus="dot",
+            ),
+            dict(
+                title="5. 得到 a 的取值范围",
+                notes=["直线可以任意转动，竖直方向也要满足严格不等式。", "所以 k^2 的系数必须严格为负。"],
+                formulas=[
+                    r"-u^2+3u-1<0",
+                    r"u^2-3u+1>0",
+                    r"u>\\frac{{3+\\sqrt5}}{{2}}",
+                    r"a>\\sqrt{{\\frac{{3+\\sqrt5}}{{2}}}}",
+                ],
+                focus="final",
+            ),
+        ]
+        for section in sections:
+            self._play_ellipse_focus_chord_section(model, section)
+        self.wait(2.0)
+
+    def _play_ellipse_focus_chord_section(self, model, section):
+        panel_x = 0.82
+        top = 1.58
+        title = cjk_text(section.get("title") or "", font_size=22, color=YELLOW)
+        title.move_to(RIGHT * panel_x + UP * top, aligned_edge=UL)
+        notes = VGroup(*[cjk_text(text, font_size=16, color=GREY_A) for text in section.get("notes") or []])
+        notes.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
+        notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.18)
+        formula_lines = self._formula_lines_group(section.get("formulas") or [])
+        if len(formula_lines) > 0 and formula_lines.width > 5.65:
+            formula_lines.scale_to_fit_width(5.65)
+        formula_lines.next_to(notes, DOWN, aligned_edge=LEFT, buff=0.26)
+        derivation = VGroup(title, notes, formula_lines)
+        self.play(FadeIn(title, shift=LEFT * 0.10), run_time=0.40)
+        for note in notes:
+            self.play(FadeIn(note, shift=UP * 0.05), run_time=0.32)
+            self.wait(0.28)
+        self._play_ellipse_focus_chord_focus(model, section.get("focus") or "")
+        for formula_line in formula_lines:
+            self.play(FadeIn(formula_line, shift=UP * 0.05), run_time=0.38)
+            self.play(Indicate(formula_line, scale_factor=1.025, color=YELLOW), run_time=0.36)
+            self.wait(0.50)
+        self.wait(2.0)
+        if section.get("focus") != "final":
+            self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.48)
+
+    def _play_ellipse_focus_chord_focus(self, model, focus):
+        if focus == "inequality":
+            self.play(
+                Indicate(model["chord"], color=BLUE_B, scale_factor=1.03),
+                Indicate(model["oa_line"], color=GREY_A, scale_factor=1.03),
+                Indicate(model["ob_line"], color=GREY_A, scale_factor=1.03),
+                run_time=1.2,
+            )
+            self.play(Indicate(model["inequality"], color=YELLOW, scale_factor=1.04), run_time=1.0)
+        elif focus == "focus":
+            self.play(Indicate(model["focus"], color=ORANGE, scale_factor=1.25), Indicate(model["focus_label"], color=ORANGE), run_time=1.0)
+            self.play(model["slope"].animate.set_value(0.62), run_time=1.7, rate_func=smooth)
+        elif focus == "vieta":
+            self.play(model["slope"].animate.set_value(1.05), run_time=1.8, rate_func=smooth)
+            self.play(Indicate(model["chord"], color=BLUE_B, scale_factor=1.04), run_time=1.0)
+        elif focus == "dot":
+            self.play(Indicate(model["oa_line"], color=YELLOW, scale_factor=1.03), Indicate(model["ob_line"], color=YELLOW, scale_factor=1.03), run_time=1.1)
+            self.play(model["slope"].animate.set_value(-0.20), run_time=1.6, rate_func=smooth)
+        elif focus == "final":
+            vertical = DashedLine(model["axes"].c2p(1, -2.1), model["axes"].c2p(1, 2.1), color=TEAL, stroke_width=3)
+            vertical_label = MathTex(r"k=\\infty", color=TEAL).scale(0.45).next_to(vertical, UP, buff=0.05)
+            result_box = MathTex(r"a>\\sqrt{{\\frac{{3+\\sqrt5}}{{2}}}}", color=YELLOW).scale(0.74)
+            result_box.next_to(model["inequality"], DOWN, aligned_edge=LEFT, buff=0.18)
+            self.play(Create(vertical), FadeIn(vertical_label), run_time=0.8)
+            self.play(FadeIn(result_box, shift=UP * 0.05), run_time=0.5)
+            self.play(Indicate(result_box, color=YELLOW, scale_factor=1.03), run_time=1.1)
 
     def _professional_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "mechanics").strip().lower()

@@ -353,6 +353,32 @@ class RenderDiagnosticsTest(unittest.TestCase):
         )
         self.assertIn(r"\lambda=1:\quad x=\frac{5}{4}", script)
 
+    def test_math_ellipse_focus_chord_manim_uses_local_professional_template(self) -> None:
+        question = (
+            "例1（2008 福建卷·理）椭圆 x^2/a^2+y^2/b^2=1（a>b>0）的一个焦点是 F(1,0)，"
+            "O 是坐标原点。设过点 F 的直线 l 交椭圆于 A、B 两点。"
+            "若直线 l 绕点 F 任意转动，恒有 |OA|^2+|OB|^2<|AB|^2，求 a 的取值范围。"
+        )
+        script = build_manim_script(
+            {
+                "subject": "math",
+                "scene_type": "conic",
+                "fallback_text": question,
+                "parameters": {"question_excerpt": question},
+            }
+        )
+
+        self.assertIn("ellipse_focus_chord", script)
+        self.assertIn("_build_ellipse_focus_chord_model", script)
+        self.assertIn("_play_ellipse_focus_chord_global_preview", script)
+        self.assertIn("_play_ellipse_focus_chord_derivation", script)
+        self.assertIn(r"\frac{x^2}{a^2}+\frac{y^2}{b^2}=1", script)
+        self.assertIn(r"|OA|^2+|OB|^2<|AB|^2", script)
+        self.assertIn(r"A\cdot B<0", script)
+        self.assertIn(r"x_1+x_2=\frac{2a^2k^2}{D}", script)
+        self.assertIn(r"A\cdot B=\frac{(-u^2+3u-1)k^2-u(u-1)}{u-1+uk^2}", script)
+        self.assertIn(r"a>\sqrt{\frac{3+\sqrt5}{2}}", script)
+
     def test_geogebra_preview_hides_editor_chrome(self) -> None:
         source = (ROOT / "frontend" / "lib" / "screen" / "capture" / "geogebra_scene_preview_screen.dart").read_text(
             encoding="utf-8"
