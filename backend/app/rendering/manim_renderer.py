@@ -400,10 +400,19 @@ class LearningScene(Scene):
         return group
 
     def _build_board_question_block(self, board, compact=False):
-        title = cjk_text("板块模型", font_size=21 if not compact else 15, color=YELLOW)
-        summary = cjk_text("光滑水平面 · B 在 A 右端 · 相对滑动后共速", font_size=12 if not compact else 9, color=GREY_A)
-        story_panel = VGroup(title, summary)
-        story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.06)
+        title = cjk_text("原题摘要", font_size=23 if not compact else 16, color=YELLOW)
+        question_lines = self._wrap_cjk_lines(
+            board.get("question") or "光滑水平面上，物块 B 位于长木板 A 右端并相对滑动。",
+            max_chars=24 if not compact else 30,
+        )[:2]
+        if len(question_lines) == 0:
+            question_lines = ["光滑水平面 · B 在 A 右端 · 相对滑动后共速"]
+        question_body = VGroup(*[cjk_text(line, font_size=14 if not compact else 10, color=GREY_A) for line in question_lines])
+        question_body.arrange(DOWN, aligned_edge=LEFT, buff=0.08 if not compact else 0.05)
+        story_panel = VGroup(title, question_body)
+        story_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.10)
+        if story_panel.width > 4.75:
+            story_panel.scale_to_fit_width(4.75)
         known_items = [
             self._value_formula("m_A", board.get("m_A"), "kg"),
             self._value_formula("m_B", board.get("m_B"), "kg"),
@@ -433,7 +442,7 @@ class LearningScene(Scene):
                     chip = RoundedRectangle(width=value.width + 0.34, height=0.38, corner_radius=0.04, color=GREY_D, stroke_width=1)
                     chip.move_to(value)
                     chips.add(VGroup(chip, value))
-        chips.arrange(RIGHT, buff=0.12)
+        chips.arrange(RIGHT, buff=0.10)
         known_panel = VGroup(cjk_text("已知", font_size=12 if not compact else 9, color=BLUE_B), chips)
         known_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
         goal_panel = VGroup(
@@ -442,8 +451,8 @@ class LearningScene(Scene):
         )
         goal_panel.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
         row = VGroup(story_panel, known_panel, goal_panel)
-        row.arrange(RIGHT, aligned_edge=UP, buff=0.54 if not compact else 0.36)
-        backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.30, 0.96), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.12)
+        row.arrange(RIGHT, aligned_edge=UP, buff=0.44 if not compact else 0.30)
+        backdrop = RoundedRectangle(width=13.15, height=max(row.height + 0.34, 1.08), corner_radius=0.04, color=GREY_E, stroke_width=1, fill_color=GREY_E, fill_opacity=0.12)
         backdrop.move_to(row.get_center())
         divider = Line(LEFT * 6.34, RIGHT * 6.34, color=GREY_D, stroke_width=1)
         divider.next_to(backdrop, DOWN, buff=0.05)
@@ -552,7 +561,7 @@ class LearningScene(Scene):
             MathTex(f_formula, color=WHITE).scale(0.50).move_to(force_arrow_centered.get_end() + RIGHT * 0.26 + UP * 0.24),
             MathTex("f_B", color=YELLOW).scale(0.52).move_to(f_on_b.get_end() + RIGHT * 0.22 + DOWN * 0.28),
             MathTex("N", color=BLUE_B).scale(0.54).move_to(n_arrow.get_end() + UP * 0.24 + RIGHT * 0.18),
-            MathTex("m_B g", color=BLUE_B).scale(0.54).move_to(g_arrow.get_end() + RIGHT * 0.50 + DOWN * 0.04),
+            MathTex("m_B g", color=BLUE_B).scale(0.54).move_to(g_arrow.get_center() + RIGHT * 0.62 + DOWN * 0.12),
             MathTex("f_A", color=YELLOW).scale(0.52).move_to(f_on_a.get_end() + LEFT * 0.22 + UP * 0.24),
         )
         forces = VGroup(b_fbd_dot, a_fbd_dot, force_arrow_centered, f_on_b, n_arrow, g_arrow, f_on_a, force_labels)
