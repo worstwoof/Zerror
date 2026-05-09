@@ -2,7 +2,9 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL=http://mirrors.tencentyun.com/pypi/simple \
+    PIP_TRUSTED_HOST=mirrors.tencentyun.com
 
 WORKDIR /app
 
