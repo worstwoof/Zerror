@@ -135,8 +135,8 @@ Zerror/
 │   ├── android/                     # Android 原生平台能力接入
 │   ├── assets/                      # 图片、背景、品牌资源等静态素材
 │   └── lib/
-│       ├── core/                    # 全局状态、主题、原生通道、会话管理
-│       ├── data/                    # 接口客户端、数据模型与数据封装
+│       ├── core/                    # 全局状态、主题、会话管理
+│       ├── data/                    # 接口客户端与数据封装
 │       └── screen/                  # 核心业务视图 (base, capture 等)
 ├── backend/                         # FastAPI 后端服务
 │   ├── app/
@@ -147,8 +147,7 @@ Zerror/
 │   │   └── services/                # 应用状态同步等核心业务逻辑
 │   └── Dockerfile                   # 后端容器化构建脚本
 ├── ai_engine/                       # AI 能力引擎模块
-│   ├── llm_logic/                   # OCR 清洗、vivo 诊断链、衍生题与学科扩展
-│   └── vision_synthesis/            # 视觉合成方向预留
+│   └── llm_logic/                   # OCR 清洗、vivo 诊断链与学科扩展
 ├── docker-compose.yml               # 后端服务本地/云端容器编排
 └── .env.example                     # 环境变量模板
 ```
