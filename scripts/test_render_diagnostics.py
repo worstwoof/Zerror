@@ -389,20 +389,20 @@ class RenderDiagnosticsTest(unittest.TestCase):
         }
 
         self.assertNotEqual(
-            manimcat_client._render_cache_key(first, job_id="job-a"),
-            manimcat_client._render_cache_key(second, job_id="job-b"),
+            manimcat_client._render_cache_key(first),
+            manimcat_client._render_cache_key(second),
         )
 
-    def test_manimcat_cache_key_includes_job_identity(self) -> None:
+    def test_manimcat_cache_key_is_stable_for_same_math_problem(self) -> None:
         scene = {
             "subject": "math",
             "scene_type": "function_graph",
             "parameters": {"question_excerpt": "Draw y=x^2."},
         }
 
-        self.assertNotEqual(
-            manimcat_client._render_cache_key(scene, job_id="job-a"),
-            manimcat_client._render_cache_key(scene, job_id="job-b"),
+        self.assertEqual(
+            manimcat_client._render_cache_key(scene),
+            manimcat_client._render_cache_key(dict(scene)),
         )
 
     def test_manimcat_concept_strips_inline_math_delimiters_from_question(self) -> None:

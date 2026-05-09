@@ -90,7 +90,7 @@ def _build_generate_payload(scene_spec: Dict[str, Any], *, job_id: str) -> Dict[
             "pace": "slow",
             "aspectRatio": "16:9",
         },
-        "renderCacheKey": _render_cache_key(scene_spec, job_id=job_id),
+        "renderCacheKey": _render_cache_key(scene_spec),
     }
 
 
@@ -290,7 +290,7 @@ def _poll_interval() -> float:
     return float(_env("MANIMCAT_POLL_INTERVAL_SECONDS", "4"))
 
 
-def _render_cache_key(scene_spec: Dict[str, Any], *, job_id: str = "") -> str:
+def _render_cache_key(scene_spec: Dict[str, Any]) -> str:
     title = _plain(scene_spec.get("title") or "", 60)
     params = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
     identity_payload = {
@@ -307,8 +307,7 @@ def _render_cache_key(scene_spec: Dict[str, Any], *, job_id: str = "") -> str:
         json.dumps(identity_payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
     ).hexdigest()[:16]
     readable_title = title or _plain(identity_payload["question"], 60) or "math"
-    unique_suffix = job_id or digest
-    return f"zerror-math:{readable_title}:{digest}:{unique_suffix}"
+    return f"zerror-math:{readable_title}:{digest}"
 
 
 def _list_text(value: Any, *, limit: int, item_limit: int) -> List[str]:
