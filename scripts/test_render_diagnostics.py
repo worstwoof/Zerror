@@ -417,8 +417,7 @@ class RenderDiagnosticsTest(unittest.TestCase):
             encoding="utf-8"
         )
         endpoint_start = source.index('def generate_physics_animation(')
-        endpoint_end = source.index('def _should_fallback_to_text_analysis', endpoint_start)
-        endpoint_source = source[endpoint_start:endpoint_end]
+        endpoint_source = source[endpoint_start:]
 
         self.assertNotIn("_ensure_credentials()", endpoint_source)
 

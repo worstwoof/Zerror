@@ -17,12 +17,13 @@ from backend.app.schemas.card_schema import (
     OCRResponse,
     PhysicsAnimationRequest,
     PhysicsAnimationResponse,
-    ReviewPlan,
 )
 from backend.app.services.analysis_jobs import (
+    build_ocr_only_analysis,
     create_image_analysis_job,
     get_image_analysis_job,
     retry_image_analysis_job,
+    should_fallback_to_text_analysis,
 )
 
 
@@ -139,7 +140,7 @@ async def analyze_image(
         except VivoAPIError as exc:
             # Degrade gracefully when the multimodal request is too slow or unavailable:
             # we already have OCR text, so fall back to the lighter text analysis path.
-            if normalized_text.strip() and _should_fallback_to_text_analysis(exc):
+            if normalized_text.strip() and should_fallback_to_text_analysis(exc):
                 fallback_to_text = True
                 analysis_started_at = time.perf_counter()
                 try:
@@ -153,13 +154,13 @@ async def analyze_image(
                         )
                     )
                 except VivoAPIError as text_exc:
-                    if not _should_fallback_to_text_analysis(text_exc):
+                    if not should_fallback_to_text_analysis(text_exc):
                         raise
                     logger.warning(
                         "api analysis image falling back to ocr-only response after text analysis failed: %s",
                         text_exc,
                     )
-                    analysis = _build_ocr_only_analysis(
+                    analysis = build_ocr_only_analysis(
                         request_payload=request_payload,
                         normalized_text=normalized_text,
                         source="image",
@@ -174,7 +175,7 @@ async def analyze_image(
                 )
                 fallback_to_text = True
                 analysis_elapsed = 0.0
-                analysis = _build_ocr_only_analysis(
+                analysis = build_ocr_only_analysis(
                     request_payload=request_payload,
                     normalized_text=normalized_text,
                     source="image",
@@ -291,54 +292,3 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
         )
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-def _should_fallback_to_text_analysis(exc: VivoAPIError) -> bool:
-    message = str(exc).lower()
-    fallback_markers = [
-        "status=504",
-        "gateway time-out",
-        "gateway timeout",
-        "read timed out",
-        "timed out",
-        "connection aborted",
-        "connection reset",
-        "invalid base64_image_url",
-        "\"code\": \"1010\"",
-        "\"code\":\"1010\"",
-    ]
-    return any(marker in message for marker in fallback_markers)
-
-
-def _build_ocr_only_analysis(
-    *,
-    request_payload: AnalysisRequest,
-    normalized_text: str,
-    source: str,
-) -> AnalysisResponse:
-    cleaned = normalized_text.strip() or request_payload.question_text.strip()
-    subject = request_payload.subject if request_payload.subject != "通用" else "未分类"
-    excerpt = cleaned[:80]
-    return AnalysisResponse(
-        question_text=request_payload.question_text,
-        cleaned_question=cleaned,
-        scene_brief=excerpt,
-        subject=subject,
-        knowledge_points=["OCR 已识别题干", "AI 深度解析稍后重试"],
-        solution_summary="AI 服务暂时响应过慢，已先保存 OCR 识别结果。可以稍后重试自动解析，或先手动整理本题。",
-        solution_steps=[
-            "已完成图片文字识别，题干内容会保留在错题档案中。",
-            "本次深度解析受到上游接口超时影响，暂未生成完整步骤。",
-            "稍后点击重试，或使用手动整理补充答案、关键公式和错因。",
-        ],
-        mistake_diagnosis="本次未完成深度解析，暂不能稳定判断错因。",
-        review_plan=ReviewPlan(
-            next_review_in_days=1,
-            focus="先确认 OCR 题干是否准确，再补充完整解析。",
-            schedule=[1, 3, 7],
-        ),
-        similar_questions=[],
-        rich_artifacts=[],
-        source=source,  # type: ignore[arg-type]
-        raw_model_output="",
-    )

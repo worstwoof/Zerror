@@ -6,7 +6,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
-from backend.app.services.analysis_jobs import _friendly_error
+from backend.app.schemas.card_schema import AnalysisRequest
+from backend.app.services.analysis_jobs import (
+    _friendly_error,
+    build_ocr_only_analysis,
+    should_fallback_to_text_analysis,
+)
 
 
 def test_latex_backslash_repairs_are_conservative() -> None:
@@ -34,8 +39,25 @@ def test_background_job_error_messages_are_student_friendly() -> None:
     assert "网络连接中断" in _friendly_error(RuntimeError("connection reset by peer"))
 
 
+def test_image_analysis_fallback_helpers_are_service_level() -> None:
+    assert should_fallback_to_text_analysis(RuntimeError("Read timed out"))
+    assert should_fallback_to_text_analysis(RuntimeError('{"code":"1010"}'))
+    assert not should_fallback_to_text_analysis(RuntimeError("bad request"))
+
+    result = build_ocr_only_analysis(
+        request_payload=AnalysisRequest(question_text="original", subject="通用"),
+        normalized_text="normalized text",
+        source="image",
+    )
+
+    assert result.cleaned_question == "normalized text"
+    assert result.source == "image"
+    assert result.subject == "未分类"
+
+
 if __name__ == "__main__":
     test_latex_backslash_repairs_are_conservative()
     test_compact_broken_fraction_is_not_guessed()
     test_background_job_error_messages_are_student_friendly()
+    test_image_analysis_fallback_helpers_are_service_level()
     print("analysis quality guard tests passed")
