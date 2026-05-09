@@ -1039,27 +1039,27 @@ class LearningScene(Scene):
 
     def _build_board_block_teaching_model(self, board_data=None):
         board_data = board_data or {{}}
-        ground = Line(LEFT * 6.45 + DOWN * 1.42, LEFT * 0.05 + DOWN * 1.42, color=GREY_A, stroke_width=3)
+        ground = Line(LEFT * 6.25 + DOWN * 1.42, RIGHT * 0.72 + DOWN * 1.42, color=GREY_A, stroke_width=3)
         board = RoundedRectangle(
-            width=5.25,
-            height=0.48,
+            width=5.85,
+            height=0.54,
             corner_radius=0.04,
             color=WHITE,
             stroke_width=3.4,
             fill_color=GREY_E,
             fill_opacity=0.72,
         )
-        board.move_to(LEFT * 3.35 + DOWN * 1.08)
+        board.move_to(LEFT * 2.78 + DOWN * 1.06)
         block = RoundedRectangle(
-            width=0.96,
-            height=0.88,
+            width=1.06,
+            height=0.98,
             corner_radius=0.04,
             color=WHITE,
             stroke_width=3.4,
             fill_color=BLUE_E,
             fill_opacity=0.82,
         )
-        block.move_to(board.get_right() + LEFT * 0.68 + UP * 0.68)
+        block.move_to(board.get_right() + LEFT * 0.74 + UP * 0.76)
         board_label = self._label("A", board.get_center(), 30)
         block_label = self._label("B", block.get_center(), 30)
         v_arrow = Arrow(block.get_top() + UP * 0.36 + RIGHT * 0.20, block.get_top() + UP * 0.36 + LEFT * 1.22, buff=0, color=WHITE, stroke_width=3.4)
@@ -1199,13 +1199,7 @@ class LearningScene(Scene):
     def _play_step_breakdown(self, spec, model, scene_type, board_data=None):
         sections = self._breakdown_sections(spec, scene_type, board_data=board_data)
         for index, section in enumerate(sections, start=1):
-            step_header = None
-            if scene_type == "board_block":
-                step_header = self._build_board_step_header(index, section)
-                self.play(FadeIn(step_header, shift=DOWN * 0.08), run_time=0.38)
             self._play_derivation_sequence(index, section, model, scene_type)
-            if step_header is not None:
-                self.play(FadeOut(step_header, shift=UP * 0.08), run_time=0.28)
 
     def _build_board_step_header(self, index, section):
         label = cjk_text("当前小问", font_size=16, color=BLUE_A)
@@ -1399,6 +1393,9 @@ class LearningScene(Scene):
         return group, title, notes, formula
 
     def _play_derivation_sequence(self, index, section, model, scene_type):
+        if model.get("type") == "board_block" or scene_type == "board_block":
+            self._play_board_chalk_sequence(index, section, model)
+            return
         derivation, title, notes, formula_lines = self._build_derivation_parts(index, section)
         self.play(FadeIn(title, shift=LEFT * 0.10), run_time=0.42)
         for note in notes:
@@ -1412,6 +1409,54 @@ class LearningScene(Scene):
             self.wait(0.24)
         self.wait(0.90)
         self.play(FadeOut(derivation, shift=UP * 0.12), run_time=0.45)
+
+    def _build_board_chalk_parts(self, index, section):
+        title_text = str(section.get("title") or "板块模型分析")
+        title_text = title_text.replace("小问一：", "").replace("小问二：", "").replace("小问三：", "")
+        title = cjk_text("(" + str(index) + ") " + title_text, font_size=22, color=YELLOW)
+        title.to_corner(UL, buff=0.42)
+        if title.width > 6.30:
+            title.scale_to_fit_width(6.30)
+            title.to_corner(UL, buff=0.42)
+        notes = VGroup(*[cjk_text(str(item), font_size=16, color=GREY_A) for item in section.get("notes") or []])
+        if len(notes) > 0:
+            notes.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
+            notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.16)
+            if notes.width > 6.30:
+                notes.scale_to_fit_width(6.30)
+                notes.next_to(title, DOWN, aligned_edge=LEFT, buff=0.16)
+        formula_lines = self._formula_lines_group(section.get("formulas") or [])
+        if len(formula_lines) > 0:
+            formula_lines.scale(1.06)
+            formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.22)
+            if formula_lines.width > 5.75:
+                formula_lines.scale_to_fit_width(5.75)
+                formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.20)
+            if formula_lines.height > 2.45:
+                formula_lines.scale_to_fit_height(2.45)
+                formula_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.17)
+            formula_lines.shift(RIGHT * (0.70 - formula_lines.get_left()[0]))
+            formula_lines.shift(UP * (2.44 - formula_lines.get_top()[1]))
+        group = VGroup(title)
+        if len(notes) > 0:
+            group.add(notes)
+        if len(formula_lines) > 0:
+            group.add(formula_lines)
+        return group, title, notes, formula_lines
+
+    def _play_board_chalk_sequence(self, index, section, model):
+        derivation, title, notes, formula_lines = self._build_board_chalk_parts(index, section)
+        self.play(FadeIn(title, shift=RIGHT * 0.08), run_time=0.38)
+        for note in notes:
+            self.play(FadeIn(note, shift=UP * 0.04), run_time=0.28)
+            self.wait(0.10)
+        self._play_local_response(model, section.get("focus") or "", "board_block")
+        self.wait(0.15)
+        for formula_line in formula_lines:
+            self.play(Write(formula_line), run_time=0.62)
+            self.wait(0.28)
+        self.wait(1.00)
+        self.play(FadeOut(derivation, shift=UP * 0.10), run_time=0.42)
 
     def _clean_formula_items(self, formulas, limit=7):
         cleaned = []
