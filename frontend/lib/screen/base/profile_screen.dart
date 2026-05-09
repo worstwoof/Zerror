@@ -12,7 +12,6 @@ import 'edit_profile_screen.dart';
 import 'favorites_screen.dart';
 import 'goals_screen.dart';
 import 'privacy_security_screen.dart';
-import 'share_center_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.onOpenDrawer});
@@ -59,20 +58,20 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      _topButton(icon: Icons.notes_rounded, onTap: onOpenDrawer),
+                      _topButton(
+                          icon: Icons.notes_rounded, onTap: onOpenDrawer),
                       const Spacer(),
                       _topButton(
                         icon: Icons.edit_rounded,
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const EditProfileScreen()),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   _heroCard(context, store),
-                  const SizedBox(height: 18),
-                  _shareCard(context, store),
                   const SizedBox(height: 18),
                   _goalsCard(context, store),
                   const SizedBox(height: 18),
@@ -91,7 +90,8 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppPalette.pastelGrey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+        border:
+            Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.16),
@@ -105,7 +105,8 @@ class ProfileScreen extends StatelessWidget {
           Container(
             height: 144,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(32)),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -210,7 +211,8 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppPalette.almondCream.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(999),
@@ -218,7 +220,8 @@ class ProfileScreen extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.workspace_premium_rounded, color: AppPalette.almondCream, size: 16),
+                        Icon(Icons.workspace_premium_rounded,
+                            color: AppPalette.almondCream, size: 16),
                         SizedBox(width: 6),
                         Text(
                           'Premium Study',
@@ -234,10 +237,15 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      Expanded(child: _heroStat('\u7d2f\u8ba1\u5f55\u5165', '${store.totalErrors}', '\u9898')),
-                      Expanded(child: _heroStat('\u575a\u6301\u590d\u4e60', '${store.studyStreakDays}', '\u5929')),
                       Expanded(
-                        child: _heroStat('\u653b\u514b\u8003\u70b9', '${store.knowledgePointCount}', '\u4e2a'),
+                          child: _heroStat('\u7d2f\u8ba1\u5f55\u5165',
+                              '${store.totalErrors}', '\u9898')),
+                      Expanded(
+                          child: _heroStat('\u575a\u6301\u590d\u4e60',
+                              '${store.studyStreakDays}', '\u5929')),
+                      Expanded(
+                        child: _heroStat('\u653b\u514b\u8003\u70b9',
+                            '${store.knowledgePointCount}', '\u4e2a'),
                       ),
                     ],
                   ),
@@ -250,69 +258,14 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _shareCard(BuildContext context, AppStore store) {
-    return _glassCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ShareCenterScreen()),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: AppPalette.honeyOrange.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(Icons.redeem_rounded, color: AppPalette.almondCream, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '\u5206\u4eab\u5b66\u4e60\u7a7a\u95f4',
-                  style: TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '\u5df2\u9080\u8bf7 ${store.invitedCount} \u4f4d\u540c\u5b66\uff0c\u7d2f\u8ba1\u89e3\u9501 ${store.unlockedMonths} \u4e2a\u6708\u9ad8\u7ea7\u6743\u76ca\u3002',
-                  style: const TextStyle(
-                    color: AppPalette.textSecondary,
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppPalette.matchaMist.withValues(alpha: 0.18),
-            ),
-            child: const Icon(Icons.ios_share_rounded, color: AppPalette.textPrimary, size: 20),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _goalsCard(BuildContext context, AppStore store) {
     final focusGoal = store.goalSteps.isNotEmpty
         ? store.goalSteps.first
         : const GoalStepData(
             title: '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
             progress: '0',
-            note: '\u65b0\u8d26\u53f7\u4f1a\u4ece 0 \u5f00\u59cb\u7d2f\u8ba1\u5b66\u4e60\u76ee\u6807\uff0c\u5f55\u5165\u9519\u9898\u540e\u8fd9\u91cc\u624d\u4f1a\u51fa\u73b0\u9636\u6bb5\u8ba1\u5212\u3002',
+            note:
+                '\u65b0\u8d26\u53f7\u4f1a\u4ece 0 \u5f00\u59cb\u7d2f\u8ba1\u5b66\u4e60\u76ee\u6807\uff0c\u5f55\u5165\u9519\u9898\u540e\u8fd9\u91cc\u624d\u4f1a\u51fa\u73b0\u9636\u6bb5\u8ba1\u5212\u3002',
           );
     final hasGoals = store.goalSteps.isNotEmpty;
     return _glassCard(
@@ -333,7 +286,8 @@ class ProfileScreen extends StatelessWidget {
                   color: AppPalette.matchaMist.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.flag_circle_rounded, color: AppPalette.textPrimary),
+                child: const Icon(Icons.flag_circle_rounded,
+                    color: AppPalette.textPrimary),
               ),
               const SizedBox(width: 12),
               const Column(
@@ -349,7 +303,8 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   Text(
                     'Goals',
-                    style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        color: AppPalette.textSecondary, fontSize: 12),
                   ),
                 ],
               ),
@@ -373,7 +328,8 @@ class ProfileScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppPalette.kombuGreen.withValues(alpha: 0.30),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppPalette.matchaMist.withValues(alpha: 0.16)),
+              border: Border.all(
+                  color: AppPalette.matchaMist.withValues(alpha: 0.16)),
             ),
             child: Row(
               children: [
@@ -384,7 +340,8 @@ class ProfileScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: AppPalette.matchaMist.withValues(alpha: 0.18),
                   ),
-                  child: const Icon(Icons.auto_graph_rounded, color: AppPalette.textPrimary, size: 28),
+                  child: const Icon(Icons.auto_graph_rounded,
+                      color: AppPalette.textPrimary, size: 28),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -392,7 +349,9 @@ class ProfileScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        hasGoals ? focusGoal.title : '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
+                        hasGoals
+                            ? focusGoal.title
+                            : '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
                         style: const TextStyle(
                           color: AppPalette.textPrimary,
                           fontSize: 16,
@@ -418,7 +377,8 @@ class ProfileScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: AppPalette.matchaMist,
                   ),
-                  child: const Icon(Icons.add_rounded, color: AppPalette.night, size: 30),
+                  child: const Icon(Icons.add_rounded,
+                      color: AppPalette.night, size: 30),
                 ),
               ],
             ),
@@ -433,7 +393,8 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppPalette.pastelGrey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+        border:
+            Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: [
@@ -456,7 +417,8 @@ class ProfileScreen extends StatelessWidget {
             context,
             icon: Icons.workspace_premium_rounded,
             title: '\u6211\u7684\u6210\u5c31',
-            subtitle: '\u67e5\u770b\u6210\u957f\u5fbd\u7ae0\u3001\u8fde\u7eed\u6253\u5361\u548c\u91cc\u7a0b\u7891',
+            subtitle:
+                '\u67e5\u770b\u6210\u957f\u5fbd\u7ae0\u3001\u8fde\u7eed\u6253\u5361\u548c\u91cc\u7a0b\u7891',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AchievementsScreen()),
             ),
@@ -466,7 +428,8 @@ class ProfileScreen extends StatelessWidget {
             context,
             icon: Icons.favorite_rounded,
             title: '\u6211\u7684\u6536\u85cf',
-            subtitle: '\u96c6\u4e2d\u67e5\u770b\u9ad8\u4ef7\u503c\u9519\u9898\u3001\u9898\u578b\u6a21\u677f\u548c\u91cd\u70b9\u7b14\u8bb0',
+            subtitle:
+                '\u96c6\u4e2d\u67e5\u770b\u9ad8\u4ef7\u503c\u9519\u9898\u3001\u9898\u578b\u6a21\u677f\u548c\u91cd\u70b9\u7b14\u8bb0',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const FavoritesScreen()),
             ),
@@ -476,7 +439,8 @@ class ProfileScreen extends StatelessWidget {
             context,
             icon: Icons.security_rounded,
             title: '\u9690\u79c1\u4e0e\u5b89\u5168',
-            subtitle: '\u7ba1\u7406\u8d26\u53f7\u5bc6\u7801\u3001\u767b\u5f55\u8bbe\u5907\u548c\u9690\u79c1\u9009\u9879',
+            subtitle:
+                '\u7ba1\u7406\u8d26\u53f7\u5bc6\u7801\u3001\u767b\u5f55\u8bbe\u5907\u548c\u9690\u79c1\u9009\u9879',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PrivacySecurityScreen()),
             ),
@@ -502,7 +466,8 @@ class ProfileScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppPalette.pastelGrey.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+            border: Border.all(
+                color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
           ),
           child: child,
         ),
@@ -581,7 +546,8 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppPalette.textSecondary, size: 16),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded,
+          color: AppPalette.textSecondary, size: 16),
       onTap: onTap,
     );
   }
@@ -610,7 +576,8 @@ class ProfileScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppPalette.pastelGrey.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+            border: Border.all(
+                color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
           ),
           child: Icon(icon, color: AppPalette.textPrimary),
         ),
@@ -632,6 +599,7 @@ class ProfileScreen extends StatelessWidget {
         syncUserId: store.syncUserId,
         authToken: store.authToken,
       );
+      if (!context.mounted) return;
       store.setAvatarPath(uploaded.fileUrl);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('\u5934\u50cf\u5df2\u66f4\u65b0')),
@@ -645,7 +613,8 @@ class ProfileScreen extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6\u5934\u50cf\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5'),
+          content: Text(
+              '\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6\u5934\u50cf\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5'),
         ),
       );
     }
@@ -680,7 +649,8 @@ class ProfileScreen extends StatelessWidget {
     return Container(
       color: AppPalette.kombuGreen,
       alignment: Alignment.center,
-      child: Icon(Icons.person_rounded, color: AppPalette.textPrimary, size: iconSize),
+      child: Icon(Icons.person_rounded,
+          color: AppPalette.textPrimary, size: iconSize),
     );
   }
 }
