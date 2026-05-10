@@ -18,6 +18,23 @@ router = APIRouter(prefix="/api/v1/files", tags=["files"])
 cos_storage = TencentCOSStorage(settings) if settings.has_tencent_cos_config else None
 
 
+async def _read_required_file_bytes(file: UploadFile) -> bytes:
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+    return file_bytes
+
+
+def _object_storage_gateway_error(exc: ObjectStorageError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=str(exc),
+    )
+
+
 @router.post("/upload", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(...),
@@ -32,12 +49,7 @@ async def upload_file(
             detail="Tencent COS is not configured.",
         )
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file is empty.",
-        )
+    file_bytes = await _read_required_file_bytes(file)
 
     effective_sync_user_id = current_user.sync_user_id or sync_user_id
     folder = _build_folder(sync_user_id=effective_sync_user_id, category=category)
@@ -49,10 +61,7 @@ async def upload_file(
             folder=folder,
         )
     except ObjectStorageError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
+        raise _object_storage_gateway_error(exc) from exc
 
     create_or_update_media_asset(
         db,
