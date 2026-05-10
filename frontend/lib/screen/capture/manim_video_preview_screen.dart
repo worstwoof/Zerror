@@ -8,6 +8,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/constants.dart';
+import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 
 enum _VideoPreviewStatus { loading, ready, failed }
@@ -243,11 +244,11 @@ class _ManimVideoPreviewScreenState extends State<ManimVideoPreviewScreen> {
 
   String _absoluteUrl(String rawUrl, String absoluteUrl) {
     final preferred = absoluteUrl.trim();
-    if (preferred.startsWith('http://') || preferred.startsWith('https://')) {
+    if (isRemoteMediaPath(preferred)) {
       return preferred;
     }
     final url = rawUrl.trim();
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (isRemoteMediaPath(url)) {
       return url;
     }
     if (url.startsWith('/')) {

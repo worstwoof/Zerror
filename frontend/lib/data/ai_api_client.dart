@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/constants.dart';
+import '../core/media_utils.dart';
 
 class AiApiException implements Exception {
   final String message;
@@ -665,7 +666,7 @@ class AiApiClient {
       final rawContent = artifact['content'];
       if (type == 'manim_video' && rawContent is String) {
         final trimmed = rawContent.trim();
-        if (trimmed.startsWith('http') || trimmed.startsWith('/static/')) {
+        if (isRemoteMediaPath(trimmed) || trimmed.startsWith('/static/')) {
           videoUrls.add(trimmed);
         }
       }
