@@ -100,9 +100,7 @@ class TencentCOSStorage:
     def _build_public_url(self, object_key: str) -> str:
         if self.settings.tencent_cos_base_url:
             return f"{self.settings.tencent_cos_base_url.rstrip('/')}/{object_key}"
-        bucket = self.settings.tencent_cos_bucket
-        region = self.settings.tencent_cos_region
-        return f"https://{bucket}.cos.{region}.myqcloud.com/{object_key}"
+        return f"https://{self._default_cos_host()}/{object_key}"
 
     def _extract_object_key(self, file_reference: str) -> str | None:
         if not file_reference:
@@ -115,23 +113,29 @@ class TencentCOSStorage:
         if not parsed.scheme or not parsed.netloc:
             return None
 
-        default_host = f"{self.settings.tencent_cos_bucket}.cos.{self.settings.tencent_cos_region}.myqcloud.com"
-        if parsed.netloc == default_host:
-            return unquote(parsed.path.lstrip("/")) or None
+        if parsed.netloc == self._default_cos_host():
+            return self._object_key_from_path(parsed.path)
 
         if self.settings.tencent_cos_base_url:
             base = urlparse(self.settings.tencent_cos_base_url)
             if parsed.netloc != base.netloc:
                 return None
 
-            base_path = base.path.rstrip("/")
-            current_path = parsed.path
-            if base_path:
-                prefix = f"{base_path}/"
-                if not current_path.startswith(prefix):
-                    return None
-                current_path = current_path[len(prefix):]
-
-            return unquote(current_path.lstrip("/")) or None
+            return self._object_key_from_path(parsed.path, base_path=base.path)
 
         return None
+
+    def _default_cos_host(self) -> str:
+        bucket = self.settings.tencent_cos_bucket
+        region = self.settings.tencent_cos_region
+        return f"{bucket}.cos.{region}.myqcloud.com"
+
+    def _object_key_from_path(self, path: str, *, base_path: str = "") -> str | None:
+        normalized_base = base_path.rstrip("/")
+        current_path = path
+        if normalized_base:
+            prefix = f"{normalized_base}/"
+            if not current_path.startswith(prefix):
+                return None
+            current_path = current_path[len(prefix) :]
+        return unquote(current_path.lstrip("/")) or None
