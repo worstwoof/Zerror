@@ -47,6 +47,10 @@ async def _read_required_upload_bytes(image: UploadFile) -> bytes:
     return image_bytes
 
 
+def _vivo_gateway_error(exc: VivoAPIError) -> HTTPException:
+    return HTTPException(status_code=502, detail=str(exc))
+
+
 @router.get("/health")
 def healthcheck() -> dict[str, str]:
     return {
@@ -62,7 +66,7 @@ def analyze_text(request: AnalysisRequest) -> AnalysisResponse:
     try:
         return diagnostic_service.analyze_text(request)
     except VivoAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _vivo_gateway_error(exc) from exc
 
 
 @router.post("/ocr/extract", response_model=OCRResponse)
@@ -84,7 +88,7 @@ async def extract_text(image: UploadFile = File(...)) -> OCRResponse:
         )
         return result.ocr
     except VivoAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _vivo_gateway_error(exc) from exc
 
 
 @router.post("/analysis/image", response_model=ImageAnalysisResponse)
@@ -144,7 +148,7 @@ async def analyze_image(
             **response_payload,
         )
     except VivoAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _vivo_gateway_error(exc) from exc
 
 
 @router.post("/analysis/image/jobs", response_model=ImageAnalysisJobResponse)
@@ -231,4 +235,4 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
             reason=reason,
         )
     except VivoAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise _vivo_gateway_error(exc) from exc
