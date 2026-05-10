@@ -59,6 +59,7 @@ class Settings:
     app_version: str
     database_url: str
     auth_session_days: int
+    auth_pbkdf2_iterations: int
     tencent_cos_secret_id: str
     tencent_cos_secret_key: str
     tencent_cos_region: str
@@ -122,6 +123,11 @@ def get_settings() -> Settings:
             f"sqlite:///{(PROJECT_ROOT / 'backend' / 'app.db').as_posix()}",
         ),
         auth_session_days=int(_get_setting("AUTH_SESSION_DAYS", file_values, "30")),
+        auth_pbkdf2_iterations=_get_positive_int_setting(
+            "AUTH_PBKDF2_ITERATIONS",
+            file_values,
+            "120000",
+        ),
         tencent_cos_secret_id=_get_setting("TENCENT_COS_SECRET_ID", file_values),
         tencent_cos_secret_key=_get_setting("TENCENT_COS_SECRET_KEY", file_values),
         tencent_cos_region=_get_setting("TENCENT_COS_REGION", file_values),

@@ -13,7 +13,7 @@ from backend.app.db.models import AuthSession, User
 from backend.app.db.session import get_db
 
 
-PBKDF2_ITERATIONS = 120_000
+PBKDF2_ITERATIONS = settings.auth_pbkdf2_iterations
 
 
 def hash_password(password: str) -> str:
