@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -12,7 +14,6 @@ from backend.app.core.auth import (
     hash_password,
     verify_password,
 )
-from datetime import datetime, timezone
 
 from backend.app.db.models import AuthSession, User, UserProfile
 from backend.app.db.session import get_db
@@ -33,8 +34,8 @@ def register(
     request: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> AuthResponse:
-    username = request.username.strip()
-    email = request.email.strip().lower()
+    username = _normalize_username(request.username)
+    email = _normalize_email(request.email)
     _validate_username(username)
 
     existing = (
@@ -79,7 +80,7 @@ def login(
     request: LoginRequest,
     db: Session = Depends(get_db),
 ) -> AuthResponse:
-    identifier = request.identifier.strip()
+    identifier = _normalize_login_identifier(request.identifier)
     user = (
         db.query(User)
         .filter(or_(User.username == identifier, User.email == identifier.lower()))
@@ -124,6 +125,18 @@ def _validate_username(username: str) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username can only contain letters, numbers, underscores, and hyphens.",
         )
+
+
+def _normalize_username(username: str) -> str:
+    return username.strip()
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _normalize_login_identifier(identifier: str) -> str:
+    return identifier.strip()
 
 
 def _build_auth_response(user: User, session: AuthSession, token: str) -> AuthResponse:

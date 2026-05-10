@@ -19,6 +19,7 @@ if [[ -z "$PYTHON_BIN" ]]; then
 fi
 
 $PYTHON_BIN scripts/test_config_guards.py
+$PYTHON_BIN scripts/test_auth_guards.py
 $PYTHON_BIN scripts/test_object_storage_guards.py
 $PYTHON_BIN scripts/test_file_route_guards.py
 $PYTHON_BIN scripts/test_upload_route_guards.py
