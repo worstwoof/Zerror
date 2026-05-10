@@ -13,10 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from backend.app.api.v1.render import _absolute_url, _is_absolute_http_url
 from backend.app.rendering.geogebra_renderer import build_geogebra_scene
 from backend.app.rendering.manim_renderer import ManimUnavailable, build_manim_script
 from backend.app.services import render_jobs
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
+
+
+class _FakeRequest:
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url
 
 
 class RenderDiagnosticsTest(unittest.TestCase):
@@ -420,6 +426,20 @@ class RenderDiagnosticsTest(unittest.TestCase):
         endpoint_source = source[endpoint_start:]
 
         self.assertNotIn("_ensure_credentials()", endpoint_source)
+
+    def test_render_route_absolute_url_helper_preserves_remote_urls(self) -> None:
+        request = _FakeRequest("https://api.example.com/base/")
+
+        self.assertTrue(_is_absolute_http_url("https://cdn.example.com/video.mp4"))
+        self.assertFalse(_is_absolute_http_url("//cdn.example.com/video.mp4"))
+        self.assertEqual(
+            _absolute_url(request, "https://cdn.example.com/video.mp4"),
+            "https://cdn.example.com/video.mp4",
+        )
+        self.assertEqual(
+            _absolute_url(request, "/static/media/manim/job.mp4"),
+            "https://api.example.com/base/static/media/manim/job.mp4",
+        )
 
     def test_manim_success_and_repeated_jobs_use_distinct_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

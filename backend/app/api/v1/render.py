@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Literal
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -128,6 +129,11 @@ def _job_response(job: Dict[str, Any], request: Request) -> ManimJobResponse:
 def _absolute_url(request: Request, video_url: str) -> str:
     if not video_url:
         return ""
-    if video_url.startswith("http://") or video_url.startswith("https://"):
+    if _is_absolute_http_url(video_url):
         return video_url
     return f"{str(request.base_url).rstrip('/')}/{video_url.lstrip('/')}"
+
+
+def _is_absolute_http_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
