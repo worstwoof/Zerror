@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
 
 from backend.app.core.config import (
     _get_positive_int_setting,
@@ -58,9 +59,26 @@ def test_background_worker_counts_can_be_configured_from_env() -> None:
             os.environ["MANIM_RENDER_MAX_WORKERS"] = previous_manim
 
 
+def test_env_example_documents_runtime_settings() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    expected_keys = {
+        "VIVO_QUALITY_TEXT_MODEL",
+        "VIVO_QUALITY_TEXT_THINKING_MODE",
+        "VIVO_QUALITY_TEXT_REASONING_EFFORT",
+        "VIVO_QUALITY_MAX_TOKENS",
+        "MANIM_MEDIA_URL_PREFIX",
+        "ANALYSIS_JOB_MAX_WORKERS",
+        "MANIM_RENDER_MAX_WORKERS",
+    }
+
+    for key in expected_keys:
+        assert f"{key}=" in env_example
+
+
 if __name__ == "__main__":
     test_normalize_url_prefix_handles_slashes()
     test_manim_media_url_prefix_can_be_configured_from_env()
     test_positive_int_setting_clamps_to_one()
     test_background_worker_counts_can_be_configured_from_env()
+    test_env_example_documents_runtime_settings()
     print("config guard tests passed")
