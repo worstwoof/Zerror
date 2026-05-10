@@ -12,6 +12,7 @@ from backend.app.services.analysis_jobs import (
     _jobs,
     _friendly_error,
     _make_analysis_request,
+    _resolve_analysis_subject,
     _run_image_analysis_job,
     analyze_image_with_fallback,
     build_ocr_only_analysis,
@@ -75,6 +76,11 @@ def test_analysis_request_helper_preserves_context_fields() -> None:
     assert request.user_answer == "学生答案"
     assert request.wrong_reason_hint == "计算错误"
     assert request.enable_subject_extensions is False
+
+
+def test_subject_fallback_helper_only_relabels_generic_subject() -> None:
+    assert _resolve_analysis_subject("通用") == "未分类"
+    assert _resolve_analysis_subject("数学") == "数学"
 
 
 def test_ocr_extraction_normalizes_text_in_service_layer() -> None:
@@ -249,6 +255,7 @@ if __name__ == "__main__":
     test_background_job_error_messages_are_student_friendly()
     test_image_analysis_fallback_helpers_are_service_level()
     test_analysis_request_helper_preserves_context_fields()
+    test_subject_fallback_helper_only_relabels_generic_subject()
     test_ocr_extraction_normalizes_text_in_service_layer()
     test_background_image_job_uses_normalized_ocr_text()
     test_image_analysis_flow_falls_back_to_text_for_timeout()

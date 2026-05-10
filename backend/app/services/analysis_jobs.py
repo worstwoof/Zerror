@@ -66,6 +66,10 @@ def _make_analysis_request(
     )
 
 
+def _resolve_analysis_subject(subject: str) -> str:
+    return subject if subject != "通用" else "未分类"
+
+
 def extract_ocr_response(
     *,
     image_bytes: bytes,
@@ -439,7 +443,7 @@ def _build_ocr_only_image_response(
     ocr: OCRResponse,
 ) -> ImageAnalysisResponse:
     cleaned = ocr.normalized_text.strip() or request_payload.question_text.strip()
-    subject = request_payload.subject if request_payload.subject != "通用" else "未分类"
+    subject = _resolve_analysis_subject(request_payload.subject)
     return ImageAnalysisResponse(
         question_text=request_payload.question_text,
         cleaned_question=cleaned,
@@ -489,7 +493,7 @@ def build_ocr_only_analysis(
     source: str,
 ) -> AnalysisResponse:
     cleaned = normalized_text.strip() or request_payload.question_text.strip()
-    subject = request_payload.subject if request_payload.subject != "通用" else "未分类"
+    subject = _resolve_analysis_subject(request_payload.subject)
     excerpt = cleaned[:80]
     return AnalysisResponse(
         question_text=request_payload.question_text,
