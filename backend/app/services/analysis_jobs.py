@@ -12,6 +12,7 @@ from typing import Any, Dict
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
 from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
+from backend.app.core.config import settings
 from backend.app.schemas.card_schema import (
     AnalysisRequest,
     AnalysisResponse,
@@ -27,7 +28,7 @@ _CLIENT_JOB_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,96}$")
 
 # Run high-quality analysis serially. The upstream model is slow and rate
 # sensitive, so one-at-a-time jobs are more reliable than parallel retries.
-ANALYSIS_JOB_MAX_WORKERS = 1
+ANALYSIS_JOB_MAX_WORKERS = settings.analysis_job_max_workers
 
 _executor = ThreadPoolExecutor(max_workers=ANALYSIS_JOB_MAX_WORKERS)
 _lock = threading.Lock()

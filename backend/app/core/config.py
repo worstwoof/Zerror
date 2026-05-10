@@ -44,6 +44,15 @@ def _normalize_url_prefix(prefix: str) -> str:
     return "/" + stripped.strip("/")
 
 
+def _get_positive_int_setting(
+    name: str,
+    file_values: Dict[str, str],
+    default: str,
+) -> int:
+    value = int(_get_setting(name, file_values, default))
+    return max(1, value)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -79,6 +88,8 @@ class Settings:
     vivo_max_tokens: int
     vivo_animation_max_tokens: int
     manim_media_url_prefix: str
+    analysis_job_max_workers: int
+    manim_render_max_workers: int
     debug: bool
 
     @property
@@ -186,6 +197,16 @@ def get_settings() -> Settings:
         ),
         manim_media_url_prefix=_normalize_url_prefix(
             _get_setting("MANIM_MEDIA_URL_PREFIX", file_values, "/static/media/manim")
+        ),
+        analysis_job_max_workers=_get_positive_int_setting(
+            "ANALYSIS_JOB_MAX_WORKERS",
+            file_values,
+            "1",
+        ),
+        manim_render_max_workers=_get_positive_int_setting(
+            "MANIM_RENDER_MAX_WORKERS",
+            file_values,
+            "1",
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )

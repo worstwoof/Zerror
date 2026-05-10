@@ -23,7 +23,7 @@ JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = settings.manim_media_url_prefix
 MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v4"
 
-_executor = ThreadPoolExecutor(max_workers=1)
+_executor = ThreadPoolExecutor(max_workers=settings.manim_render_max_workers)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
 _renderer_available_cache: bool | None = None

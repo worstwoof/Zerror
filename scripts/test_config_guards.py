@@ -6,7 +6,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.app.core.config import _normalize_url_prefix, get_settings
+from backend.app.core.config import (
+    _get_positive_int_setting,
+    _normalize_url_prefix,
+    get_settings,
+)
 
 
 def test_normalize_url_prefix_handles_slashes() -> None:
@@ -28,7 +32,35 @@ def test_manim_media_url_prefix_can_be_configured_from_env() -> None:
             os.environ["MANIM_MEDIA_URL_PREFIX"] = previous
 
 
+def test_positive_int_setting_clamps_to_one() -> None:
+    assert _get_positive_int_setting("MISSING_SETTING", {}, "2") == 2
+    assert _get_positive_int_setting("MISSING_SETTING", {}, "0") == 1
+    assert _get_positive_int_setting("MISSING_SETTING", {}, "-5") == 1
+
+
+def test_background_worker_counts_can_be_configured_from_env() -> None:
+    previous_analysis = os.environ.get("ANALYSIS_JOB_MAX_WORKERS")
+    previous_manim = os.environ.get("MANIM_RENDER_MAX_WORKERS")
+    os.environ["ANALYSIS_JOB_MAX_WORKERS"] = "2"
+    os.environ["MANIM_RENDER_MAX_WORKERS"] = "0"
+    try:
+        settings = get_settings()
+        assert settings.analysis_job_max_workers == 2
+        assert settings.manim_render_max_workers == 1
+    finally:
+        if previous_analysis is None:
+            os.environ.pop("ANALYSIS_JOB_MAX_WORKERS", None)
+        else:
+            os.environ["ANALYSIS_JOB_MAX_WORKERS"] = previous_analysis
+        if previous_manim is None:
+            os.environ.pop("MANIM_RENDER_MAX_WORKERS", None)
+        else:
+            os.environ["MANIM_RENDER_MAX_WORKERS"] = previous_manim
+
+
 if __name__ == "__main__":
     test_normalize_url_prefix_handles_slashes()
     test_manim_media_url_prefix_can_be_configured_from_env()
+    test_positive_int_setting_clamps_to_one()
+    test_background_worker_counts_can_be_configured_from_env()
     print("config guard tests passed")
