@@ -213,7 +213,7 @@ def extract_remote_file_references(snapshot: dict[str, Any]) -> set[str]:
     references: set[str] = set()
 
     avatar_path = snapshot.get("avatar_path")
-    if isinstance(avatar_path, str) and avatar_path.startswith(("http://", "https://")):
+    if is_remote_file_reference(avatar_path):
         references.add(avatar_path)
 
     raw_errors = snapshot.get("errors")
@@ -222,10 +222,14 @@ def extract_remote_file_references(snapshot: dict[str, Any]) -> set[str]:
             if not isinstance(item, dict):
                 continue
             image_url = item.get("image_url")
-            if isinstance(image_url, str) and image_url.startswith(("http://", "https://")):
+            if is_remote_file_reference(image_url):
                 references.add(image_url)
 
     return references
+
+
+def is_remote_file_reference(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(("http://", "https://"))
 
 
 def delete_media_assets_by_urls(db: Session, user: User, file_urls: set[str]) -> None:
@@ -347,7 +351,7 @@ def _upsert_error_records(
             if (_normalize_text(tag) or "")
         ]
 
-        if record.image_url and record.image_url.startswith(("http://", "https://")):
+        if is_remote_file_reference(record.image_url):
             errors_by_image_url[record.image_url] = record
 
     for leftover in existing_records.values():
@@ -364,7 +368,7 @@ def _sync_media_assets(
     errors_by_image_url: dict[str, ErrorRecord],
 ) -> None:
     referenced_urls = set(errors_by_image_url.keys())
-    if avatar_path and avatar_path.startswith(("http://", "https://")):
+    if is_remote_file_reference(avatar_path):
         referenced_urls.add(avatar_path)
 
     existing_assets = db.query(MediaAsset).filter(MediaAsset.user_id == user.id).all()
@@ -374,7 +378,7 @@ def _sync_media_assets(
         if asset.file_url not in referenced_urls:
             asset.error_record_id = None
 
-    if avatar_path and avatar_path.startswith(("http://", "https://")):
+    if is_remote_file_reference(avatar_path):
         asset = existing_by_url.get(avatar_path)
         if asset is None:
             asset = MediaAsset(
