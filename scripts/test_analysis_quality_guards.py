@@ -11,6 +11,7 @@ from backend.app.schemas.card_schema import AnalysisRequest, AnalysisResponse, R
 from backend.app.services.analysis_jobs import (
     _jobs,
     _friendly_error,
+    _make_analysis_request,
     _run_image_analysis_job,
     analyze_image_with_fallback,
     build_ocr_only_analysis,
@@ -58,6 +59,22 @@ def test_image_analysis_fallback_helpers_are_service_level() -> None:
     assert result.cleaned_question == "normalized text"
     assert result.source == "image"
     assert result.subject == "未分类"
+
+
+def test_analysis_request_helper_preserves_context_fields() -> None:
+    request = _make_analysis_request(
+        question_text="题目文本",
+        subject="数学",
+        user_answer="学生答案",
+        wrong_reason_hint="计算错误",
+        enable_subject_extensions=False,
+    )
+
+    assert request.question_text == "题目文本"
+    assert request.subject == "数学"
+    assert request.user_answer == "学生答案"
+    assert request.wrong_reason_hint == "计算错误"
+    assert request.enable_subject_extensions is False
 
 
 def test_ocr_extraction_normalizes_text_in_service_layer() -> None:
@@ -231,6 +248,7 @@ if __name__ == "__main__":
     test_compact_broken_fraction_is_not_guessed()
     test_background_job_error_messages_are_student_friendly()
     test_image_analysis_fallback_helpers_are_service_level()
+    test_analysis_request_helper_preserves_context_fields()
     test_ocr_extraction_normalizes_text_in_service_layer()
     test_background_image_job_uses_normalized_ocr_text()
     test_image_analysis_flow_falls_back_to_text_for_timeout()

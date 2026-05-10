@@ -49,6 +49,23 @@ class ImageAnalysisFallbackResult:
     fallback_to_text: bool
 
 
+def _make_analysis_request(
+    *,
+    question_text: str,
+    subject: str,
+    user_answer: str,
+    wrong_reason_hint: str,
+    enable_subject_extensions: bool,
+) -> AnalysisRequest:
+    return AnalysisRequest(
+        question_text=question_text,
+        subject=subject,
+        user_answer=user_answer,
+        wrong_reason_hint=wrong_reason_hint,
+        enable_subject_extensions=enable_subject_extensions,
+    )
+
+
 def extract_ocr_response(
     *,
     image_bytes: bytes,
@@ -85,7 +102,7 @@ def analyze_image_with_fallback(
     )
     ocr = ocr_result.ocr
     normalized_text = ocr.normalized_text
-    request_payload = AnalysisRequest(
+    request_payload = _make_analysis_request(
         question_text=normalized_text,
         subject=subject,
         user_answer=user_answer,
@@ -109,7 +126,7 @@ def analyze_image_with_fallback(
             analysis_started_at = time.perf_counter()
             try:
                 analysis = diagnostic_service.analyze_text(
-                    AnalysisRequest(
+                    _make_analysis_request(
                         question_text=normalized_text,
                         subject=subject,
                         user_answer=user_answer,
@@ -287,7 +304,7 @@ def _run_image_analysis_job(
         )
         ocr = ocr_result.ocr
         normalized_text = ocr.normalized_text
-        request_payload = AnalysisRequest(
+        request_payload = _make_analysis_request(
             question_text=normalized_text or "未识别到清晰题目文字",
             subject=subject,
             user_answer=user_answer,
@@ -373,7 +390,7 @@ def _run_quality_stage(
     _update_job(job_id, status="processing", progress=65, message="正在生成高质量详解。")
     try:
         analysis = diagnostic_service.analyze_text_quality(
-            AnalysisRequest(
+            _make_analysis_request(
                 question_text=normalized_text,
                 subject=subject,
                 user_answer=user_answer,
