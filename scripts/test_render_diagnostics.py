@@ -551,6 +551,36 @@ class RenderDiagnosticsTest(unittest.TestCase):
                 self.assertTrue(video_path.exists())
                 self.assertIsNotNone(render_jobs.get_manim_job(completed["job_id"]))
 
+    def test_manim_video_url_helpers_accept_configured_prefix_and_full_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            render_jobs,
+            "MEDIA_ROOT",
+            Path(temp_dir),
+        ), patch.object(render_jobs, "MEDIA_URL_PREFIX", "/assets/manim"):
+            video_path = Path(temp_dir) / "job-123.mp4"
+
+            self.assertEqual(render_jobs._video_url_for_output(video_path), "/assets/manim/job-123.mp4")
+            self.assertEqual(
+                render_jobs._path_for_video_url("https://cdn.example.com/assets/manim/job-123.mp4"),
+                video_path,
+            )
+            self.assertEqual(
+                render_jobs._job_id_from_video_url("https://cdn.example.com/assets/manim/job-123.mp4"),
+                "job-123",
+            )
+
+    def test_manim_video_url_helpers_support_root_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            render_jobs,
+            "MEDIA_ROOT",
+            Path(temp_dir),
+        ), patch.object(render_jobs, "MEDIA_URL_PREFIX", ""):
+            video_path = Path(temp_dir) / "job-root.mp4"
+
+            self.assertEqual(render_jobs._video_url_for_output(video_path), "/job-root.mp4")
+            self.assertEqual(render_jobs._path_for_video_url("/job-root.mp4"), video_path)
+            self.assertIsNone(render_jobs._path_for_video_url("job-root.mp4"))
+
     def test_mp4_mime_type_is_registered(self) -> None:
         main_source = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")
         self.assertIn('mimetypes.add_type("video/mp4", ".mp4")', main_source)

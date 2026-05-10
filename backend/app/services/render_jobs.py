@@ -168,7 +168,7 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
     try:
         renderer_backend = "local_manim"
         output_path = _render_scene_video(scene_spec=scene_spec, job_id=job_id)
-        video_url = f"{MEDIA_URL_PREFIX}/{output_path.name}"
+        video_url = _video_url_for_output(output_path)
         elapsed = time.perf_counter() - started_at
         diagnostics = _video_diagnostics(video_url)
         diagnostics.update(
@@ -451,12 +451,7 @@ def _collect_job_ids(
 def _job_id_from_video_url(video_url: str) -> str:
     path = _path_for_video_url(video_url)
     if path is None:
-        parsed = urlparse(video_url)
-        candidate_path = unquote(parsed.path if parsed.scheme else video_url)
-        prefix = f"{MEDIA_URL_PREFIX}/"
-        if prefix not in candidate_path:
-            return ""
-        path = MEDIA_ROOT / Path(candidate_path.split(prefix, 1)[1]).name
+        return ""
     if path.suffix.lower() != ".mp4":
         return ""
     return _safe_job_id(path.stem)
@@ -504,12 +499,7 @@ def _delete_job_artifacts_locked(
 def _delete_orphan_video_url_locked(video_url: str) -> bool:
     path = _path_for_video_url(video_url)
     if path is None:
-        parsed = urlparse(video_url)
-        candidate_path = unquote(parsed.path if parsed.scheme else video_url)
-        prefix = f"{MEDIA_URL_PREFIX}/"
-        if prefix not in candidate_path:
-            return False
-        path = MEDIA_ROOT / Path(candidate_path.split(prefix, 1)[1]).name
+        return False
     job_id = _safe_job_id(path.stem)
     job = _jobs.get(job_id) or _load_job(job_id)
     if isinstance(job, dict) and job.get("retained"):
@@ -598,10 +588,19 @@ def _video_diagnostics(video_url: str) -> Dict[str, Any]:
     }
 
 
+def _video_url_for_output(output_path: Path) -> str:
+    if MEDIA_URL_PREFIX:
+        return f"{MEDIA_URL_PREFIX}/{output_path.name}"
+    return f"/{output_path.name}"
+
+
 def _path_for_video_url(video_url: str) -> Path | None:
-    if not video_url.startswith(f"{MEDIA_URL_PREFIX}/"):
+    parsed = urlparse(video_url)
+    candidate_path = unquote(parsed.path if parsed.scheme else video_url)
+    prefix = f"{MEDIA_URL_PREFIX}/" if MEDIA_URL_PREFIX else "/"
+    if not candidate_path.startswith(prefix):
         return None
-    name = Path(video_url).name
+    name = Path(candidate_path[len(prefix) :]).name
     if not name:
         return None
     return MEDIA_ROOT / name
