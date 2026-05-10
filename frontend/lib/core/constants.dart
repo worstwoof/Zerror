@@ -2,21 +2,41 @@ import 'package:flutter/foundation.dart';
 
 class AppConstants {
   static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120';
+  static const String _defaultShareBaseUrl = 'https://zerror.app';
 
   static const String _apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
   );
+  static const String _shareBaseUrlOverride = String.fromEnvironment(
+    'SHARE_BASE_URL',
+    defaultValue: '',
+  );
 
   static String get apiBaseUrl {
     if (_apiBaseUrlOverride.isNotEmpty) {
-      return _apiBaseUrlOverride;
+      return _normalizeBaseUrl(_apiBaseUrlOverride);
     }
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
-      return _defaultCloudApiBaseUrl;
+      return _normalizeBaseUrl(_defaultCloudApiBaseUrl);
     }
-    return _defaultCloudApiBaseUrl;
+    return _normalizeBaseUrl(_defaultCloudApiBaseUrl);
   }
+
+  static String get shareBaseUrl {
+    if (_shareBaseUrlOverride.isNotEmpty) {
+      return _normalizeBaseUrl(_shareBaseUrlOverride);
+    }
+    return _normalizeBaseUrl(_defaultShareBaseUrl);
+  }
+
+  static String inviteLink(String inviteCode) =>
+      '$shareBaseUrl/invite/${Uri.encodeComponent(inviteCode)}';
+
+  static String _normalizeBaseUrl(String value) => value.trim().replaceFirst(
+        RegExp(r'/+$'),
+        '',
+      );
 
   static String snapshotStorageKey(String? syncUserId) {
     final scopedKey = (syncUserId == null || syncUserId.trim().isEmpty)

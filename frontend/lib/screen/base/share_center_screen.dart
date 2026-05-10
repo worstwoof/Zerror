@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 
 class ShareCenterScreen extends StatelessWidget {
@@ -61,7 +62,8 @@ class ShareCenterScreen extends StatelessWidget {
                       label: '复制邀请码',
                       icon: Icons.copy_rounded,
                       onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: store.inviteCode));
+                        await Clipboard.setData(
+                            ClipboardData(text: store.inviteCode));
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('邀请码已复制到剪贴板')),
@@ -83,7 +85,7 @@ class ShareCenterScreen extends StatelessWidget {
                 subtitle: '直接复制链接发给同学，最快完成邀请。',
                 icon: Icons.link_rounded,
                 onTap: () async {
-                  final link = 'https://zerror.app/invite/${store.inviteCode}';
+                  final link = AppConstants.inviteLink(store.inviteCode);
                   await Clipboard.setData(ClipboardData(text: link));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +110,8 @@ class ShareCenterScreen extends StatelessWidget {
                 subtitle: '适合直接把邀请码发给正在和你一起学习的同学。',
                 icon: Icons.send_rounded,
                 onTap: () async {
-                  await Clipboard.setData(ClipboardData(text: store.inviteCode));
+                  await Clipboard.setData(
+                      ClipboardData(text: store.inviteCode));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('邀请码已复制，可以直接粘贴发送')),
@@ -324,7 +327,8 @@ class _BackButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppPalette.pastelGrey.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
         ),
         child: const Icon(
           Icons.arrow_back_ios_new_rounded,
