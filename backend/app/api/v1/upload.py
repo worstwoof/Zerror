@@ -19,11 +19,10 @@ from backend.app.schemas.card_schema import (
     PhysicsAnimationResponse,
 )
 from backend.app.services.analysis_jobs import (
-    build_ocr_only_analysis,
+    analyze_image_with_fallback,
     create_image_analysis_job,
     get_image_analysis_job,
     retry_image_analysis_job,
-    should_fallback_to_text_analysis,
 )
 
 
@@ -108,10 +107,6 @@ async def analyze_image(
         raise HTTPException(status_code=400, detail="上传图片为空。")
 
     try:
-        ocr_started_at = time.perf_counter()
-        ocr_result = vivo_client.ocr_image(image_bytes)
-        ocr_elapsed = time.perf_counter() - ocr_started_at
-        normalized_text = normalize_ocr_text(ocr_result["raw_text"])
         logger.info(
             "api analysis image upload filename=%s content_type=%s image_kb=%.1f requested_subject_extensions=%s effective_subject_extensions=%s",
             upload_filename,
@@ -120,79 +115,26 @@ async def analyze_image(
             requested_subject_extensions,
             effective_subject_extensions,
         )
-        request_payload = AnalysisRequest(
-            question_text=normalized_text,
+        result = analyze_image_with_fallback(
+            image_bytes=image_bytes,
+            content_type=upload_content_type or "image/png",
             subject=subject,
             user_answer=user_answer,
             wrong_reason_hint=wrong_reason_hint,
             enable_subject_extensions=effective_subject_extensions,
+            diagnostic_service=diagnostic_service,
+            vivo_client=vivo_client,
         )
-        fallback_to_text = False
-        try:
-            analysis_started_at = time.perf_counter()
-            analysis = diagnostic_service.analyze_image(
-                request_payload,
-                image_bytes=image_bytes,
-                mime_type=upload_content_type or "image/png",
-                ocr_draft=normalized_text,
-            )
-            analysis_elapsed = time.perf_counter() - analysis_started_at
-        except VivoAPIError as exc:
-            # Degrade gracefully when the multimodal request is too slow or unavailable:
-            # we already have OCR text, so fall back to the lighter text analysis path.
-            if normalized_text.strip() and should_fallback_to_text_analysis(exc):
-                fallback_to_text = True
-                analysis_started_at = time.perf_counter()
-                try:
-                    analysis = diagnostic_service.analyze_text(
-                        AnalysisRequest(
-                            question_text=normalized_text,
-                            subject=subject,
-                            user_answer=user_answer,
-                            wrong_reason_hint=wrong_reason_hint,
-                            enable_subject_extensions=effective_subject_extensions,
-                        )
-                    )
-                except VivoAPIError as text_exc:
-                    if not should_fallback_to_text_analysis(text_exc):
-                        raise
-                    logger.warning(
-                        "api analysis image falling back to ocr-only response after text analysis failed: %s",
-                        text_exc,
-                    )
-                    analysis = build_ocr_only_analysis(
-                        request_payload=request_payload,
-                        normalized_text=normalized_text,
-                        source="image",
-                    )
-                analysis_elapsed = time.perf_counter() - analysis_started_at
-            else:
-                if not normalized_text.strip():
-                    raise
-                logger.warning(
-                    "api analysis image falling back to ocr-only response after vision analysis failed: %s",
-                    exc,
-                )
-                fallback_to_text = True
-                analysis_elapsed = 0.0
-                analysis = build_ocr_only_analysis(
-                    request_payload=request_payload,
-                    normalized_text=normalized_text,
-                    source="image",
-                )
+        analysis = result.analysis
         response_payload = analysis.model_dump()
         response_payload["source"] = "image"
-        response_payload["ocr"] = OCRResponse(
-            raw_text=ocr_result["raw_text"],
-            normalized_text=normalized_text,
-            blocks=ocr_result.get("blocks", []),
-        )
+        response_payload["ocr"] = result.ocr
         logger.info(
             "api analysis image image_kb=%.1f ocr=%.2fs analysis=%.2fs fallback_to_text=%s requested_subject_extensions=%s effective_subject_extensions=%s artifacts=%s total=%.2fs",
             len(image_bytes) / 1024,
-            ocr_elapsed,
-            analysis_elapsed,
-            fallback_to_text,
+            result.ocr_elapsed,
+            result.analysis_elapsed,
+            result.fallback_to_text,
             requested_subject_extensions,
             effective_subject_extensions,
             len(analysis.rich_artifacts),

@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import Any, Dict
 
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
@@ -31,6 +32,104 @@ ANALYSIS_JOB_MAX_WORKERS = 1
 _executor = ThreadPoolExecutor(max_workers=ANALYSIS_JOB_MAX_WORKERS)
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
+
+
+@dataclass(frozen=True)
+class ImageAnalysisFallbackResult:
+    analysis: AnalysisResponse
+    ocr: OCRResponse
+    ocr_elapsed: float
+    analysis_elapsed: float
+    fallback_to_text: bool
+
+
+def analyze_image_with_fallback(
+    *,
+    image_bytes: bytes,
+    content_type: str,
+    subject: str,
+    user_answer: str,
+    wrong_reason_hint: str,
+    enable_subject_extensions: bool,
+    diagnostic_service: DiagnosticService,
+    vivo_client: VivoLMClient,
+) -> ImageAnalysisFallbackResult:
+    ocr_started_at = time.perf_counter()
+    ocr_result = vivo_client.ocr_image(image_bytes)
+    ocr_elapsed = time.perf_counter() - ocr_started_at
+    normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+    ocr = OCRResponse(
+        raw_text=ocr_result["raw_text"],
+        normalized_text=normalized_text,
+        blocks=ocr_result.get("blocks", []),
+    )
+    request_payload = AnalysisRequest(
+        question_text=normalized_text,
+        subject=subject,
+        user_answer=user_answer,
+        wrong_reason_hint=wrong_reason_hint,
+        enable_subject_extensions=enable_subject_extensions,
+    )
+
+    fallback_to_text = False
+    try:
+        analysis_started_at = time.perf_counter()
+        analysis = diagnostic_service.analyze_image(
+            request_payload,
+            image_bytes=image_bytes,
+            mime_type=content_type or "image/png",
+            ocr_draft=normalized_text,
+        )
+        analysis_elapsed = time.perf_counter() - analysis_started_at
+    except VivoAPIError as exc:
+        if normalized_text.strip() and should_fallback_to_text_analysis(exc):
+            fallback_to_text = True
+            analysis_started_at = time.perf_counter()
+            try:
+                analysis = diagnostic_service.analyze_text(
+                    AnalysisRequest(
+                        question_text=normalized_text,
+                        subject=subject,
+                        user_answer=user_answer,
+                        wrong_reason_hint=wrong_reason_hint,
+                        enable_subject_extensions=enable_subject_extensions,
+                    )
+                )
+            except VivoAPIError as text_exc:
+                if not should_fallback_to_text_analysis(text_exc):
+                    raise
+                logger.warning(
+                    "image analysis falling back to ocr-only response after text analysis failed: %s",
+                    text_exc,
+                )
+                analysis = build_ocr_only_analysis(
+                    request_payload=request_payload,
+                    normalized_text=normalized_text,
+                    source="image",
+                )
+            analysis_elapsed = time.perf_counter() - analysis_started_at
+        else:
+            if not normalized_text.strip():
+                raise
+            logger.warning(
+                "image analysis falling back to ocr-only response after vision analysis failed: %s",
+                exc,
+            )
+            fallback_to_text = True
+            analysis_elapsed = 0.0
+            analysis = build_ocr_only_analysis(
+                request_payload=request_payload,
+                normalized_text=normalized_text,
+                source="image",
+            )
+
+    return ImageAnalysisFallbackResult(
+        analysis=analysis,
+        ocr=ocr,
+        ocr_elapsed=ocr_elapsed,
+        analysis_elapsed=analysis_elapsed,
+        fallback_to_text=fallback_to_text,
+    )
 
 
 def create_image_analysis_job(
