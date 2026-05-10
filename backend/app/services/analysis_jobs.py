@@ -281,13 +281,12 @@ def _run_image_analysis_job(
 ) -> None:
     _update_job(job_id, status="processing", progress=10, message="正在识别题目文字。")
     try:
-        ocr_result = vivo_client.ocr_image(image_bytes)
-        normalized_text = normalize_ocr_text(ocr_result["raw_text"])
-        ocr = OCRResponse(
-            raw_text=ocr_result["raw_text"],
-            normalized_text=normalized_text,
-            blocks=ocr_result.get("blocks", []),
+        ocr_result = extract_ocr_response(
+            image_bytes=image_bytes,
+            vivo_client=vivo_client,
         )
+        ocr = ocr_result.ocr
+        normalized_text = ocr.normalized_text
         request_payload = AnalysisRequest(
             question_text=normalized_text or "未识别到清晰题目文字",
             subject=subject,

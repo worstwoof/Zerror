@@ -9,7 +9,9 @@ from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.vivo_client import VivoAPIError
 from backend.app.schemas.card_schema import AnalysisRequest, AnalysisResponse, ReviewPlan
 from backend.app.services.analysis_jobs import (
+    _jobs,
     _friendly_error,
+    _run_image_analysis_job,
     analyze_image_with_fallback,
     build_ocr_only_analysis,
     extract_ocr_response,
@@ -70,6 +72,48 @@ def test_ocr_extraction_normalizes_text_in_service_layer() -> None:
     assert result.ocr_elapsed >= 0
 
 
+def test_background_image_job_uses_normalized_ocr_text() -> None:
+    job_id = "test-normalized-ocr-job"
+    raw_text = "  first line\r\n\r\nsecond line  "
+    _jobs.clear()
+    _jobs[job_id] = {
+        "job_id": job_id,
+        "status": "pending",
+        "progress": 0,
+        "message": "",
+        "error": "",
+        "created_at": 0.0,
+        "updated_at": 0.0,
+        "ocr": None,
+        "result": None,
+        "partial_result": None,
+    }
+    diagnostic_service = _FakeDiagnosticService()
+
+    try:
+        _run_image_analysis_job(
+            job_id,
+            b"image",
+            "数学",
+            "",
+            "",
+            True,
+            diagnostic_service,  # type: ignore[arg-type]
+            _FakeVivoClient(raw_text=raw_text),  # type: ignore[arg-type]
+        )
+
+        job = _jobs[job_id]
+        assert job["status"] == "completed"
+        assert job["ocr"].raw_text == raw_text
+        assert job["ocr"].normalized_text == "first line\n\nsecond line"
+        assert diagnostic_service.quality_calls == 1
+        assert diagnostic_service.quality_requests[0].question_text == "first line\n\nsecond line"
+        assert job["partial_result"].ocr.raw_text == raw_text
+        assert job["result"].ocr.normalized_text == "first line\n\nsecond line"
+    finally:
+        _jobs.clear()
+
+
 class _FakeVivoClient:
     def __init__(self, raw_text: str = "OCR text") -> None:
         self.raw_text = raw_text
@@ -89,6 +133,8 @@ class _FakeDiagnosticService:
         self.text_error = text_error
         self.image_calls = 0
         self.text_calls = 0
+        self.quality_calls = 0
+        self.quality_requests: list[AnalysisRequest] = []
 
     def analyze_image(
         self,
@@ -108,6 +154,11 @@ class _FakeDiagnosticService:
         if self.text_error is not None:
             raise self.text_error
         return _analysis_response(request, "text")
+
+    def analyze_text_quality(self, request: AnalysisRequest) -> AnalysisResponse:
+        self.quality_calls += 1
+        self.quality_requests.append(request)
+        return _analysis_response(request, "quality")
 
 
 def _analysis_response(request: AnalysisRequest, marker: str) -> AnalysisResponse:
@@ -181,6 +232,7 @@ if __name__ == "__main__":
     test_background_job_error_messages_are_student_friendly()
     test_image_analysis_fallback_helpers_are_service_level()
     test_ocr_extraction_normalizes_text_in_service_layer()
+    test_background_image_job_uses_normalized_ocr_text()
     test_image_analysis_flow_falls_back_to_text_for_timeout()
     test_image_analysis_flow_uses_ocr_only_when_text_fallback_also_times_out()
     print("analysis quality guard tests passed")
