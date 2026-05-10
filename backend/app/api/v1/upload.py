@@ -6,7 +6,6 @@ import time
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
-from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
 from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
 from backend.app.core.config import settings
 from backend.app.schemas.card_schema import (
@@ -21,6 +20,7 @@ from backend.app.schemas.card_schema import (
 from backend.app.services.analysis_jobs import (
     analyze_image_with_fallback,
     create_image_analysis_job,
+    extract_ocr_response,
     get_image_analysis_job,
     retry_image_analysis_job,
 )
@@ -67,20 +67,17 @@ async def extract_text(image: UploadFile = File(...)) -> OCRResponse:
         raise HTTPException(status_code=400, detail="上传图片为空。")
 
     try:
-        ocr_started_at = time.perf_counter()
-        ocr_result = vivo_client.ocr_image(image_bytes)
-        normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+        result = extract_ocr_response(
+            image_bytes=image_bytes,
+            vivo_client=vivo_client,
+        )
         logger.info(
             "api ocr extract image_kb=%.1f ocr=%.2fs total=%.2fs",
             len(image_bytes) / 1024,
-            time.perf_counter() - ocr_started_at,
+            result.ocr_elapsed,
             time.perf_counter() - started_at,
         )
-        return OCRResponse(
-            raw_text=ocr_result["raw_text"],
-            normalized_text=normalized_text,
-            blocks=ocr_result.get("blocks", []),
-        )
+        return result.ocr
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

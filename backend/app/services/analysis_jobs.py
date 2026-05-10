@@ -35,12 +35,37 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 
 
 @dataclass(frozen=True)
+class OCRExtractionResult:
+    ocr: OCRResponse
+    ocr_elapsed: float
+
+
+@dataclass(frozen=True)
 class ImageAnalysisFallbackResult:
     analysis: AnalysisResponse
     ocr: OCRResponse
     ocr_elapsed: float
     analysis_elapsed: float
     fallback_to_text: bool
+
+
+def extract_ocr_response(
+    *,
+    image_bytes: bytes,
+    vivo_client: VivoLMClient,
+) -> OCRExtractionResult:
+    ocr_started_at = time.perf_counter()
+    ocr_result = vivo_client.ocr_image(image_bytes)
+    ocr_elapsed = time.perf_counter() - ocr_started_at
+    normalized_text = normalize_ocr_text(ocr_result["raw_text"])
+    return OCRExtractionResult(
+        ocr=OCRResponse(
+            raw_text=ocr_result["raw_text"],
+            normalized_text=normalized_text,
+            blocks=ocr_result.get("blocks", []),
+        ),
+        ocr_elapsed=ocr_elapsed,
+    )
 
 
 def analyze_image_with_fallback(
@@ -54,15 +79,12 @@ def analyze_image_with_fallback(
     diagnostic_service: DiagnosticService,
     vivo_client: VivoLMClient,
 ) -> ImageAnalysisFallbackResult:
-    ocr_started_at = time.perf_counter()
-    ocr_result = vivo_client.ocr_image(image_bytes)
-    ocr_elapsed = time.perf_counter() - ocr_started_at
-    normalized_text = normalize_ocr_text(ocr_result["raw_text"])
-    ocr = OCRResponse(
-        raw_text=ocr_result["raw_text"],
-        normalized_text=normalized_text,
-        blocks=ocr_result.get("blocks", []),
+    ocr_result = extract_ocr_response(
+        image_bytes=image_bytes,
+        vivo_client=vivo_client,
     )
+    ocr = ocr_result.ocr
+    normalized_text = ocr.normalized_text
     request_payload = AnalysisRequest(
         question_text=normalized_text,
         subject=subject,
@@ -126,7 +148,7 @@ def analyze_image_with_fallback(
     return ImageAnalysisFallbackResult(
         analysis=analysis,
         ocr=ocr,
-        ocr_elapsed=ocr_elapsed,
+        ocr_elapsed=ocr_result.ocr_elapsed,
         analysis_elapsed=analysis_elapsed,
         fallback_to_text=fallback_to_text,
     )

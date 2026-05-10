@@ -12,6 +12,7 @@ from backend.app.services.analysis_jobs import (
     _friendly_error,
     analyze_image_with_fallback,
     build_ocr_only_analysis,
+    extract_ocr_response,
     should_fallback_to_text_analysis,
 )
 
@@ -55,6 +56,18 @@ def test_image_analysis_fallback_helpers_are_service_level() -> None:
     assert result.cleaned_question == "normalized text"
     assert result.source == "image"
     assert result.subject == "未分类"
+
+
+def test_ocr_extraction_normalizes_text_in_service_layer() -> None:
+    result = extract_ocr_response(
+        image_bytes=b"image",
+        vivo_client=_FakeVivoClient(raw_text="  first line\r\n\r\nsecond line  "),  # type: ignore[arg-type]
+    )
+
+    assert result.ocr.raw_text == "  first line\r\n\r\nsecond line  "
+    assert result.ocr.normalized_text == "first line\n\nsecond line"
+    assert result.ocr.blocks == [{"text": "  first line\r\n\r\nsecond line  "}]
+    assert result.ocr_elapsed >= 0
 
 
 class _FakeVivoClient:
@@ -167,6 +180,7 @@ if __name__ == "__main__":
     test_compact_broken_fraction_is_not_guessed()
     test_background_job_error_messages_are_student_friendly()
     test_image_analysis_fallback_helpers_are_service_level()
+    test_ocr_extraction_normalizes_text_in_service_layer()
     test_image_analysis_flow_falls_back_to_text_for_timeout()
     test_image_analysis_flow_uses_ocr_only_when_text_fallback_also_times_out()
     print("analysis quality guard tests passed")
