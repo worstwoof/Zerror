@@ -52,3 +52,7 @@ jobs:
       - name: Analyze Flutter code
         working-directory: frontend
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run Flutter tests
+        working-directory: frontend
+        run: flutter test

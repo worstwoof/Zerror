@@ -1,0 +1,24 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[*.dart]
+indent_size = 2
+
+[*.{json,md,py,sh,toml,yaml,yml}]
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.{psd,png,jpg,jpeg,gif,ico,webp}]
+insert_final_newline = false
+trim_trailing_whitespace = false

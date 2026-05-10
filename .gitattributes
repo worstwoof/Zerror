@@ -1,0 +1,25 @@
+* text=auto
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+
+*.dart text
+*.js text
+*.json text
+*.kt text
+*.md text
+*.py text
+*.toml text
+*.xml text
+*.yaml text
+*.yml text
+
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.psd binary
+*.webp binary
