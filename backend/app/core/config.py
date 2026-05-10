@@ -90,6 +90,9 @@ class Settings:
     manim_media_url_prefix: str
     analysis_job_max_workers: int
     manim_render_max_workers: int
+    manim_render_timeout_seconds: int
+    manim_faststart_timeout_seconds: int
+    manim_probe_timeout_seconds: int
     debug: bool
 
     @property
@@ -207,6 +210,21 @@ def get_settings() -> Settings:
             "MANIM_RENDER_MAX_WORKERS",
             file_values,
             "1",
+        ),
+        manim_render_timeout_seconds=_get_positive_int_setting(
+            "MANIM_RENDER_TIMEOUT_SECONDS",
+            file_values,
+            "420",
+        ),
+        manim_faststart_timeout_seconds=_get_positive_int_setting(
+            "MANIM_FASTSTART_TIMEOUT_SECONDS",
+            file_values,
+            "120",
+        ),
+        manim_probe_timeout_seconds=_get_positive_int_setting(
+            "MANIM_PROBE_TIMEOUT_SECONDS",
+            file_values,
+            "15",
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )

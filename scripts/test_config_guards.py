@@ -59,6 +59,33 @@ def test_background_worker_counts_can_be_configured_from_env() -> None:
             os.environ["MANIM_RENDER_MAX_WORKERS"] = previous_manim
 
 
+def test_manim_renderer_timeouts_can_be_configured_from_env() -> None:
+    previous_render = os.environ.get("MANIM_RENDER_TIMEOUT_SECONDS")
+    previous_faststart = os.environ.get("MANIM_FASTSTART_TIMEOUT_SECONDS")
+    previous_probe = os.environ.get("MANIM_PROBE_TIMEOUT_SECONDS")
+    os.environ["MANIM_RENDER_TIMEOUT_SECONDS"] = "600"
+    os.environ["MANIM_FASTSTART_TIMEOUT_SECONDS"] = "0"
+    os.environ["MANIM_PROBE_TIMEOUT_SECONDS"] = "20"
+    try:
+        settings = get_settings()
+        assert settings.manim_render_timeout_seconds == 600
+        assert settings.manim_faststart_timeout_seconds == 1
+        assert settings.manim_probe_timeout_seconds == 20
+    finally:
+        if previous_render is None:
+            os.environ.pop("MANIM_RENDER_TIMEOUT_SECONDS", None)
+        else:
+            os.environ["MANIM_RENDER_TIMEOUT_SECONDS"] = previous_render
+        if previous_faststart is None:
+            os.environ.pop("MANIM_FASTSTART_TIMEOUT_SECONDS", None)
+        else:
+            os.environ["MANIM_FASTSTART_TIMEOUT_SECONDS"] = previous_faststart
+        if previous_probe is None:
+            os.environ.pop("MANIM_PROBE_TIMEOUT_SECONDS", None)
+        else:
+            os.environ["MANIM_PROBE_TIMEOUT_SECONDS"] = previous_probe
+
+
 def test_env_example_documents_runtime_settings() -> None:
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     expected_keys = {
@@ -69,6 +96,9 @@ def test_env_example_documents_runtime_settings() -> None:
         "MANIM_MEDIA_URL_PREFIX",
         "ANALYSIS_JOB_MAX_WORKERS",
         "MANIM_RENDER_MAX_WORKERS",
+        "MANIM_RENDER_TIMEOUT_SECONDS",
+        "MANIM_FASTSTART_TIMEOUT_SECONDS",
+        "MANIM_PROBE_TIMEOUT_SECONDS",
     }
 
     for key in expected_keys:
@@ -80,5 +110,6 @@ if __name__ == "__main__":
     test_manim_media_url_prefix_can_be_configured_from_env()
     test_positive_int_setting_clamps_to_one()
     test_background_worker_counts_can_be_configured_from_env()
+    test_manim_renderer_timeouts_can_be_configured_from_env()
     test_env_example_documents_runtime_settings()
     print("config guard tests passed")

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-from backend.app.core.config import PROJECT_ROOT
+from backend.app.core.config import PROJECT_ROOT, settings
 
 
 class ManimUnavailable(RuntimeError):
@@ -39,7 +39,7 @@ def render_manim_video(
         cwd=output_dir,
         capture_output=True,
         text=True,
-        timeout=420,
+        timeout=settings.manim_render_timeout_seconds,
         check=False,
     )
     if completed.returncode != 0:
@@ -95,7 +95,7 @@ def optimize_mp4_for_streaming(video_path: Path) -> None:
             cwd=video_path.parent,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=settings.manim_faststart_timeout_seconds,
             check=False,
         )
         if (
@@ -2386,7 +2386,7 @@ def _python_manim_available() -> bool:
         [sys.executable, "-c", "import manim"],
         capture_output=True,
         text=True,
-        timeout=15,
+        timeout=settings.manim_probe_timeout_seconds,
         check=False,
     )
     return completed.returncode == 0
