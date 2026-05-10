@@ -37,6 +37,13 @@ def _get_setting(name: str, file_values: Dict[str, str], default: str = "") -> s
     return os.getenv(name, file_values.get(name, default))
 
 
+def _normalize_url_prefix(prefix: str) -> str:
+    stripped = prefix.strip()
+    if not stripped or stripped == "/":
+        return ""
+    return "/" + stripped.strip("/")
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -71,6 +78,7 @@ class Settings:
     vivo_animation_timeout_seconds: int
     vivo_max_tokens: int
     vivo_animation_max_tokens: int
+    manim_media_url_prefix: str
     debug: bool
 
     @property
@@ -175,6 +183,9 @@ def get_settings() -> Settings:
                 file_values,
                 _get_setting("VIVO_MAX_TOKENS", file_values, "4096"),
             )
+        ),
+        manim_media_url_prefix=_normalize_url_prefix(
+            _get_setting("MANIM_MEDIA_URL_PREFIX", file_values, "/static/media/manim")
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )

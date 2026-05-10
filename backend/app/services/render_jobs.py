@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 from urllib.parse import unquote, urlparse
 
-from backend.app.core.config import PROJECT_ROOT
+from backend.app.core.config import PROJECT_ROOT, settings
 from backend.app.rendering.manim_renderer import (
     ManimUnavailable,
     is_manim_available,
@@ -20,7 +20,7 @@ from backend.app.rendering.manim_renderer import (
 
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
-MEDIA_URL_PREFIX = "/static/media/manim"
+MEDIA_URL_PREFIX = settings.manim_media_url_prefix
 MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v4"
 
 _executor = ThreadPoolExecutor(max_workers=1)
