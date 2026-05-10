@@ -40,6 +40,13 @@ def _ensure_credentials() -> None:
         )
 
 
+async def _read_required_upload_bytes(image: UploadFile) -> bytes:
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="上传图片为空。")
+    return image_bytes
+
+
 @router.get("/health")
 def healthcheck() -> dict[str, str]:
     return {
@@ -62,9 +69,7 @@ def analyze_text(request: AnalysisRequest) -> AnalysisResponse:
 async def extract_text(image: UploadFile = File(...)) -> OCRResponse:
     _ensure_credentials()
     started_at = time.perf_counter()
-    image_bytes = await image.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="上传图片为空。")
+    image_bytes = await _read_required_upload_bytes(image)
 
     try:
         result = extract_ocr_response(
@@ -99,9 +104,7 @@ async def analyze_image(
     upload_filename = image.filename or ""
     requested_subject_extensions = enable_subject_extensions
     effective_subject_extensions = True
-    image_bytes = await image.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="上传图片为空。")
+    image_bytes = await _read_required_upload_bytes(image)
 
     try:
         logger.info(
@@ -157,9 +160,7 @@ async def create_analysis_image_job(
     # expose OCR partials quickly, then let the quality model finish detached
     # from the phone's upload connection.
     _ensure_credentials()
-    image_bytes = await image.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="上传图片为空。")
+    image_bytes = await _read_required_upload_bytes(image)
     return create_image_analysis_job(
         client_job_id=client_job_id,
         image_bytes=image_bytes,
