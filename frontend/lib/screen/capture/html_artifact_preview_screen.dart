@@ -8,10 +8,14 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
     super.key,
     required this.title,
     required this.htmlContent,
+    this.infoTitle = 'HTML 学科扩展预览',
+    this.infoNote,
   });
 
   final String title;
   final String htmlContent;
+  final String infoTitle;
+  final String? infoNote;
 
   @override
   State<HtmlArtifactPreviewScreen> createState() =>
@@ -51,16 +55,58 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.infoTitle,
+                      style: const TextStyle(
+                        color: AppPalette.almondCream,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.infoNote ??
+                          '当前内容来自后端返回的 interactive_html artifact，已在 WebView 中本地加载。',
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 12.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: WebViewWidget(controller: _controller),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+                      ),
+                    ),
+                    child: WebViewWidget(controller: _controller),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
