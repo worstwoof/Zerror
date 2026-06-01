@@ -81,3 +81,54 @@ class PhysicsAnimationResponse(BaseModel):
     artifact: Optional[RichArtifact] = None
     generated: bool = False
     reason: str = ""
+
+
+class PracticePaperSourceError(BaseModel):
+    id: str
+    subject: str = ""
+    topic: str = ""
+    question: str = ""
+    reason: str = ""
+    tags: List[str] = Field(default_factory=list)
+    my_answer: str = ""
+    ai_analysis: str = ""
+
+
+class PracticePaperRequest(BaseModel):
+    errors: List[PracticePaperSourceError] = Field(default_factory=list)
+    question_count: int = Field(default=10, ge=3, le=50)
+    selected_subjects: List[str] = Field(default_factory=list)
+    strategy_label: str = "薄弱点突破"
+    include_answer_key: bool = True
+
+
+class PracticeQuestion(BaseModel):
+    id: str
+    type: str = "简答题"
+    subject: str = ""
+    topic: str = ""
+    stem: str
+    options: List[str] = Field(default_factory=list)
+    answer: str
+    answer_index: Optional[int] = None
+    solution_outline: str = ""
+    reason_hint: str = ""
+    difficulty: str = "中等"
+    estimated_minutes: int = Field(default=4, ge=1, le=30)
+    source_error_ids: List[str] = Field(default_factory=list)
+
+
+class PracticePaperResponse(BaseModel):
+    title: str
+    subtitle: str = ""
+    subject_focus: List[str] = Field(default_factory=list)
+    topic_focus: List[str] = Field(default_factory=list)
+    strategy_label: str
+    estimated_minutes: int = Field(default=20, ge=1)
+    handout_overview: str
+    learning_targets: List[str] = Field(default_factory=list)
+    warmup_notes: List[str] = Field(default_factory=list)
+    questions: List[PracticeQuestion] = Field(default_factory=list)
+    answer_key: List[str] = Field(default_factory=list)
+    printable_html: str = ""
+    raw_model_output: str = ""

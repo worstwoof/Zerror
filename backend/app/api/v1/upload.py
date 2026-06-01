@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
+from ai_engine.llm_logic.practice_paper_chain import PracticePaperService
 from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
 from backend.app.core.config import settings
 from backend.app.schemas.card_schema import (
@@ -16,12 +17,15 @@ from backend.app.schemas.card_schema import (
     OCRResponse,
     PhysicsAnimationRequest,
     PhysicsAnimationResponse,
+    PracticePaperRequest,
+    PracticePaperResponse,
 )
 
 
 router = APIRouter(prefix="/api/v1", tags=["ai"])
 vivo_client = VivoLMClient(settings)
 diagnostic_service = DiagnosticService(vivo_client)
+practice_paper_service = PracticePaperService(vivo_client)
 logger = logging.getLogger(__name__)
 
 
@@ -205,6 +209,25 @@ def generate_physics_animation(request: PhysicsAnimationRequest) -> PhysicsAnima
             generated=generated,
             reason=reason,
         )
+    except VivoAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/analysis/practice-paper", response_model=PracticePaperResponse)
+def generate_practice_paper(request: PracticePaperRequest) -> PracticePaperResponse:
+    _ensure_credentials()
+    if not request.errors:
+        raise HTTPException(status_code=400, detail="请至少提供一道错题用于组卷。")
+    started_at = time.perf_counter()
+    try:
+        response = practice_paper_service.generate_practice_paper(request)
+        logger.info(
+            "api practice paper questions=%s errors=%s elapsed=%.2fs",
+            len(response.questions),
+            len(request.errors),
+            time.perf_counter() - started_at,
+        )
+        return response
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

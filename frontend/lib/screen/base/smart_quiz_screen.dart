@@ -4,6 +4,7 @@ import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
+import '../../data/ai_api_client.dart';
 import 'quiz_paper_screen.dart';
 
 class SmartQuizScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class SmartQuizScreen extends StatefulWidget {
 }
 
 class _SmartQuizScreenState extends State<SmartQuizScreen> {
+  final AiApiClient _aiApiClient = const AiApiClient();
   final List<String> _selectedSubjects = ['全部学科'];
 
   int _questionCount = 15;
@@ -27,20 +29,70 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
   ];
 
   Future<void> _startGenerate() async {
+    final store = AppStateScope.of(context);
+    final sourceErrors = _selectedErrors(store);
+    if (sourceErrors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先录入错题，AI 才能生成针对性练习讲义')),
+      );
+      return;
+    }
+
     setState(() => _isGenerating = true);
-    await Future.delayed(const Duration(milliseconds: 1800));
-    if (!mounted) return;
-    setState(() => _isGenerating = false);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => QuizPaperScreen(
-          questionCount: _questionCount,
-          selectedSubjects: List<String>.from(_selectedSubjects),
-          strategyLabel: _strategies[_selectedStrategy].$1,
+    try {
+      final paper = await _aiApiClient.generatePracticePaper(
+        errors: sourceErrors.map((item) => item.toJson()).toList(growable: false),
+        questionCount: _questionCount,
+        selectedSubjects: List<String>.from(_selectedSubjects),
+        strategyLabel: _strategies[_selectedStrategy].$1,
+      );
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuizPaperScreen(
+            questionCount: paper.questions.length,
+            selectedSubjects: List<String>.from(_selectedSubjects),
+            strategyLabel: paper.strategyLabel.isEmpty
+                ? _strategies[_selectedStrategy].$1
+                : paper.strategyLabel,
+            generatedQuestions: paper.questions
+                .map((item) => item.toQuizMap())
+                .toList(growable: false),
+            printableTitle: paper.title,
+            printableHtml: paper.printableHtml,
+          ),
         ),
-      ),
-    );
+      );
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('生成失败：$error')),
+      );
+    }
+  }
+
+  List<ErrorRecord> _selectedErrors(AppStore store) {
+    final selected = _selectedSubjects
+        .where((item) => item != '全部学科' && item != '全部')
+        .toSet();
+    if (selected.isEmpty) {
+      return store.pendingReviewErrors.isNotEmpty
+          ? store.pendingReviewErrors
+          : store.errors.toList(growable: false);
+    }
+    final filtered = store.errors
+        .where((item) => selected.contains(item.subject))
+        .toList(growable: false);
+    return filtered.isNotEmpty ? filtered : store.errors.toList(growable: false);
   }
 
   @override
@@ -107,7 +159,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             RoseThreeLoader(size: 156),
             SizedBox(height: 24),
             Text(
-              'AI 正在调取错题档案...',
+              'AI 正在编排专题讲义...',
               style: TextStyle(
                 color: AppPalette.textPrimary,
                 fontSize: 16,
@@ -116,7 +168,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              '正在根据你的复习节奏和薄弱点匹配最合适的题目',
+              '正在根据错题档案生成练习题、答案栏和 A4 打印版式',
               style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
             ),
           ],

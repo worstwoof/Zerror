@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../capture/html_artifact_preview_screen.dart';
 import 'quiz_result_screen.dart';
 
 class QuizPaperScreen extends StatefulWidget {
@@ -11,11 +12,19 @@ class QuizPaperScreen extends StatefulWidget {
     this.questionCount = 15,
     this.selectedSubjects = const [],
     this.strategyLabel = '抗遗忘复习',
+    this.generatedQuestions,
+    this.generatedTitle,
+    this.printableTitle,
+    this.printableHtml,
   });
 
   final int questionCount;
   final List<String> selectedSubjects;
   final String strategyLabel;
+  final List<Map<String, dynamic>>? generatedQuestions;
+  final String? generatedTitle;
+  final String? printableTitle;
+  final String? printableHtml;
 
   @override
   State<QuizPaperScreen> createState() => _QuizPaperScreenState();
@@ -47,6 +56,11 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
   }
 
   List<Map<String, dynamic>> _buildQuestions() {
+    final generated = widget.generatedQuestions;
+    if (generated != null && generated.isNotEmpty) {
+      return generated;
+    }
+
     final selected = widget.selectedSubjects.where((item) => item != '全部学科').toList();
     final primarySubject = selected.isNotEmpty ? selected.first : '线性代数';
 
@@ -169,6 +183,26 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     );
   }
 
+  void _openPrintableHandout() {
+    final html = widget.printableHtml;
+    if (html == null || html.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前试卷没有可预览的打印讲义')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HtmlArtifactPreviewScreen(
+          title: widget.printableTitle ?? '打印讲义',
+          htmlContent: html,
+          infoTitle: 'A4 打印讲义预览',
+          infoNote: '这份讲义由组卷接口生成，包含题目区、作答留白和参考答案。可在支持打印的 WebView 或浏览器中按 A4 版式输出。',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -190,16 +224,26 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              _formatTime(_secondsElapsed),
+              widget.generatedTitle ?? _formatTime(_secondsElapsed),
               style: const TextStyle(
                 color: AppPalette.almondCream,
                 fontSize: 13,
-                fontFamily: 'monospace',
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
         actions: [
+          if (widget.printableHtml?.trim().isNotEmpty == true)
+            IconButton(
+              tooltip: '预览打印讲义',
+              onPressed: _openPrintableHandout,
+              icon: const Icon(
+                Icons.description_outlined,
+                color: AppPalette.almondCream,
+              ),
+            ),
           TextButton(
             onPressed: _submitPaper,
             child: const Text(
@@ -411,7 +455,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
 
   List<Widget> _buildChoiceOptions(Map<String, dynamic> question, int index) {
     final options = (question['options'] as List<dynamic>).cast<String>();
-    const prefixes = ['A', 'B', 'C', 'D'];
+    const prefixes = ['A', 'B', 'C', 'D', 'E', 'F'];
 
     return List.generate(options.length, (optIndex) {
       final optionText = options[optIndex];
@@ -438,7 +482,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           child: Row(
             children: [
               Text(
-                '${prefixes[optIndex]}.  ',
+                '${optIndex < prefixes.length ? prefixes[optIndex] : optIndex + 1}.  ',
                 style: TextStyle(
                   color: isSelected
                       ? AppPalette.matchaMist

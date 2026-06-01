@@ -31,6 +31,8 @@ class AppConstants {
   static String get meEndpoint => '$apiBaseUrl/api/v1/auth/me';
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';
   static String get analysisEndpoint => '$apiBaseUrl/api/v1/analysis/text';
+  static String get practicePaperEndpoint =>
+      '$apiBaseUrl/api/v1/analysis/practice-paper';
   static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';
   static String appStateEndpoint(String syncUserId) =>
       '$apiBaseUrl/api/v1/app-state/${Uri.encodeComponent(syncUserId)}';

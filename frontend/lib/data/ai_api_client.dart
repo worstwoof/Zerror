@@ -174,6 +174,153 @@ class PhysicsAnimationResult {
   }
 }
 
+class GeneratedPracticeQuestion {
+  final String id;
+  final String type;
+  final String subject;
+  final String topic;
+  final String stem;
+  final List<String> options;
+  final String answer;
+  final int? answerIndex;
+  final String solutionOutline;
+  final String reasonHint;
+  final String difficulty;
+  final int estimatedMinutes;
+  final List<String> sourceErrorIds;
+
+  const GeneratedPracticeQuestion({
+    required this.id,
+    required this.type,
+    required this.subject,
+    required this.topic,
+    required this.stem,
+    required this.options,
+    required this.answer,
+    required this.answerIndex,
+    required this.solutionOutline,
+    required this.reasonHint,
+    required this.difficulty,
+    required this.estimatedMinutes,
+    required this.sourceErrorIds,
+  });
+
+  factory GeneratedPracticeQuestion.fromJson(Map<String, dynamic> json) {
+    return GeneratedPracticeQuestion(
+      id: (json['id'] ?? '').toString(),
+      type: (json['type'] ?? '简答题').toString(),
+      subject: (json['subject'] ?? '').toString(),
+      topic: (json['topic'] ?? '').toString(),
+      stem: (json['stem'] ?? '').toString(),
+      options: (json['options'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(),
+      answer: (json['answer'] ?? '').toString(),
+      answerIndex: int.tryParse((json['answer_index'] ?? '').toString()),
+      solutionOutline: (json['solution_outline'] ?? '').toString(),
+      reasonHint: (json['reason_hint'] ?? '').toString(),
+      difficulty: (json['difficulty'] ?? '中等').toString(),
+      estimatedMinutes: int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 4,
+      sourceErrorIds: (json['source_error_ids'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toQuizMap() {
+    final isChoice = options.isNotEmpty && answerIndex != null;
+    return {
+      'type': type,
+      'subject': subject.isEmpty ? '综合' : subject,
+      'topic': topic.isEmpty ? '错题回收' : topic,
+      'content': stem,
+      'options': options,
+      'correctIndex': answerIndex,
+      'correctAnswer': answer,
+      'keywords': _answerKeywords(answer),
+      'reasonHint': reasonHint.isEmpty ? '组卷练习中暴露出薄弱点' : reasonHint,
+      'analysisHint': solutionOutline.isEmpty ? answer : solutionOutline,
+      'answerType': isChoice ? 'choice' : 'text',
+      'difficulty': difficulty,
+      'estimatedMinutes': estimatedMinutes,
+      'sourceErrorIds': sourceErrorIds,
+    };
+  }
+
+  List<String> _answerKeywords(String text) {
+    final chunks = text
+        .split(RegExp(r'[\s,，。；;、]+'))
+        .map((item) => item.trim())
+        .where((item) => item.length >= 2)
+        .take(4)
+        .toList();
+    return chunks.isEmpty ? [text.trim()] : chunks;
+  }
+}
+
+class PracticePaperResult {
+  final String title;
+  final String subtitle;
+  final List<String> subjectFocus;
+  final List<String> topicFocus;
+  final String strategyLabel;
+  final int estimatedMinutes;
+  final String handoutOverview;
+  final List<String> learningTargets;
+  final List<String> warmupNotes;
+  final List<GeneratedPracticeQuestion> questions;
+  final List<String> answerKey;
+  final String printableHtml;
+
+  const PracticePaperResult({
+    required this.title,
+    required this.subtitle,
+    required this.subjectFocus,
+    required this.topicFocus,
+    required this.strategyLabel,
+    required this.estimatedMinutes,
+    required this.handoutOverview,
+    required this.learningTargets,
+    required this.warmupNotes,
+    required this.questions,
+    required this.answerKey,
+    required this.printableHtml,
+  });
+
+  factory PracticePaperResult.fromJson(Map<String, dynamic> json) {
+    return PracticePaperResult(
+      title: (json['title'] ?? '专题针对性练习').toString(),
+      subtitle: (json['subtitle'] ?? '').toString(),
+      subjectFocus: _stringList(json['subject_focus']),
+      topicFocus: _stringList(json['topic_focus']),
+      strategyLabel: (json['strategy_label'] ?? '').toString(),
+      estimatedMinutes: int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 20,
+      handoutOverview: (json['handout_overview'] ?? '').toString(),
+      learningTargets: _stringList(json['learning_targets']),
+      warmupNotes: _stringList(json['warmup_notes']),
+      questions: (json['questions'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => GeneratedPracticeQuestion.fromJson(
+              item.map((key, value) => MapEntry(key.toString(), value)),
+            ),
+          )
+          .toList(),
+      answerKey: _stringList(json['answer_key']),
+      printableHtml: (json['printable_html'] ?? '').toString(),
+    );
+  }
+
+  static List<String> _stringList(dynamic value) {
+    return (value as List<dynamic>? ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
+  }
+}
+
 class AiApiClient {
   const AiApiClient();
 
@@ -271,6 +418,39 @@ class AiApiClient {
     }
 
     return PhysicsAnimationResult.fromJson(decoded);
+  }
+
+  Future<PracticePaperResult> generatePracticePaper({
+    required List<Map<String, dynamic>> errors,
+    required int questionCount,
+    required List<String> selectedSubjects,
+    required String strategyLabel,
+  }) async {
+    final response = await http.post(
+      Uri.parse(AppConstants.practicePaperEndpoint),
+      headers: const {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: jsonEncode({
+        'errors': errors,
+        'question_count': questionCount,
+        'selected_subjects': selectedSubjects,
+        'strategy_label': strategyLabel,
+        'include_answer_key': true,
+      }),
+    );
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 404) {
+        throw AiApiException(
+          '组卷接口未找到，请确认 App 正在连接已更新并重启后的后端：${AppConstants.practicePaperEndpoint}',
+        );
+      }
+      throw AiApiException(_extractErrorMessage(decoded));
+    }
+
+    return PracticePaperResult.fromJson(decoded);
   }
 
   Map<String, dynamic> _decodeJson(http.Response response) {

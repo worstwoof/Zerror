@@ -10,10 +10,14 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
     super.key,
     required this.title,
     required this.htmlContent,
+    this.infoTitle = 'HTML 学科扩展预览',
+    this.infoNote,
   });
 
   final String title;
   final String htmlContent;
+  final String infoTitle;
+  final String? infoNote;
 
   @override
   State<HtmlArtifactPreviewScreen> createState() => _HtmlArtifactPreviewScreenState();
@@ -70,9 +74,9 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'HTML 学科扩展预览',
-                      style: TextStyle(
+                    Text(
+                      widget.infoTitle,
+                      style: const TextStyle(
                         color: AppPalette.almondCream,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -80,7 +84,8 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '当前内容来自后端返回的 interactive_html artifact，已在 WebView 中本地加载。源码大小约 $htmlSize KB。',
+                      widget.infoNote ??
+                          '当前内容来自后端返回的 interactive_html artifact，已在 WebView 中本地加载。源码大小约 $htmlSize KB。',
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
                         fontSize: 12.5,
