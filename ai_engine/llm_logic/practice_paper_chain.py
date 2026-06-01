@@ -60,7 +60,9 @@ class PracticePaperService:
 - 策略：{request.strategy_label}。
 - 题目必须围绕错题暴露出的知识点、错因和相近专题生成，不要复刻原题。
 - 难度应包含基础回收、变式巩固、综合迁移，适合学生打印后手写完成。
+- 讲义不能只有习题，必须先给出公式梳理、题型模型、例题讲解和易错提醒。
 - 题干要完整清晰；选择题必须提供 4 个选项和 0-based answer_index；非选择题 answer_index 返回 null。
+- options 里只写选项内容，不要带 A.、B.、C.、D.、（A）、A、 等序号前缀。
 - 答案解析要简洁，像教辅答案栏，不要写长篇聊天式解释。
 
 错题档案：
@@ -76,6 +78,11 @@ class PracticePaperService:
   "handout_overview": "这份讲义针对什么问题，80 字以内",
   "learning_targets": ["目标1", "目标2", "目标3"],
   "warmup_notes": ["做题提醒1", "做题提醒2"],
+  "concept_review": ["核心概念讲解1", "核心概念讲解2"],
+  "formula_cards": ["公式/性质/判定条件1", "公式/性质/判定条件2"],
+  "method_models": ["题型模型：识别条件 -> 建模 -> 运算 -> 检验", "常用解题路径"],
+  "worked_examples": ["例题：题干摘要；讲解：关键步骤和结论"],
+  "common_traps": ["易错提醒1", "易错提醒2"],
   "questions": [
     {{
       "id": "q1",
@@ -169,6 +176,11 @@ class PracticePaperService:
             ),
             learning_targets=self._string_list(parsed.get("learning_targets"))[:5],
             warmup_notes=self._string_list(parsed.get("warmup_notes"))[:5],
+            concept_review=self._string_list(parsed.get("concept_review"))[:6],
+            formula_cards=self._string_list(parsed.get("formula_cards"))[:8],
+            method_models=self._string_list(parsed.get("method_models"))[:6],
+            worked_examples=self._string_list(parsed.get("worked_examples"))[:4],
+            common_traps=self._string_list(parsed.get("common_traps"))[:6],
             questions=questions,
             answer_key=answer_key,
             raw_model_output=raw_output,
@@ -195,7 +207,10 @@ class PracticePaperService:
             if not stem or not answer:
                 continue
             answer_index = self._optional_int(item.get("answer_index"))
-            options = self._string_list(item.get("options"))[:4]
+            options = [
+                self._normalize_option(item)
+                for item in self._string_list(item.get("options"))[:4]
+            ]
             if options and answer_index is not None and not 0 <= answer_index < len(options):
                 answer_index = None
 
@@ -272,10 +287,46 @@ class PracticePaperService:
             f"<li>{html.escape(item)}</li>"
             for item in response.answer_key
         )
-        targets = "".join(f"<li>{html.escape(item)}</li>" for item in response.learning_targets)
-        notes = "".join(f"<li>{html.escape(item)}</li>" for item in response.warmup_notes)
+        targets = self._list_items_html(response.learning_targets)
+        notes = self._list_items_html(response.warmup_notes)
         topics = " / ".join(response.topic_focus) or "专题巩固"
         subjects = " / ".join(response.subject_focus) or "综合"
+        primary_topic = response.topic_focus[0] if response.topic_focus else "本专题"
+        concepts = self._list_items_html(
+            response.concept_review
+            or [
+                f"围绕“{primary_topic}”先确认定义、适用条件和常见变式。",
+                "把原错题中的已知条件、目标结论和关键限制分开标注，避免直接套题型。",
+            ]
+        )
+        formulas = self._list_items_html(
+            response.formula_cards
+            or [
+                f"{primary_topic}相关公式要先检查适用条件，再代入计算。",
+                "遇到等价变形时保留中间步骤，便于回查符号、单位或定义域。",
+            ]
+        )
+        methods = self._list_items_html(
+            response.method_models
+            or [
+                "识别题型 -> 提取条件 -> 选择模型 -> 分步运算 -> 回代检验。",
+                "先做基础回收题确认概念，再做变式题检查迁移能力。",
+            ]
+        )
+        examples = self._list_items_html(
+            response.worked_examples
+            or [
+                f"例题讲解：选择一道“{primary_topic}”同类题，先写出条件表，再按模型完成推导。",
+                "讲解重点：每一步都说明为什么能这样变形，并在最后标出最容易错的检查点。",
+            ]
+        )
+        traps = self._list_items_html(
+            response.common_traps
+            or [
+                "不要只记结论；先判断题目是否满足公式或模型的前提。",
+                "计算完成后至少检查一次符号、范围、单位或选项对应关系。",
+            ]
+        )
 
         return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -330,6 +381,23 @@ class PracticePaperService:
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 14px;
+    }}
+    .teach-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }}
+    .teach-box {{
+      break-inside: avoid;
+      border: 1px solid #d9d0bd;
+      background: #fffaf0;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }}
+    .teach-box h3 {{
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #284b36;
     }}
     ul {{ margin: 8px 0 0 18px; padding: 0; }}
     .question {{
@@ -396,6 +464,29 @@ class PracticePaperService:
         <ul>{notes}</ul>
       </div>
     </section>
+    <h2>专题精讲</h2>
+    <section class="teach-grid">
+      <div class="teach-box">
+        <h3>核心概念</h3>
+        <ul>{concepts}</ul>
+      </div>
+      <div class="teach-box">
+        <h3>公式与条件</h3>
+        <ul>{formulas}</ul>
+      </div>
+      <div class="teach-box">
+        <h3>题型模型</h3>
+        <ul>{methods}</ul>
+      </div>
+      <div class="teach-box">
+        <h3>易错提醒</h3>
+        <ul>{traps}</ul>
+      </div>
+    </section>
+    <h2>例题讲解</h2>
+    <div class="teach-box">
+      <ul>{examples}</ul>
+    </div>
     <h2>专题练习</h2>
     {question_blocks}
     <section class="answer-key">
@@ -426,6 +517,20 @@ class PracticePaperService:
   {options}
   <div class="answer-space"></div>
 </section>"""
+
+    def _list_items_html(self, items: list[str]) -> str:
+        if not items:
+            return "<li>结合本讲义专题，先回看定义、条件和解题步骤，再进入练习。</li>"
+        return "".join(f"<li>{html.escape(item)}</li>" for item in items)
+
+    def _normalize_option(self, option: str) -> str:
+        cleaned = option.strip()
+        cleaned = re.sub(
+            r"^\s*(?:[\(\[（【]?\s*[A-Fa-f]\s*[\)\]）】]?[\.\、．:：]?\s+|[A-Fa-f][\.\、．:：]\s*)",
+            "",
+            cleaned,
+        ).strip()
+        return cleaned or option.strip()
 
     def _parse_json(self, raw_output: str) -> dict[str, Any]:
         cleaned = raw_output.strip()
