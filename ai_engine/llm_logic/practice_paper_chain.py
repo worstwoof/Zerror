@@ -66,6 +66,10 @@ class PracticePaperService:
 - 答案解析要像教辅答案栏一样完整，给出 2 到 5 个分步 solution_steps；不要只写一句答案。
 - 如果几何、函数图像、物理受力/电路、化学流程、统计图等题目有必要配图，可以在 diagram_svg 返回一个简洁 SVG 示意图；不用图时返回空字符串。
 - diagram_svg 必须是单个 <svg>...</svg>，不要包含 script、foreignObject、外链图片或事件属性。
+- diagram_svg 的 viewBox 建议控制在 320x180 或 360x200 内，画成讲义小图，不要做成占满整页的大图。
+- 示意图必须服务解题：标出已知点、关键线段/角度/坐标轴、运动方向、受力方向、电场/磁场方向、电流方向或光路方向等关键标记。
+- 物理图不要只画物块/圆点；必须用箭头和文字标注 v、F、a、B、E、I、N、mg 等必要方向。磁场垂直纸面时用 ⊙/⊗ 或点/叉阵列表示，并写清“B 出纸面/入纸面”。
+- 函数或几何图要标出坐标轴、关键点、辅助线、角度或长度关系；电路图要标出电源、开关、电流方向和关键表计/电阻。
 
 错题档案：
 {source_json}
@@ -444,13 +448,15 @@ class PracticePaperService:
     }}
     .diagram {{
       margin: 10px 0;
-      padding: 8px;
+      padding: 6px;
       border: 1px solid #d9d0bd;
       background: #fffaf0;
       text-align: center;
     }}
     .diagram svg {{
-      max-width: 100%;
+      width: min(100%, 330px);
+      max-width: 330px;
+      max-height: 190px;
       height: auto;
     }}
     .caption {{
