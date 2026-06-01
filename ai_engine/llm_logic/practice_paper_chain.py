@@ -63,7 +63,9 @@ class PracticePaperService:
 - 讲义不能只有习题，必须先给出公式梳理、题型模型、例题讲解和易错提醒。
 - 题干要完整清晰；选择题必须提供 4 个选项和 0-based answer_index；非选择题 answer_index 返回 null。
 - options 里只写选项内容，不要带 A.、B.、C.、D.、（A）、A、 等序号前缀。
-- 答案解析要简洁，像教辅答案栏，不要写长篇聊天式解释。
+- 答案解析要像教辅答案栏一样完整，给出 2 到 5 个分步 solution_steps；不要只写一句答案。
+- 如果几何、函数图像、物理受力/电路、化学流程、统计图等题目有必要配图，可以在 diagram_svg 返回一个简洁 SVG 示意图；不用图时返回空字符串。
+- diagram_svg 必须是单个 <svg>...</svg>，不要包含 script、foreignObject、外链图片或事件属性。
 
 错题档案：
 {source_json}
@@ -94,6 +96,9 @@ class PracticePaperService:
       "answer": "标准答案",
       "answer_index": 0,
       "solution_outline": "答案要点",
+      "solution_steps": ["步骤1", "步骤2", "步骤3"],
+      "diagram_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 360 180\">...</svg>",
+      "diagram_caption": "示意图说明",
       "reason_hint": "这题主要回收的错因",
       "difficulty": "基础/中等/提高",
       "estimated_minutes": 3,
@@ -225,6 +230,9 @@ class PracticePaperService:
                     answer=answer,
                     answer_index=answer_index,
                     solution_outline=str(item.get("solution_outline") or ""),
+                    solution_steps=self._string_list(item.get("solution_steps"))[:5],
+                    diagram_svg=self._sanitize_svg(str(item.get("diagram_svg") or "")),
+                    diagram_caption=str(item.get("diagram_caption") or ""),
                     reason_hint=str(item.get("reason_hint") or ""),
                     difficulty=str(item.get("difficulty") or "中等"),
                     estimated_minutes=max(
@@ -251,6 +259,11 @@ class PracticePaperService:
                     stem="请选择最近一道错题，写出当时出错的关键步骤，并说明下一次如何避免。",
                     answer="应指出原错误步骤、正确思路和可执行的检查方法。",
                     solution_outline="重点看错因是否具体，纠正策略是否可执行。",
+                    solution_steps=[
+                        "写出原错误步骤，并说明它为什么不成立。",
+                        "补上正确概念或公式的适用条件。",
+                        "给出下一次做题时可以执行的检查动作。",
+                    ],
                     reason_hint="错因复盘不够具体",
                     source_error_ids=[],
                 )
@@ -271,6 +284,11 @@ class PracticePaperService:
                     ),
                     answer="答案需覆盖核心概念、关键步骤和易错点检查。",
                     solution_outline=source.ai_analysis or "先定位考点，再按步骤推导，最后回看易错条件。",
+                    solution_steps=[
+                        "先标出题目所属考点和已知条件。",
+                        "选择对应模型或公式，逐步完成推导。",
+                        "最后检查原错因是否已经被规避。",
+                    ],
                     reason_hint=source.reason or "原错题暴露出的薄弱点",
                     source_error_ids=[source.id],
                     estimated_minutes=4,
@@ -283,10 +301,7 @@ class PracticePaperService:
             self._question_html(index, question)
             for index, question in enumerate(response.questions)
         )
-        answer_blocks = "\n".join(
-            f"<li>{html.escape(item)}</li>"
-            for item in response.answer_key
-        )
+        answer_blocks = self._answer_key_html(response)
         targets = self._list_items_html(response.learning_targets)
         notes = self._list_items_html(response.warmup_notes)
         topics = " / ".join(response.topic_focus) or "专题巩固"
@@ -427,6 +442,23 @@ class PracticePaperService:
       gap: 6px 18px;
       margin: 6px 0;
     }}
+    .diagram {{
+      margin: 10px 0;
+      padding: 8px;
+      border: 1px solid #d9d0bd;
+      background: #fffaf0;
+      text-align: center;
+    }}
+    .diagram svg {{
+      max-width: 100%;
+      height: auto;
+    }}
+    .caption {{
+      margin-top: 4px;
+      color: #6f746c;
+      font-size: 11px;
+      text-align: center;
+    }}
     .answer-space {{
       height: 46px;
       border-bottom: 1px solid #d8d0bf;
@@ -435,6 +467,15 @@ class PracticePaperService:
     .answer-key {{
       break-before: page;
       font-size: 13px;
+    }}
+    .answer-item {{
+      break-inside: avoid;
+      margin-bottom: 14px;
+    }}
+    .answer-item h3 {{
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #284b36;
     }}
     @media print {{
       body {{ background: white; }}
@@ -491,7 +532,7 @@ class PracticePaperService:
     {question_blocks}
     <section class="answer-key">
       <h2>参考答案与要点</h2>
-      <ol>{answer_blocks}</ol>
+      {answer_blocks}
     </section>
   </main>
 </body>
@@ -506,6 +547,7 @@ class PracticePaperService:
                 for i, option in enumerate(question.options)
             ]
             options = f"<div class=\"options\">{''.join(option_items)}</div>"
+        diagram = self._diagram_html(question)
         return f"""
 <section class="question">
   <div class="q-head">
@@ -514,9 +556,41 @@ class PracticePaperService:
     <span class="tag">{html.escape(question.topic or question.subject or "专题")}</span>
   </div>
   <div class="stem">{html.escape(question.stem)}</div>
+  {diagram}
   {options}
   <div class="answer-space"></div>
 </section>"""
+
+    def _answer_key_html(self, response: PracticePaperResponse) -> str:
+        blocks = []
+        for index, question in enumerate(response.questions):
+            steps = question.solution_steps
+            if not steps and question.solution_outline:
+                steps = [question.solution_outline]
+            step_items = "".join(f"<li>{html.escape(step)}</li>" for step in steps if step.strip())
+            diagram = self._diagram_html(question)
+            blocks.append(
+                f"""
+<section class="answer-item">
+  <h3>{index + 1}. {html.escape(question.type)}答案</h3>
+  <p><strong>答案：</strong>{html.escape(question.answer)}</p>
+  {diagram}
+  <ol>{step_items}</ol>
+</section>"""
+            )
+        if blocks:
+            return "\n".join(blocks)
+        return "<p>暂无参考答案。</p>"
+
+    def _diagram_html(self, question: PracticeQuestion) -> str:
+        if not question.diagram_svg.strip():
+            return ""
+        caption = (
+            f"<div class=\"caption\">{html.escape(question.diagram_caption)}</div>"
+            if question.diagram_caption.strip()
+            else ""
+        )
+        return f"<div class=\"diagram\">{question.diagram_svg}{caption}</div>"
 
     def _list_items_html(self, items: list[str]) -> str:
         if not items:
@@ -531,6 +605,19 @@ class PracticePaperService:
             cleaned,
         ).strip()
         return cleaned or option.strip()
+
+    def _sanitize_svg(self, raw_svg: str) -> str:
+        if not raw_svg.strip():
+            return ""
+        match = re.search(r"<svg\b[^>]*>.*?</svg>", raw_svg, re.IGNORECASE | re.DOTALL)
+        if not match:
+            return ""
+        svg = match.group(0)
+        svg = re.sub(r"<script\b[^>]*>.*?</script>", "", svg, flags=re.IGNORECASE | re.DOTALL)
+        svg = re.sub(r"<foreignObject\b[^>]*>.*?</foreignObject>", "", svg, flags=re.IGNORECASE | re.DOTALL)
+        svg = re.sub(r"\s+on[a-zA-Z]+\s*=\s*(['\"]).*?\1", "", svg, flags=re.IGNORECASE | re.DOTALL)
+        svg = re.sub(r"\s+(?:href|xlink:href)\s*=\s*(['\"])\s*(?:https?:|data:).*?\1", "", svg, flags=re.IGNORECASE | re.DOTALL)
+        return svg.strip()
 
     def _parse_json(self, raw_output: str) -> dict[str, Any]:
         cleaned = raw_output.strip()
