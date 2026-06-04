@@ -543,8 +543,9 @@ class _AnswerSection extends StatelessWidget {
   }
 }
 
-class _FloatingSlimeOrb extends StatefulWidget {
+class _FloatingSlimeOrb extends StatelessWidget {
   const _FloatingSlimeOrb({
+    super.key,
     required this.size,
     this.compact = false,
   });
@@ -553,57 +554,17 @@ class _FloatingSlimeOrb extends StatefulWidget {
   final bool compact;
 
   @override
-  State<_FloatingSlimeOrb> createState() => _FloatingSlimeOrbState();
-}
-
-class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 4300),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final t = _controller.value * math.pi * 2;
-        final floatY = math.sin(t) * (widget.compact ? 1.5 : 10.0);
-        final scaleX = 1 + math.sin(t + 0.7) * 0.022;
-        final scaleY = 1 + math.cos(t + 0.2) * 0.028;
-
-        return ExcludeSemantics(
-          child: RepaintBoundary(
-            child: Transform.translate(
-              offset: Offset(0, floatY),
-              child: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.diagonal3Values(scaleX, scaleY, 1),
-                child: CustomPaint(
-                  size: Size.square(widget.size),
-                  painter: _SlimeOrbPainter(
-                    phase: _controller.value,
-                    compact: widget.compact,
-                  ),
-                ),
-              ),
-            ),
+    return ExcludeSemantics(
+      child: RepaintBoundary(
+        child: CustomPaint(
+          size: Size.square(size),
+          painter: _SlimeOrbPainter(
+            phase: 0.18,
+            compact: compact,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
