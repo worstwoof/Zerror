@@ -176,10 +176,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
               alignment: Alignment.center,
               children: const [
                 Positioned(
-                  top: 232,
-                  child: _OrbFloorGlow(),
-                ),
-                Positioned(
                   top: 18,
                   child: _FloatingSlimeOrb(size: 268),
                 ),
@@ -352,23 +348,6 @@ class _HelloBubble extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _OrbFloorGlow extends StatelessWidget {
-  const _OrbFloorGlow();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 282,
-      height: 82,
-      child: Image.asset(
-        'assets/images/ai_orb_shadow.png',
-        fit: BoxFit.fill,
-        filterQuality: FilterQuality.high,
-      ),
     );
   }
 }
