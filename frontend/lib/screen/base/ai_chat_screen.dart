@@ -151,7 +151,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      height: 660,
+      height: 684,
       padding: const EdgeInsets.fromLTRB(22, 42, 22, 28),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFDFB),
