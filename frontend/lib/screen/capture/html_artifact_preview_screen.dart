@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -10,12 +12,14 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
     required this.htmlContent,
     this.infoTitle = 'HTML 学科扩展预览',
     this.infoNote,
+    this.scrollable = false,
   });
 
   final String title;
   final String htmlContent;
   final String infoTitle;
   final String? infoNote;
+  final bool scrollable;
 
   @override
   State<HtmlArtifactPreviewScreen> createState() =>
@@ -31,7 +35,12 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
-      ..loadHtmlString(_prepareHtmlForPreview(widget.htmlContent));
+      ..loadHtmlString(
+        _prepareHtmlForPreview(
+          widget.htmlContent,
+          scrollable: widget.scrollable,
+        ),
+      );
   }
 
   @override
@@ -103,20 +112,76 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
                         color: AppPalette.pastelGrey.withValues(alpha: 0.10),
                       ),
                     ),
-                    child: WebViewWidget(controller: _controller),
+                    child: WebViewWidget(
+                      controller: _controller,
+                      gestureRecognizers: widget.scrollable
+                          ? {
+                              Factory<OneSequenceGestureRecognizer>(
+                                () => EagerGestureRecognizer(),
+                              ),
+                            }
+                          : const <Factory<OneSequenceGestureRecognizer>>{},
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  String _prepareHtmlForPreview(String rawHtml) {
+  String _prepareHtmlForPreview(String rawHtml, {required bool scrollable}) {
     final normalized = rawHtml.trim();
-    const previewFitHead = '''
+    final previewFitHead = scrollable
+        ? '''
+<style id="zerror-preview-fit">
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: auto !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    min-width: 0;
+    height: auto !important;
+    min-height: 100% !important;
+    max-width: 100vw;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-x pan-y;
+  }
+  img, svg, canvas, video {
+    max-width: 100%;
+    height: auto;
+  }
+</style>
+<script>
+  window.addEventListener('load', function () {
+    document.documentElement.style.height = 'auto';
+    document.documentElement.style.minHeight = '100%';
+    document.documentElement.style.maxHeight = 'none';
+    document.documentElement.style.overflowX = 'hidden';
+    document.documentElement.style.overflowY = 'auto';
+    document.body.style.height = 'auto';
+    document.body.style.minHeight = '100%';
+    document.body.style.maxHeight = 'none';
+    document.body.style.overflowX = 'hidden';
+    document.body.style.overflowY = 'auto';
+  });
+</script>
+'''
+        : '''
 <style id="zerror-preview-fit">
   html, body {
     margin: 0;

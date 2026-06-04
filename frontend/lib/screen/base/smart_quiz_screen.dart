@@ -5,7 +5,7 @@ import '../../core/app_ui.dart';
 import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
-import 'quiz_paper_screen.dart';
+import 'practice_paper_entry_screen.dart';
 
 class SmartQuizScreen extends StatefulWidget {
   const SmartQuizScreen({super.key});
@@ -51,17 +51,12 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => QuizPaperScreen(
-            questionCount: paper.questions.length,
+          builder: (_) => PracticePaperEntryScreen(
+            paper: paper,
             selectedSubjects: List<String>.from(_selectedSubjects),
             strategyLabel: paper.strategyLabel.isEmpty
                 ? _strategies[_selectedStrategy].$1
                 : paper.strategyLabel,
-            generatedQuestions: paper.questions
-                .map((item) => item.toQuizMap())
-                .toList(growable: false),
-            printableTitle: paper.title,
-            printableHtml: paper.printableHtml,
           ),
         ),
       );

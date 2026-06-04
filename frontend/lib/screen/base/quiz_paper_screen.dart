@@ -16,6 +16,7 @@ class QuizPaperScreen extends StatefulWidget {
     this.generatedTitle,
     this.printableTitle,
     this.printableHtml,
+    this.showPrintableAction = true,
   });
 
   final int questionCount;
@@ -25,6 +26,7 @@ class QuizPaperScreen extends StatefulWidget {
   final String? generatedTitle;
   final String? printableTitle;
   final String? printableHtml;
+  final bool showPrintableAction;
 
   @override
   State<QuizPaperScreen> createState() => _QuizPaperScreenState();
@@ -198,6 +200,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           htmlContent: html,
           infoTitle: 'A4 打印讲义预览',
           infoNote: '这份讲义由组卷接口生成，包含题目区、作答留白和参考答案。可在支持打印的 WebView 或浏览器中按 A4 版式输出。',
+          scrollable: true,
         ),
       ),
     );
@@ -235,7 +238,8 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           ],
         ),
         actions: [
-          if (widget.printableHtml?.trim().isNotEmpty == true)
+          if (widget.showPrintableAction &&
+              widget.printableHtml?.trim().isNotEmpty == true)
             IconButton(
               tooltip: '预览打印讲义',
               onPressed: _openPrintableHandout,
