@@ -21,14 +21,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
       text: '我可以帮你拆解错题、安排复习、生成同类题。先把今天最卡的一道题发给我吧。',
       isUser: false,
     ),
-    _ChatMessage(
-      text: '帮我把这道错题拆成三步讲清楚',
-      isUser: true,
-    ),
-    _ChatMessage(
-      text: '可以。第一步先定位题型和已知条件；第二步把公式写成可代入的结构；第三步检查单位、符号和边界条件。你也可以把题干粘过来，我会按这个节奏继续。',
-      isUser: false,
-    ),
   ].toList();
   bool _isThinking = false;
 
@@ -118,7 +110,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Expanded(
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
                 children: [
                   _hero(),
                   const SizedBox(height: 18),
@@ -160,16 +152,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
+      constraints: const BoxConstraints(minHeight: 560),
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
-        color: AppPalette.paper.withOpacity(0.82),
+        color: AppPalette.paper.withOpacity(0.88),
         borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withOpacity(0.84), width: 1.4),
         boxShadow: [
           BoxShadow(
             color: AppPalette.moodBlue.withOpacity(0.08),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
+            blurRadius: 30,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
@@ -177,18 +170,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
         children: [
           Row(
             children: [
-              AppFlatIconButton(
-                icon: Icons.auto_awesome_rounded,
-                onTap: null,
-                color: AppPalette.mint.withOpacity(0.58),
-                iconColor: AppPalette.inkBlue,
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppPalette.mint.withOpacity(0.58),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppPalette.inkBlue,
+                  size: 21,
+                ),
               ),
               const Spacer(),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 decoration: BoxDecoration(
-                  color: AppPalette.mint.withOpacity(0.22),
+                  color: AppPalette.mint.withOpacity(0.24),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
@@ -196,57 +196,72 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   style: TextStyle(
                     color: AppPalette.textPrimary,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 26),
+          const _HeroTitle(),
           const SizedBox(height: 18),
-          const Text(
-            '你的错题 AI 助手',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 30,
-              height: 1.12,
-              fontWeight: FontWeight.w900,
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: const [
+              _FloatingSlimeOrb(size: 246),
+              Positioned(
+                top: 16,
+                left: 28,
+                child: _HelloBubble(),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const Spacer(),
           const Text(
-            '把题目、错因和复习目标交给我，我会整理成更容易执行的学习路径。',
+            'Get instant help and support\nwith any question or problem',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppPalette.textSecondary,
-              fontSize: 13,
+              fontSize: 14,
               height: 1.55,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 18),
-          const _FloatingSlimeOrb(size: 188),
-          const SizedBox(height: 18),
-          Row(
-            children: const [
-              Expanded(
-                child: _HeroMetricCard(
-                  color: AppPalette.peach,
-                  icon: Icons.psychology_alt_rounded,
-                  title: '拆题',
-                  value: '5 步',
-                ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => _send('帮我把这道错题拆成三步讲清楚'),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppPalette.inkBlue.withOpacity(0.06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _HeroMetricCard(
-                  color: AppPalette.mint,
-                  icon: Icons.edit_note_rounded,
-                  title: '练习',
-                  value: '3 题',
-                ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Get started',
+                    style: TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: AppPalette.textPrimary, size: 20),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -275,6 +290,64 @@ class _AiChatScreenState extends State<AiChatScreen> {
           onPressed: () => _send(prompt),
         );
       }).toList(),
+    );
+  }
+}
+
+class _HeroTitle extends StatelessWidget {
+  const _HeroTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      textAlign: TextAlign.center,
+      text: const TextSpan(
+        style: TextStyle(
+          color: AppPalette.textPrimary,
+          fontSize: 38,
+          height: 1.08,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0,
+        ),
+        children: [
+          TextSpan(text: 'Your '),
+          TextSpan(
+            text: 'Smart\nAssistant',
+            style: TextStyle(color: AppPalette.moodBlue),
+          ),
+          TextSpan(text: ' for\nStudy Tasks'),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelloBubble extends StatelessWidget {
+  const _HelloBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppPalette.inkBlue.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: const Text(
+        'Hello!',
+        style: TextStyle(
+          color: AppPalette.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -470,55 +543,6 @@ class _AnswerSection extends StatelessWidget {
   }
 }
 
-class _HeroMetricCard extends StatelessWidget {
-  const _HeroMetricCard({
-    required this.color,
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  final Color color;
-  final IconData icon;
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppPalette.inkBlue, size: 20),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _FloatingSlimeOrb extends StatefulWidget {
   const _FloatingSlimeOrb({
     required this.size,
@@ -541,7 +565,7 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3600),
+      duration: const Duration(milliseconds: 4300),
     )..repeat();
   }
 
@@ -557,9 +581,9 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
       animation: _controller,
       builder: (context, _) {
         final t = _controller.value * math.pi * 2;
-        final floatY = math.sin(t) * (widget.compact ? 1.8 : 9.0);
-        final scaleX = 1 + math.sin(t + 0.7) * 0.026;
-        final scaleY = 1 + math.cos(t + 0.2) * 0.032;
+        final floatY = math.sin(t) * (widget.compact ? 1.5 : 10.0);
+        final scaleX = 1 + math.sin(t + 0.7) * 0.022;
+        final scaleY = 1 + math.cos(t + 0.2) * 0.028;
 
         return Transform.translate(
           offset: Offset(0, floatY),
@@ -593,41 +617,123 @@ class _SlimeOrbPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final shortest = math.min(size.width, size.height);
-    final radius = shortest * (compact ? 0.38 : 0.32);
-    final pulse = math.sin(phase * math.pi * 2);
+    final radius = shortest * (compact ? 0.38 : 0.34);
+    final t = phase * math.pi * 2;
+    final pulse = math.sin(t);
 
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          AppPalette.mint.withOpacity(0.0),
-          AppPalette.mint.withOpacity(0.18),
-          AppPalette.blush.withOpacity(0.0),
+          const Color(0xFFFF7DB5).withOpacity(0.0),
+          const Color(0xFF8EE9F0).withOpacity(compact ? 0.20 : 0.28),
+          const Color(0xFFFF7DB5).withOpacity(0.0),
         ],
-        stops: const [0.25, 0.58, 1],
-      ).createShader(Rect.fromCircle(center: center, radius: shortest * 0.48));
-    canvas.drawCircle(center, shortest * (compact ? 0.46 : 0.44), glowPaint);
+        stops: const [0.2, 0.55, 1],
+      ).createShader(Rect.fromCircle(center: center, radius: shortest * 0.5));
+    canvas.drawCircle(center, shortest * 0.48, glowPaint);
 
     final shadowPaint = Paint()
-      ..color = AppPalette.moodBlue.withOpacity(compact ? 0.06 : 0.10)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      ..color = const Color(0xFFFF7DB5).withOpacity(compact ? 0.05 : 0.16)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, compact ? 10 : 24);
     canvas.drawOval(
       Rect.fromCenter(
-        center: center.translate(0, radius * 0.88),
-        width: radius * 1.42,
-        height: radius * 0.28,
+        center: center.translate(0, radius * 1.15),
+        width: radius * (compact ? 1.2 : 1.55),
+        height: radius * (compact ? 0.22 : 0.34),
       ),
       shadowPaint,
     );
 
+    final bodyPath = _buildBlobPath(center, radius, t, pulse);
+
+    final basePaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.42, -0.52),
+        radius: 1.12,
+        colors: const [
+          Color(0xFFEFFFFF),
+          Color(0xFFB7F5EE),
+          Color(0xFFFFB7D7),
+          Color(0xFF875EEA),
+        ],
+        stops: [0.0, 0.34, 0.68, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 1.18));
+    canvas.drawPath(bodyPath, basePaint);
+
+    canvas.save();
+    canvas.clipPath(bodyPath);
+    _drawSoftColor(
+      canvas,
+      center.translate(-radius * 0.48, radius * 0.26),
+      radius * 0.95,
+      const Color(0xFFFF6FAE),
+      0.72,
+    );
+    _drawSoftColor(
+      canvas,
+      center.translate(radius * 0.48, -radius * 0.08),
+      radius * 0.86,
+      const Color(0xFF63E7DD),
+      0.66,
+    );
+    _drawSoftColor(
+      canvas,
+      center.translate(radius * 0.22, radius * 0.48),
+      radius * 0.72,
+      const Color(0xFFFFC65C),
+      0.72,
+    );
+    _drawSoftColor(
+      canvas,
+      center.translate(-radius * 0.18, -radius * 0.20),
+      radius * 0.86,
+      const Color(0xFF7E58EA),
+      0.42,
+    );
+    canvas.restore();
+
+    final shinePaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.45, -0.62),
+        radius: 0.62,
+        colors: [
+          Colors.white.withOpacity(0.78),
+          Colors.white.withOpacity(0.16),
+          Colors.white.withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawPath(bodyPath, shinePaint);
+
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = compact ? 1.0 : 2.0
+      ..color = Colors.white.withOpacity(0.34);
+    canvas.drawPath(bodyPath, rimPaint);
+
+    if (!compact) {
+      _drawTriangleEye(
+        canvas,
+        center.translate(-radius * 0.28, -radius * 0.10 + pulse * 1.5),
+        radius * 0.22,
+      );
+      _drawTriangleEye(
+        canvas,
+        center.translate(radius * 0.28, -radius * 0.10 + pulse * 1.5),
+        radius * 0.22,
+      );
+    }
+  }
+
+  Path _buildBlobPath(Offset center, double radius, double t, double pulse) {
     final path = Path();
-    const points = 56;
+    const points = 72;
     for (var i = 0; i <= points; i++) {
       final angle = i / points * math.pi * 2;
-      final wobble = math.sin(angle * 3 + phase * math.pi * 2) * 0.035 +
-          math.cos(angle * 2 - phase * math.pi * 2.4) * 0.026;
-      final r = radius * (1 + wobble + pulse * 0.012);
+      final wobble = math.sin(angle * 2.0 + t) * 0.018 +
+          math.cos(angle * 3.0 - t * 0.8) * 0.022;
+      final r = radius * (1 + wobble + pulse * 0.006);
       final dx = math.cos(angle) * r;
-      final dy = math.sin(angle) * r * (1 + math.sin(phase * math.pi * 2) * 0.02);
+      final dy = math.sin(angle) * r * (1 + math.sin(t + 0.5) * 0.018);
       final point = center.translate(dx, dy);
       if (i == 0) {
         path.moveTo(point.dx, point.dy);
@@ -636,64 +742,54 @@ class _SlimeOrbPainter extends CustomPainter {
       }
     }
     path.close();
+    return path;
+  }
 
-    final bodyPaint = Paint()
-      ..shader = SweepGradient(
-        transform: GradientRotation(phase * math.pi * 2),
-        colors: const [
-          Color(0xFF6FE7E3),
-          Color(0xFFFFD770),
-          Color(0xFFFF7DB5),
-          Color(0xFF755CE8),
-          Color(0xFF6FE7E3),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 1.25));
-    canvas.drawPath(path, bodyPaint);
-
-    final softOverlay = Paint()
+  void _drawSoftColor(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color,
+    double opacity,
+  ) {
+    final paint = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.35, -0.45),
-        radius: 0.86,
         colors: [
-          Colors.white.withOpacity(0.82),
-          Colors.white.withOpacity(0.10),
-          Colors.transparent,
+          color.withOpacity(opacity),
+          color.withOpacity(opacity * 0.42),
+          color.withOpacity(0),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawPath(path, softOverlay);
+    canvas.drawCircle(center, radius, paint);
+  }
 
-    final rimPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 1.2 : 2.2
-      ..color = Colors.white.withOpacity(0.34);
-    canvas.drawPath(path, rimPaint);
-
-    if (!compact) {
-      final eyePaint = Paint()..color = Colors.white.withOpacity(0.92);
-      final eyeY = center.dy - radius * 0.12 + pulse * 2;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(center.dx - radius * 0.28, eyeY),
-            width: radius * 0.18,
-            height: radius * 0.32,
-          ),
-          Radius.circular(radius * 0.12),
-        ),
-        eyePaint,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(center.dx + radius * 0.28, eyeY),
-            width: radius * 0.18,
-            height: radius * 0.32,
-          ),
-          Radius.circular(radius * 0.12),
-        ),
-        eyePaint,
-      );
-    }
+  void _drawTriangleEye(Canvas canvas, Offset center, double size) {
+    final eye = Path()
+      ..moveTo(center.dx, center.dy - size * 0.64)
+      ..quadraticBezierTo(
+        center.dx + size * 0.58,
+        center.dy + size * 0.28,
+        center.dx + size * 0.30,
+        center.dy + size * 0.54,
+      )
+      ..quadraticBezierTo(
+        center.dx,
+        center.dy + size * 0.36,
+        center.dx - size * 0.30,
+        center.dy + size * 0.54,
+      )
+      ..quadraticBezierTo(
+        center.dx - size * 0.58,
+        center.dy + size * 0.28,
+        center.dx,
+        center.dy - size * 0.64,
+      )
+      ..close();
+    final glow = Paint()
+      ..color = Colors.white.withOpacity(0.50)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawPath(eye, glow);
+    canvas.drawPath(eye, Paint()..color = Colors.white.withOpacity(0.96));
   }
 
   @override
