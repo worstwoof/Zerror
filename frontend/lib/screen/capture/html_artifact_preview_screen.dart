@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +43,9 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
           scrollable: widget.scrollable,
         ),
       );
+    if (widget.scrollable) {
+      unawaited(_controller.enableZoom(true).catchError((Object _) {}));
+    }
   }
 
   @override
@@ -94,6 +99,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     final normalized = rawHtml.trim();
     final previewFitHead = scrollable
         ? '''
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes" />
 <style id="zerror-preview-fit">
   html, body {
     margin: 0;
@@ -101,7 +107,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     height: auto !important;
     min-height: 100% !important;
     max-height: none !important;
-    overflow-x: hidden !important;
+    overflow-x: auto !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -113,11 +119,16 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     min-width: 0;
     height: auto !important;
     min-height: 100% !important;
-    max-width: 100vw;
+    width: max-content;
+    min-width: 100%;
+    max-width: none !important;
     max-height: none !important;
-    overflow-x: hidden !important;
+    overflow-x: auto !important;
     overflow-y: auto !important;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+  .sheet {
+    max-width: none !important;
   }
   img, svg, canvas, video {
     max-width: 100%;
@@ -125,17 +136,51 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
   }
 </style>
 <script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\\\(', '\\\\)'], ['\$', '\$']],
+      displayMath: [['\\\\[', '\\\\]'], ['\$\$', '\$\$']],
+      processEscapes: true
+    },
+    svg: { fontCache: 'global' },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  };
+  function zerrorLoadMathJaxFallback() {
+    var fallback = document.createElement('script');
+    fallback.async = true;
+    fallback.src = 'https://unpkg.com/mathjax@3/es5/tex-svg.js';
+    document.head.appendChild(fallback);
+  }
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" onerror="zerrorLoadMathJaxFallback()"></script>
+<script>
   window.addEventListener('load', function () {
+    var viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) {
+      viewport = document.createElement('meta');
+      viewport.name = 'viewport';
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes');
     document.documentElement.style.height = 'auto';
     document.documentElement.style.minHeight = '100%';
     document.documentElement.style.maxHeight = 'none';
-    document.documentElement.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'auto';
     document.documentElement.style.overflowY = 'auto';
     document.body.style.height = 'auto';
     document.body.style.minHeight = '100%';
     document.body.style.maxHeight = 'none';
-    document.body.style.overflowX = 'hidden';
+    document.body.style.width = 'max-content';
+    document.body.style.minWidth = '100%';
+    document.body.style.maxWidth = 'none';
+    document.body.style.overflowX = 'auto';
     document.body.style.overflowY = 'auto';
+    document.body.style.touchAction = 'pan-x pan-y pinch-zoom';
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise();
+    }
   });
 </script>
 '''

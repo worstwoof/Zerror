@@ -18,6 +18,21 @@ from .vivo_client import VivoLMClient
 
 logger = logging.getLogger(__name__)
 
+_MATH_SPAN_PATTERN = re.compile(
+    r"(\\\(.*?\\\)|\\\[.*?\\\]|\$\$.*?\$\$|\$[^$\n]+\$)",
+    re.DOTALL,
+)
+_BARE_TEX_PATTERN = re.compile(
+    r"(?<![\w\\])"
+    r"(?:[A-Za-z]\s*=\s*)?"
+    r"(?:[-+]?\d+(?:\.\d+)?\s*)?"
+    r"(?:"
+    r"\\(?:sqrt|frac|dfrac|tfrac|cdot|times|div|le|ge|neq|pm|mp|angle|triangle|parallel|perp|sin|cos|tan|log|ln|lim|sum|int)\b"
+    r"(?:\s*\{[^{}]*\}){0,3}"
+    r"(?:\s*[+\-*/=]\s*(?:[A-Za-z]|\d+(?:\.\d+)?|\\[A-Za-z]+(?:\s*\{[^{}]*\}){0,3}))*"
+    r")"
+)
+
 
 class PracticePaperService:
     def __init__(self, client: VivoLMClient) -> None:
@@ -63,8 +78,12 @@ class PracticePaperService:
 - 讲义不能只有习题，必须先给出公式梳理、题型模型、例题讲解和易错提醒。
 - 题干要完整清晰；选择题必须提供 4 个选项和 0-based answer_index；非选择题 answer_index 返回 null。
 - options 里只写选项内容，不要带 A.、B.、C.、D.、（A）、A、 等序号前缀。
+- LaTeX 输出规范：所有数学公式、变量、方程、分式、根式、指数、坐标、角度、向量和带数学意义的数字都用 MathJax 可渲染格式包裹；行内公式用 \\( ... \\)，展示公式用 \\[ ... \\]。例如必须写成 \\(2\\sqrt{{6}}\\)、\\(x=\\frac{{13}}{{6}}\\)、\\(a^2=b^2+c^2-2bc\\cos A\\)，不要裸写 2\\sqrt{{6}} 或 x=\\frac{{13}}{{6}}。
+- 答案 answer、solution_outline、solution_steps 以及讲义的公式卡片、例题讲解、易错提醒中也必须遵守上述 LaTeX 规范；普通解释文字用中文，数学对象进入公式环境。
 - 答案解析要像教辅答案栏一样完整，给出 2 到 5 个分步 solution_steps；不要只写一句答案。
-- 如果几何、函数图像、物理受力/电路、化学流程、统计图等题目有必要配图，可以在 diagram_svg 返回一个简洁 SVG 示意图；不用图时返回空字符串。
+- 每道题先判断是否有“视觉结构”：图形位置关系、函数/圆锥曲线图像、运动或力的方向、电路连接、光路、化学流程、统计图表等。
+- 如果存在视觉结构，必须在 diagram_svg 返回一个简洁 SVG 示意图；纯代数运算、纯概念辨析、无需图像辅助的题目返回空字符串。
+- 圆锥曲线/椭圆/双曲线/抛物线、几何证明、函数图像题通常需要图；若判断需要图，至少标出坐标轴、中心/顶点、焦点、关键点、长短轴、准线、辅助线等核心元素。
 - diagram_svg 必须是单个 <svg>...</svg>，不要包含 script、foreignObject、外链图片或事件属性。
 - diagram_svg 的 viewBox 建议控制在 320x180 或 360x200 内，画成讲义小图，不要做成占满整页的大图。
 - 示意图必须服务解题：标出已知点、关键线段/角度/坐标轴、运动方向、受力方向、电场/磁场方向、电流方向或光路方向等关键标记。
@@ -223,29 +242,28 @@ class PracticePaperService:
             if options and answer_index is not None and not 0 <= answer_index < len(options):
                 answer_index = None
 
-            questions.append(
-                PracticeQuestion(
-                    id=str(item.get("id") or f"q{index + 1}"),
-                    type=str(item.get("type") or "简答题"),
-                    subject=str(item.get("subject") or ""),
-                    topic=str(item.get("topic") or ""),
-                    stem=stem,
-                    options=options,
-                    answer=answer,
-                    answer_index=answer_index,
-                    solution_outline=str(item.get("solution_outline") or ""),
-                    solution_steps=self._string_list(item.get("solution_steps"))[:5],
-                    diagram_svg=self._sanitize_svg(str(item.get("diagram_svg") or "")),
-                    diagram_caption=str(item.get("diagram_caption") or ""),
-                    reason_hint=str(item.get("reason_hint") or ""),
-                    difficulty=str(item.get("difficulty") or "中等"),
-                    estimated_minutes=max(
-                        1,
-                        min(30, self._positive_int(item.get("estimated_minutes"), default=4)),
-                    ),
-                    source_error_ids=self._string_list(item.get("source_error_ids")),
-                )
+            question = PracticeQuestion(
+                id=str(item.get("id") or f"q{index + 1}"),
+                type=str(item.get("type") or "简答题"),
+                subject=str(item.get("subject") or ""),
+                topic=str(item.get("topic") or ""),
+                stem=stem,
+                options=options,
+                answer=answer,
+                answer_index=answer_index,
+                solution_outline=str(item.get("solution_outline") or ""),
+                solution_steps=self._string_list(item.get("solution_steps"))[:5],
+                diagram_svg=self._sanitize_svg(str(item.get("diagram_svg") or "")),
+                diagram_caption=str(item.get("diagram_caption") or ""),
+                reason_hint=str(item.get("reason_hint") or ""),
+                difficulty=str(item.get("difficulty") or "中等"),
+                estimated_minutes=max(
+                    1,
+                    min(30, self._positive_int(item.get("estimated_minutes"), default=4)),
+                ),
+                source_error_ids=self._string_list(item.get("source_error_ids")),
             )
+            questions.append(self._with_fallback_diagram(question))
 
         if questions:
             return questions
@@ -549,7 +567,7 @@ class PracticePaperService:
         if question.options:
             labels = ["A", "B", "C", "D"]
             option_items = [
-                f"<div>{labels[i]}. {html.escape(option)}</div>"
+                f"<div>{labels[i]}. {self._math_text_html(option)}</div>"
                 for i, option in enumerate(question.options)
             ]
             options = f"<div class=\"options\">{''.join(option_items)}</div>"
@@ -557,11 +575,11 @@ class PracticePaperService:
         return f"""
 <section class="question">
   <div class="q-head">
-    <span>{index + 1}. {html.escape(question.type)}</span>
-    <span class="tag">{html.escape(question.difficulty)}</span>
-    <span class="tag">{html.escape(question.topic or question.subject or "专题")}</span>
+    <span>{index + 1}. {self._math_text_html(question.type)}</span>
+    <span class="tag">{self._math_text_html(question.difficulty)}</span>
+    <span class="tag">{self._math_text_html(question.topic or question.subject or "专题")}</span>
   </div>
-  <div class="stem">{html.escape(question.stem)}</div>
+  <div class="stem">{self._math_text_html(question.stem)}</div>
   {diagram}
   {options}
   <div class="answer-space"></div>
@@ -573,13 +591,13 @@ class PracticePaperService:
             steps = question.solution_steps
             if not steps and question.solution_outline:
                 steps = [question.solution_outline]
-            step_items = "".join(f"<li>{html.escape(step)}</li>" for step in steps if step.strip())
+            step_items = "".join(f"<li>{self._math_text_html(step)}</li>" for step in steps if step.strip())
             diagram = self._diagram_html(question)
             blocks.append(
                 f"""
 <section class="answer-item">
-  <h3>{index + 1}. {html.escape(question.type)}答案</h3>
-  <p><strong>答案：</strong>{html.escape(question.answer)}</p>
+  <h3>{index + 1}. {self._math_text_html(question.type)}答案</h3>
+  <p><strong>答案：</strong>{self._math_text_html(question.answer)}</p>
   {diagram}
   <ol>{step_items}</ol>
 </section>"""
@@ -598,10 +616,79 @@ class PracticePaperService:
         )
         return f"<div class=\"diagram\">{question.diagram_svg}{caption}</div>"
 
+    def _with_fallback_diagram(self, question: PracticeQuestion) -> PracticeQuestion:
+        if question.diagram_svg.strip():
+            return question
+        diagram_svg = self._fallback_diagram_svg(question)
+        if not diagram_svg:
+            return question
+        caption = question.diagram_caption.strip() or self._fallback_diagram_caption(question)
+        return question.model_copy(
+            update={
+                "diagram_svg": diagram_svg,
+                "diagram_caption": caption,
+            }
+        )
+
+    def _fallback_diagram_svg(self, question: PracticeQuestion) -> str:
+        text = f"{question.subject} {question.topic} {question.stem}".lower()
+        if any(keyword in text for keyword in ("椭圆", "圆锥曲线", "焦点", "离心率")):
+            return self._ellipse_diagram_svg()
+        return ""
+
+    def _fallback_diagram_caption(self, question: PracticeQuestion) -> str:
+        text = f"{question.subject} {question.topic} {question.stem}".lower()
+        if any(keyword in text for keyword in ("椭圆", "圆锥曲线", "焦点", "离心率")):
+            return "椭圆标准示意图：标出长轴、短轴、中心、焦点和动点，便于对应题目条件。"
+        return "题目关键关系示意图。"
+
+    def _ellipse_diagram_svg(self) -> str:
+        return """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 200" role="img" aria-label="椭圆示意图">
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#52635a"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="360" height="200" fill="#fffaf0"/>
+  <line x1="32" y1="100" x2="328" y2="100" stroke="#52635a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="180" y1="176" x2="180" y2="24" stroke="#52635a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <ellipse cx="180" cy="100" rx="112" ry="58" fill="#dfeadc" stroke="#284b36" stroke-width="2.5"/>
+  <line x1="68" y1="100" x2="292" y2="100" stroke="#88a891" stroke-width="2" stroke-dasharray="5 5"/>
+  <line x1="180" y1="42" x2="180" y2="158" stroke="#88a891" stroke-width="2" stroke-dasharray="5 5"/>
+  <circle cx="128" cy="100" r="4" fill="#b15d3a"/>
+  <circle cx="232" cy="100" r="4" fill="#b15d3a"/>
+  <circle cx="180" cy="100" r="3.5" fill="#1f2924"/>
+  <circle cx="245" cy="63" r="4" fill="#2f6f9f"/>
+  <line x1="128" y1="100" x2="245" y2="63" stroke="#d79c4a" stroke-width="1.5"/>
+  <line x1="232" y1="100" x2="245" y2="63" stroke="#d79c4a" stroke-width="1.5"/>
+  <text x="326" y="94" font-size="13" fill="#52635a">x</text>
+  <text x="187" y="30" font-size="13" fill="#52635a">y</text>
+  <text x="184" y="114" font-size="12" fill="#1f2924">O</text>
+  <text x="112" y="94" font-size="12" fill="#b15d3a">F1</text>
+  <text x="238" y="94" font-size="12" fill="#b15d3a">F2</text>
+  <text x="251" y="58" font-size="12" fill="#2f6f9f">P(x,y)</text>
+  <text x="284" y="117" font-size="12" fill="#284b36">长轴 2a</text>
+  <text x="188" y="48" font-size="12" fill="#284b36">短轴 2b</text>
+</svg>
+""".strip()
+
     def _list_items_html(self, items: list[str]) -> str:
         if not items:
             return "<li>结合本讲义专题，先回看定义、条件和解题步骤，再进入练习。</li>"
-        return "".join(f"<li>{html.escape(item)}</li>" for item in items)
+        return "".join(f"<li>{self._math_text_html(item)}</li>" for item in items)
+
+    def _math_text_html(self, value: str) -> str:
+        escaped = html.escape(str(value or ""))
+        if not escaped:
+            return ""
+
+        parts = _MATH_SPAN_PATTERN.split(escaped)
+        for index, part in enumerate(parts):
+            if not part or _MATH_SPAN_PATTERN.fullmatch(part):
+                continue
+            parts[index] = _BARE_TEX_PATTERN.sub(r"\\(\g<0>\\)", part)
+        return "".join(parts)
 
     def _normalize_option(self, option: str) -> str:
         cleaned = option.strip()
