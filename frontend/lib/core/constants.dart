@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
-  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120';
+  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120:8001';
 
   static const String _apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
