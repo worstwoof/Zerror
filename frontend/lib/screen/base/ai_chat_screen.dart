@@ -585,16 +585,20 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
         final scaleX = 1 + math.sin(t + 0.7) * 0.022;
         final scaleY = 1 + math.cos(t + 0.2) * 0.028;
 
-        return Transform.translate(
-          offset: Offset(0, floatY),
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.diagonal3Values(scaleX, scaleY, 1),
-            child: CustomPaint(
-              size: Size.square(widget.size),
-              painter: _SlimeOrbPainter(
-                phase: _controller.value,
-                compact: widget.compact,
+        return ExcludeSemantics(
+          child: RepaintBoundary(
+            child: Transform.translate(
+              offset: Offset(0, floatY),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.diagonal3Values(scaleX, scaleY, 1),
+                child: CustomPaint(
+                  size: Size.square(widget.size),
+                  painter: _SlimeOrbPainter(
+                    phase: _controller.value,
+                    compact: widget.compact,
+                  ),
+                ),
               ),
             ),
           ),
