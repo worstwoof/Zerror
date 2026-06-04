@@ -153,6 +153,47 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     fallback.src = 'https://unpkg.com/mathjax@3/es5/tex-svg.js';
     document.head.appendChild(fallback);
   }
+  function zerrorEnableSingleFingerPan() {
+    var active = false;
+    var lastX = 0;
+    var lastY = 0;
+    function scrollByDelta(dx, dy) {
+      var root = document.scrollingElement || document.documentElement;
+      root.scrollLeft += dx;
+      root.scrollTop += dy;
+      if (root !== document.body) {
+        document.body.scrollLeft += dx;
+        document.body.scrollTop += dy;
+      }
+    }
+    document.addEventListener('touchstart', function (event) {
+      if (event.touches.length !== 1) {
+        active = false;
+        return;
+      }
+      active = true;
+      lastX = event.touches[0].clientX;
+      lastY = event.touches[0].clientY;
+    }, { passive: false });
+    document.addEventListener('touchmove', function (event) {
+      if (!active || event.touches.length !== 1) {
+        active = false;
+        return;
+      }
+      var currentX = event.touches[0].clientX;
+      var currentY = event.touches[0].clientY;
+      scrollByDelta(lastX - currentX, lastY - currentY);
+      lastX = currentX;
+      lastY = currentY;
+      event.preventDefault();
+    }, { passive: false });
+    document.addEventListener('touchend', function () {
+      active = false;
+    }, { passive: false });
+    document.addEventListener('touchcancel', function () {
+      active = false;
+    }, { passive: false });
+  }
 </script>
 <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" onerror="zerrorLoadMathJaxFallback()"></script>
 <script>
@@ -178,6 +219,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     document.body.style.overflowX = 'auto';
     document.body.style.overflowY = 'auto';
     document.body.style.touchAction = 'pan-x pan-y pinch-zoom';
+    zerrorEnableSingleFingerPan();
     if (window.MathJax && window.MathJax.typesetPromise) {
       window.MathJax.typesetPromise();
     }
