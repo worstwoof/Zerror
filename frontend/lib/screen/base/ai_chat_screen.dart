@@ -152,7 +152,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      constraints: const BoxConstraints(minHeight: 560),
+      height: 560,
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
         color: AppPalette.paper.withOpacity(0.88),
@@ -217,7 +217,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 12),
           const Text(
             'Get instant help and support\nwith any question or problem',
             textAlign: TextAlign.center,
