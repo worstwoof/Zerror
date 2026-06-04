@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -152,7 +151,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      height: 560,
+      height: 650,
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
         color: AppPalette.paper.withOpacity(0.88),
@@ -209,7 +208,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: const [
-              _FloatingSlimeOrb(size: 246),
+              _FloatingSlimeOrb(size: 226),
               Positioned(
                 top: 16,
                 left: 28,
@@ -304,7 +303,7 @@ class _HeroTitle extends StatelessWidget {
       text: const TextSpan(
         style: TextStyle(
           color: AppPalette.textPrimary,
-          fontSize: 38,
+          fontSize: 34,
           height: 1.08,
           fontWeight: FontWeight.w900,
           letterSpacing: 0,
@@ -555,13 +554,135 @@ class _FloatingSlimeOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orbSize = size * (compact ? 0.72 : 0.66);
     return ExcludeSemantics(
       child: RepaintBoundary(
-        child: CustomPaint(
-          size: Size.square(size),
-          painter: _SlimeOrbPainter(
-            phase: 0.18,
-            compact: compact,
+        child: SizedBox.square(
+          dimension: size,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                bottom: compact ? size * 0.16 : size * 0.10,
+                child: Container(
+                  width: orbSize * 1.12,
+                  height: orbSize * 0.20,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFFF7DB5).withOpacity(0.00),
+                        const Color(0xFFFF7DB5).withOpacity(compact ? 0.08 : 0.18),
+                        const Color(0xFF7A5CE8).withOpacity(0.00),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: orbSize * 1.16,
+                height: orbSize * 1.16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFFFFF).withOpacity(0.10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF7DB5)
+                          .withOpacity(compact ? 0.08 : 0.18),
+                      blurRadius: compact ? 18 : 34,
+                      spreadRadius: compact ? 0 : 8,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF8EE9F0)
+                          .withOpacity(compact ? 0.08 : 0.16),
+                      blurRadius: compact ? 14 : 28,
+                      spreadRadius: compact ? 0 : 5,
+                    ),
+                  ],
+                ),
+              ),
+              ClipOval(
+                child: Container(
+                  width: orbSize,
+                  height: orbSize,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment(-0.42, -0.52),
+                      radius: 1.05,
+                      colors: [
+                        Color(0xFFF8FFFF),
+                        Color(0xFFC6F7F0),
+                        Color(0xFFFFB7D9),
+                        Color(0xFF765DE7),
+                      ],
+                      stops: [0.0, 0.34, 0.68, 1.0],
+                    ),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _OrbColorBlob(
+                        left: -orbSize * 0.18,
+                        bottom: orbSize * 0.02,
+                        size: orbSize * 0.72,
+                        color: const Color(0xFFFF76B4),
+                        opacity: 0.68,
+                      ),
+                      _OrbColorBlob(
+                        right: -orbSize * 0.12,
+                        top: orbSize * 0.06,
+                        size: orbSize * 0.72,
+                        color: const Color(0xFF66E9DE),
+                        opacity: 0.62,
+                      ),
+                      _OrbColorBlob(
+                        right: orbSize * 0.04,
+                        bottom: -orbSize * 0.18,
+                        size: orbSize * 0.64,
+                        color: const Color(0xFFFFC85C),
+                        opacity: 0.66,
+                      ),
+                      _OrbColorBlob(
+                        left: orbSize * 0.12,
+                        top: orbSize * 0.02,
+                        size: orbSize * 0.72,
+                        color: const Color(0xFF7D5AE8),
+                        opacity: 0.30,
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: const Alignment(-0.44, -0.58),
+                              radius: 0.58,
+                              colors: [
+                                Colors.white.withOpacity(0.72),
+                                Colors.white.withOpacity(0.16),
+                                Colors.white.withOpacity(0.0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (!compact) ...[
+                        Positioned(
+                          left: orbSize * 0.34,
+                          top: orbSize * 0.38,
+                          child: const _TriangleEye(size: 22),
+                        ),
+                        Positioned(
+                          right: orbSize * 0.34,
+                          top: orbSize * 0.38,
+                          child: const _TriangleEye(size: 22),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -569,198 +690,107 @@ class _FloatingSlimeOrb extends StatelessWidget {
   }
 }
 
-class _SlimeOrbPainter extends CustomPainter {
-  const _SlimeOrbPainter({
-    required this.phase,
-    required this.compact,
+class _OrbColorBlob extends StatelessWidget {
+  const _OrbColorBlob({
+    this.left,
+    this.right,
+    this.top,
+    this.bottom,
+    required this.size,
+    required this.color,
+    required this.opacity,
   });
 
-  final double phase;
-  final bool compact;
+  final double? left;
+  final double? right;
+  final double? top;
+  final double? bottom;
+  final double size;
+  final Color color;
+  final double opacity;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final shortest = math.min(size.width, size.height);
-    final radius = shortest * (compact ? 0.38 : 0.34);
-    final t = phase * math.pi * 2;
-    final pulse = math.sin(t);
-
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFFF7DB5).withOpacity(0.0),
-          const Color(0xFF8EE9F0).withOpacity(compact ? 0.20 : 0.28),
-          const Color(0xFFFF7DB5).withOpacity(0.0),
-        ],
-        stops: const [0.2, 0.55, 1],
-      ).createShader(Rect.fromCircle(center: center, radius: shortest * 0.5));
-    canvas.drawCircle(center, shortest * 0.48, glowPaint);
-
-    final shadowPaint = Paint()
-      ..color = const Color(0xFFFF7DB5).withOpacity(compact ? 0.05 : 0.16)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, compact ? 10 : 24);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center.translate(0, radius * 1.15),
-        width: radius * (compact ? 1.2 : 1.55),
-        height: radius * (compact ? 0.22 : 0.34),
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left,
+      right: right,
+      top: top,
+      bottom: bottom,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              color.withOpacity(opacity),
+              color.withOpacity(opacity * 0.42),
+              color.withOpacity(0),
+            ],
+          ),
+        ),
       ),
-      shadowPaint,
     );
-
-    final bodyPath = _buildBlobPath(center, radius, t, pulse);
-
-    final basePaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.42, -0.52),
-        radius: 1.12,
-        colors: const [
-          Color(0xFFEFFFFF),
-          Color(0xFFB7F5EE),
-          Color(0xFFFFB7D7),
-          Color(0xFF875EEA),
-        ],
-        stops: [0.0, 0.34, 0.68, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 1.18));
-    canvas.drawPath(bodyPath, basePaint);
-
-    canvas.save();
-    canvas.clipPath(bodyPath);
-    _drawSoftColor(
-      canvas,
-      center.translate(-radius * 0.48, radius * 0.26),
-      radius * 0.95,
-      const Color(0xFFFF6FAE),
-      0.72,
-    );
-    _drawSoftColor(
-      canvas,
-      center.translate(radius * 0.48, -radius * 0.08),
-      radius * 0.86,
-      const Color(0xFF63E7DD),
-      0.66,
-    );
-    _drawSoftColor(
-      canvas,
-      center.translate(radius * 0.22, radius * 0.48),
-      radius * 0.72,
-      const Color(0xFFFFC65C),
-      0.72,
-    );
-    _drawSoftColor(
-      canvas,
-      center.translate(-radius * 0.18, -radius * 0.20),
-      radius * 0.86,
-      const Color(0xFF7E58EA),
-      0.42,
-    );
-    canvas.restore();
-
-    final shinePaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.45, -0.62),
-        radius: 0.62,
-        colors: [
-          Colors.white.withOpacity(0.78),
-          Colors.white.withOpacity(0.16),
-          Colors.white.withOpacity(0.0),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawPath(bodyPath, shinePaint);
-
-    final rimPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = compact ? 1.0 : 2.0
-      ..color = Colors.white.withOpacity(0.34);
-    canvas.drawPath(bodyPath, rimPaint);
-
-    if (!compact) {
-      _drawTriangleEye(
-        canvas,
-        center.translate(-radius * 0.28, -radius * 0.10 + pulse * 1.5),
-        radius * 0.22,
-      );
-      _drawTriangleEye(
-        canvas,
-        center.translate(radius * 0.28, -radius * 0.10 + pulse * 1.5),
-        radius * 0.22,
-      );
-    }
   }
+}
 
-  Path _buildBlobPath(Offset center, double radius, double t, double pulse) {
-    final path = Path();
-    const points = 72;
-    for (var i = 0; i <= points; i++) {
-      final angle = i / points * math.pi * 2;
-      final wobble = math.sin(angle * 2.0 + t) * 0.018 +
-          math.cos(angle * 3.0 - t * 0.8) * 0.022;
-      final r = radius * (1 + wobble + pulse * 0.006);
-      final dx = math.cos(angle) * r;
-      final dy = math.sin(angle) * r * (1 + math.sin(t + 0.5) * 0.018);
-      final point = center.translate(dx, dy);
-      if (i == 0) {
-        path.moveTo(point.dx, point.dy);
-      } else {
-        path.lineTo(point.dx, point.dy);
-      }
-    }
-    path.close();
-    return path;
-  }
+class _TriangleEye extends StatelessWidget {
+  const _TriangleEye({required this.size});
 
-  void _drawSoftColor(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    Color color,
-    double opacity,
-  ) {
-    final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          color.withOpacity(opacity),
-          color.withOpacity(opacity * 0.42),
-          color.withOpacity(0),
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.46),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
         ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, paint);
+      ),
+      child: ClipPath(
+        clipper: const _TriangleEyeClipper(),
+        child: Container(color: Colors.white.withOpacity(0.96)),
+      ),
+    );
   }
+}
 
-  void _drawTriangleEye(Canvas canvas, Offset center, double size) {
-    final eye = Path()
-      ..moveTo(center.dx, center.dy - size * 0.64)
+class _TriangleEyeClipper extends CustomClipper<Path> {
+  const _TriangleEyeClipper();
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(size.width * 0.50, size.height * 0.08)
       ..quadraticBezierTo(
-        center.dx + size * 0.58,
-        center.dy + size * 0.28,
-        center.dx + size * 0.30,
-        center.dy + size * 0.54,
+        size.width * 0.96,
+        size.height * 0.70,
+        size.width * 0.76,
+        size.height * 0.90,
       )
       ..quadraticBezierTo(
-        center.dx,
-        center.dy + size * 0.36,
-        center.dx - size * 0.30,
-        center.dy + size * 0.54,
+        size.width * 0.50,
+        size.height * 0.70,
+        size.width * 0.24,
+        size.height * 0.90,
       )
       ..quadraticBezierTo(
-        center.dx - size * 0.58,
-        center.dy + size * 0.28,
-        center.dx,
-        center.dy - size * 0.64,
+        size.width * 0.04,
+        size.height * 0.70,
+        size.width * 0.50,
+        size.height * 0.08,
       )
       ..close();
-    final glow = Paint()
-      ..color = Colors.white.withOpacity(0.50)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawPath(eye, glow);
-    canvas.drawPath(eye, Paint()..color = Colors.white.withOpacity(0.96));
   }
 
   @override
-  bool shouldRepaint(covariant _SlimeOrbPainter oldDelegate) {
-    return oldDelegate.phase != phase || oldDelegate.compact != compact;
-  }
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class _AnswerSectionData {
