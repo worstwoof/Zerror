@@ -151,74 +151,49 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      height: 650,
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+      height: 680,
+      padding: const EdgeInsets.fromLTRB(22, 42, 22, 28),
       decoration: BoxDecoration(
-        color: AppPalette.paper.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: Colors.white.withOpacity(0.84), width: 1.4),
+        color: const Color(0xFFFDFDFB),
+        borderRadius: BorderRadius.circular(38),
+        border: Border.all(color: Colors.white.withOpacity(0.92), width: 1.6),
         boxShadow: [
           BoxShadow(
-            color: AppPalette.moodBlue.withOpacity(0.08),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
+            color: AppPalette.moodBlue.withOpacity(0.10),
+            blurRadius: 36,
+            offset: const Offset(0, 22),
           ),
         ],
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppPalette.mint.withOpacity(0.58),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppPalette.inkBlue,
-                  size: 21,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: AppPalette.mint.withOpacity(0.24),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'Study Pulse',
-                  style: TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 26),
           const _HeroTitle(),
-          const SizedBox(height: 18),
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: const [
-              _FloatingSlimeOrb(size: 226),
-              Positioned(
-                top: 16,
-                left: 28,
-                child: _HelloBubble(),
-              ),
-            ],
+          const SizedBox(height: 30),
+          SizedBox(
+            height: 320,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: const [
+                Positioned(
+                  bottom: 12,
+                  child: _OrbFloorGlow(),
+                ),
+                Positioned(
+                  top: 18,
+                  child: _FloatingSlimeOrb(size: 266),
+                ),
+                Positioned(
+                  top: 34,
+                  left: 42,
+                  child: _HelloBubble(),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           const Text(
-            'Get instant help and support\nwith any question or problem',
+            'Get instant help and support\nwith any task or problem',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppPalette.textSecondary,
@@ -230,35 +205,43 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const SizedBox(height: 20),
           GestureDetector(
             onTap: () => _send('帮我把这道错题拆成三步讲清楚'),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(26),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppPalette.inkBlue.withOpacity(0.06),
-                    blurRadius: 18,
-                    offset: const Offset(0, 10),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.96),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppPalette.inkBlue.withOpacity(0.07),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Get started',
-                    style: TextStyle(
-                      color: AppPalette.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Get started',
+                        style: TextStyle(
+                          color: AppPalette.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppPalette.textPrimary,
+                        size: 21,
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 10),
-                  Icon(Icons.arrow_forward_rounded,
-                      color: AppPalette.textPrimary, size: 20),
-                ],
+                ),
               ),
             ),
           ),
@@ -296,6 +279,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
 class _HeroTitle extends StatelessWidget {
   const _HeroTitle();
 
+  static const Color _accent = Color(0xFF6257D9);
+
   @override
   Widget build(BuildContext context) {
     return RichText(
@@ -303,7 +288,7 @@ class _HeroTitle extends StatelessWidget {
       text: const TextSpan(
         style: TextStyle(
           color: AppPalette.textPrimary,
-          fontSize: 34,
+          fontSize: 36,
           height: 1.08,
           fontWeight: FontWeight.w900,
           letterSpacing: 0,
@@ -312,9 +297,9 @@ class _HeroTitle extends StatelessWidget {
           TextSpan(text: 'Your '),
           TextSpan(
             text: 'Smart\nAssistant',
-            style: TextStyle(color: AppPalette.moodBlue),
+            style: TextStyle(color: _accent),
           ),
-          TextSpan(text: ' for\nStudy Tasks'),
+          TextSpan(text: ' for\nAny Tasks'),
         ],
       ),
     );
@@ -326,26 +311,82 @@ class _HelloBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppPalette.inkBlue.withOpacity(0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: const Text(
+            'Hello!',
+            style: TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Positioned(
+          right: 14,
+          bottom: -8,
+          child: Transform.rotate(
+            angle: 0.8,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.94),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OrbFloorGlow extends StatelessWidget {
+  const _OrbFloorGlow();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+      width: 260,
+      height: 70,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(999),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFF2A0C7).withOpacity(0.22),
+            const Color(0xFF776AE6).withOpacity(0.16),
+            const Color(0xFF92E4F3).withOpacity(0.10),
+          ],
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppPalette.inkBlue.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: const Color(0xFFEA9FCC).withOpacity(0.38),
+            blurRadius: 34,
+            spreadRadius: 10,
+            offset: const Offset(-18, 4),
+          ),
+          BoxShadow(
+            color: const Color(0xFF8372E8).withOpacity(0.22),
+            blurRadius: 36,
+            spreadRadius: 8,
+            offset: const Offset(28, 8),
           ),
         ],
-      ),
-      child: const Text(
-        'Hello!',
-        style: TextStyle(
-          color: AppPalette.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }
