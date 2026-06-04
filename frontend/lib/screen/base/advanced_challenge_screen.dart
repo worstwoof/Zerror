@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 class AdvancedChallengeScreen extends StatefulWidget {
   const AdvancedChallengeScreen({super.key});
 
@@ -8,9 +10,9 @@ class AdvancedChallengeScreen extends StatefulWidget {
 }
 
 class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
-  final Color bgDark = const Color(0xFF1E2823);
-  final Color primaryGreen = const Color(0xFF70A88D);
-  final Color cardBg = const Color(0xFF2A352F);
+  final Color bgDark = AppPalette.cream;
+  final Color primaryGreen = AppPalette.moodBlue;
+  final Color cardBg = AppPalette.paper;
 
   // 模拟压轴大题的数据（多步求解）
   int _currentStep = 0; // 当前解锁到第几步
@@ -99,9 +101,9 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
           children: [
             Icon(Icons.workspace_premium_rounded, color: Colors.orangeAccent, size: 60),
             const SizedBox(height: 16),
-            const Text('大题攻克！', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text('大题攻克！', style: TextStyle(color: AppPalette.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Text('完美的逻辑链！你已经掌握了特征值与伴随矩阵的综合运用。', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), height: 1.5)),
+            Text('完美的逻辑链！你已经掌握了特征值与伴随矩阵的综合运用。', textAlign: TextAlign.center, style: const TextStyle(color: AppPalette.textSecondary, height: 1.5)),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () { Navigator.pop(context); // 关弹窗
@@ -127,13 +129,13 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text('第 03 关：进阶挑战', style: TextStyle(color: Colors.white, fontSize: 16)),
-        leading: IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        title: const Text('第 03 关：进阶挑战', style: TextStyle(color: AppPalette.textPrimary, fontSize: 16)),
+        leading: IconButton(icon: const Icon(Icons.close_rounded, color: AppPalette.textPrimary), onPressed: () => Navigator.pop(context)),
       ),
       body: Stack(
         children: [
           Positioned.fill(child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover)),
-          Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
+          Positioned.fill(child: Container(color: AppPalette.cream.withOpacity(0.78))),
 
           SafeArea(
             child: Column(
@@ -143,16 +145,16 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                   margin: const EdgeInsets.all(24),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: primaryGreen.withValues(alpha: 0.1),
+                    color: primaryGreen.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: primaryGreen.withValues(alpha: 0.3)),
+                    border: Border.all(color: primaryGreen.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(_bossProblem['title'], style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
-                      Text(_bossProblem['context'], style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.6)),
+                      Text(_bossProblem['context'], style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16, height: 1.6)),
                     ],
                   ),
                 ),
@@ -171,9 +173,9 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                         margin: const EdgeInsets.only(bottom: 24),
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: cardBg.withValues(alpha: isCurrentActiveStep ? 0.9 : 0.5),
+                          color: cardBg.withOpacity(isCurrentActiveStep ? 0.9 : 0.5),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isCurrentActiveStep ? primaryGreen.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05)),
+                          border: Border.all(color: isCurrentActiveStep ? primaryGreen.withOpacity(0.5) : AppPalette.inkBlue.withOpacity(0.06)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,11 +184,11 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: isCurrentActiveStep ? primaryGreen : Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-                                  child: Text('Step ${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  decoration: BoxDecoration(color: isCurrentActiveStep ? primaryGreen : AppPalette.inkBlue.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                                  child: Text('Step ${index + 1}', style: TextStyle(color: isCurrentActiveStep ? Colors.white : AppPalette.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
                                 ),
                                 const SizedBox(width: 12),
-                                Expanded(child: Text(step['question'], style: TextStyle(color: Colors.white.withValues(alpha: isCurrentActiveStep ? 1.0 : 0.6), fontSize: 15))),
+                                Expanded(child: Text(step['question'], style: TextStyle(color: isCurrentActiveStep ? AppPalette.textPrimary : AppPalette.textSecondary, fontSize: 15))),
                               ],
                             ),
 
@@ -196,7 +198,7 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                                 final isSelected = _selectedOption == optIdx;
                                 final isCorrect = optIdx == step['correctIndex'];
 
-                                Color borderColor = Colors.white.withValues(alpha: 0.1);
+                                Color borderColor = AppPalette.inkBlue.withOpacity(0.08);
                                 if (_isStepSubmitted) {
                                   if (isCorrect) borderColor = primaryGreen;
                                   else if (isSelected) borderColor = Colors.redAccent;
@@ -208,11 +210,11 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                                     margin: const EdgeInsets.only(bottom: 12),
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: borderColor.withValues(alpha: 0.1),
+                                      color: borderColor.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(color: borderColor),
                                     ),
-                                    child: Text(step['options'][optIdx], style: const TextStyle(color: Colors.white)),
+                                    child: Text(step['options'][optIdx], style: const TextStyle(color: AppPalette.textPrimary)),
                                   ),
                                 );
                               }),
@@ -228,7 +230,7 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                             ] else ...[
                               // 已经做过的历史步骤，只显示正确答案
                               const SizedBox(height: 16),
-                              Text('正确答案：${step['options'][step['correctIndex']]}', style: TextStyle(color: primaryGreen.withValues(alpha: 0.8), fontSize: 14)),
+                              Text('正确答案：${step['options'][step['correctIndex']]}', style: TextStyle(color: primaryGreen.withOpacity(0.8), fontSize: 14)),
                             ]
                           ],
                         ),
@@ -242,7 +244,7 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: bgDark,
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, -2))],
+                    boxShadow: [BoxShadow(color: AppPalette.inkBlue.withOpacity(0.08), blurRadius: 10, offset: Offset(0, -2))],
                   ),
                   child: _buildDynamicButton(),
                 )
@@ -260,7 +262,7 @@ class _AdvancedChallengeScreenState extends State<AdvancedChallengeScreen> {
         onPressed: _selectedOption == null ? null : _submitStep,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreen,
-          disabledBackgroundColor: Colors.white10,
+          disabledBackgroundColor: AppPalette.inkBlue.withOpacity(0.08),
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),

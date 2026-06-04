@@ -64,7 +64,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final store = AppStateScope.of(context);
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -200,17 +200,17 @@ class _InputCard extends StatelessWidget {
                 ),
               ),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.04),
+              fillColor: AppPalette.paper.withOpacity(0.94),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+                  color: AppPalette.pastelGrey.withOpacity(0.06),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+                  color: AppPalette.pastelGrey.withOpacity(0.06),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -297,9 +297,10 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
         child: const Icon(
           Icons.arrow_back_ios_new_rounded,

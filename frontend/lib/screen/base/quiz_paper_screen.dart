@@ -63,7 +63,8 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
       return generated;
     }
 
-    final selected = widget.selectedSubjects.where((item) => item != '全部学科').toList();
+    final selected =
+        widget.selectedSubjects.where((item) => item != '全部学科').toList();
     final primarySubject = selected.isNotEmpty ? selected.first : '线性代数';
 
     final base = <Map<String, dynamic>>[
@@ -72,7 +73,12 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
         'subject': primarySubject,
         'topic': '矩阵特征值与相似对角化',
         'content': '设矩阵 A 的特征值为 λ1、λ2、λ3，且 A 可逆。A 的伴随矩阵 A* 的特征值应为哪一组？',
-        'options': ['λ1, λ2, λ3', '1/λ1, 1/λ2, 1/λ3', '|A|/λ1, |A|/λ2, |A|/λ3', '|A|λ1, |A|λ2, |A|λ3'],
+        'options': [
+          'λ1, λ2, λ3',
+          '1/λ1, 1/λ2, 1/λ3',
+          '|A|/λ1, |A|/λ2, |A|/λ3',
+          '|A|λ1, |A|λ2, |A|λ3'
+        ],
         'correctIndex': 2,
         'correctAnswer': '|A|/λ1, |A|/λ2, |A|/λ3',
         'reasonHint': '伴随矩阵与逆矩阵关系没串起来',
@@ -107,9 +113,11 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
       (widget.questionCount - base.length).clamp(0, 100),
       (index) => <String, dynamic>{
         'type': '判断题',
-        'subject': selected.isNotEmpty ? selected[index % selected.length] : '综合考察',
+        'subject':
+            selected.isNotEmpty ? selected[index % selected.length] : '综合考察',
         'topic': '错题迁移训练',
-        'content': '这是基于「${widget.strategyLabel}」自动生成的第 ${index + 4} 道变式练习，用来继续回收你的薄弱点。',
+        'content':
+            '这是基于「${widget.strategyLabel}」自动生成的第 ${index + 4} 道变式练习，用来继续回收你的薄弱点。',
         'options': ['正确', '错误'],
         'correctIndex': index.isEven ? 0 : 1,
         'correctAnswer': index.isEven ? '正确' : '错误',
@@ -140,7 +148,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppPalette.kombuGreen,
+        backgroundColor: AppPalette.paper,
         title: const Text(
           '确认交卷？',
           style: TextStyle(color: AppPalette.textPrimary),
@@ -175,8 +183,8 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppPalette.almondCream,
-              foregroundColor: AppPalette.night,
+              backgroundColor: AppPalette.inkBlue,
+              foregroundColor: Colors.white,
             ),
             child: const Text('确认交卷'),
           ),
@@ -209,7 +217,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -229,7 +237,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
             Text(
               widget.generatedTitle ?? _formatTime(_secondsElapsed),
               style: const TextStyle(
-                color: AppPalette.almondCream,
+                color: AppPalette.moodBlue,
                 fontSize: 13,
               ),
               maxLines: 1,
@@ -253,7 +261,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
             child: const Text(
               '交卷',
               style: TextStyle(
-                color: AppPalette.almondCream,
+                color: AppPalette.moodBlue,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -269,10 +277,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
             ),
           ),
           Positioned.fill(
-            child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
-          ),
-          Positioned.fill(
-            child: Container(color: AppPalette.night.withValues(alpha: 0.72)),
+            child: const SizedBox.shrink(),
           ),
           Column(
             children: [
@@ -281,7 +286,8 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: _questions.length,
-                  onPageChanged: (index) => setState(() => _currentIndex = index),
+                  onPageChanged: (index) =>
+                      setState(() => _currentIndex = index),
                   itemBuilder: (context, index) {
                     return _buildQuestionCard(_questions[index], index);
                   },
@@ -311,7 +317,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           Color bubbleColor = Colors.transparent;
           Color textColor = AppPalette.textSecondary;
           Border? border = Border.all(
-            color: Colors.white.withValues(alpha: 0.10),
+            color: AppPalette.inkBlue.withOpacity(0.08),
           );
 
           if (isCurrent) {
@@ -319,14 +325,14 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
             textColor = AppPalette.night;
             border = null;
           } else if (isMarked) {
-            bubbleColor = AppPalette.honeyOrange.withValues(alpha: 0.20);
+            bubbleColor = AppPalette.honeyOrange.withOpacity(0.20);
             textColor = AppPalette.honeyOrange;
             border = Border.all(color: AppPalette.honeyOrange);
           } else if (isAnswered) {
-            bubbleColor = AppPalette.matchaMist.withValues(alpha: 0.18);
+            bubbleColor = AppPalette.matchaMist.withOpacity(0.18);
             textColor = AppPalette.matchaMist;
             border = Border.all(
-              color: AppPalette.matchaMist.withValues(alpha: 0.40),
+              color: AppPalette.matchaMist.withOpacity(0.40),
             );
           }
 
@@ -360,7 +366,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
   }
 
   Widget _buildQuestionCard(Map<String, dynamic> question, int index) {
-    final cardColor = AppPalette.kombuGreen.withValues(alpha: 0.88);
+    final cardColor = AppPalette.paper.withOpacity(0.96);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -369,9 +375,14 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-          ),
+          border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
+          boxShadow: [
+            BoxShadow(
+              color: AppPalette.inkBlue.withOpacity(0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,10 +452,10 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 decoration: InputDecoration(
                   hintText: '点击此处输入你的推导过程或笔记...',
                   hintStyle: TextStyle(
-                    color: AppPalette.textSecondary.withValues(alpha: 0.50),
+                    color: AppPalette.textSecondary.withOpacity(0.50),
                   ),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.04),
+                  fillColor: AppPalette.cream,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -473,13 +484,13 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppPalette.matchaMist.withValues(alpha: 0.12)
+                ? AppPalette.matchaMist.withOpacity(0.12)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
                   ? AppPalette.matchaMist
-                  : Colors.white.withValues(alpha: 0.10),
+                  : AppPalette.inkBlue.withOpacity(0.08),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -517,10 +528,10 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        color: AppPalette.night.withValues(alpha: 0.94),
+        color: AppPalette.paper,
         border: Border(
           top: BorderSide(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+            color: AppPalette.inkBlue.withOpacity(0.06),
           ),
         ),
       ),
@@ -539,7 +550,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 Icons.arrow_back_ios_rounded,
                 color: _currentIndex > 0
                     ? AppPalette.textPrimary
-                    : AppPalette.textSecondary.withValues(alpha: 0.3),
+                    : AppPalette.textSecondary.withOpacity(0.3),
               ),
             ),
             TextButton.icon(
@@ -556,12 +567,16 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 isMarked
                     ? Icons.bookmark_rounded
                     : Icons.bookmark_border_rounded,
-                color: isMarked ? AppPalette.honeyOrange : AppPalette.textSecondary,
+                color: isMarked
+                    ? AppPalette.honeyOrange
+                    : AppPalette.textSecondary,
               ),
               label: Text(
                 isMarked ? '已存疑' : '标记存疑',
                 style: TextStyle(
-                  color: isMarked ? AppPalette.honeyOrange : AppPalette.textSecondary,
+                  color: isMarked
+                      ? AppPalette.honeyOrange
+                      : AppPalette.textSecondary,
                 ),
               ),
             ),
@@ -576,7 +591,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 Icons.arrow_forward_ios_rounded,
                 color: _currentIndex < _questions.length - 1
                     ? AppPalette.textPrimary
-                    : AppPalette.textSecondary.withValues(alpha: 0.3),
+                    : AppPalette.textSecondary.withOpacity(0.3),
               ),
             ),
           ],

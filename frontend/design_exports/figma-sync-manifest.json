@@ -1,0 +1,120 @@
+{
+  "name": "Zerror Flat UI Redesign",
+  "figma": {
+    "fileKey": "FBfQTUkBHS7TnI0dOvIiIV",
+    "url": "https://www.figma.com/design/FBfQTUkBHS7TnI0dOvIiIV",
+    "status": "created, pending final MCP upload because Starter plan call limit is reached"
+  },
+  "style": {
+    "direction": "warm flat learning app UI",
+    "colors": {
+      "inkBlue": "#111A3A",
+      "cream": "#F8F2E8",
+      "paper": "#FFFBF3",
+      "mutedText": "#8F887D",
+      "moodBlue": "#405EA9",
+      "mint": "#A9D9C8",
+      "leaf": "#B9CC7B",
+      "peach": "#FFC982",
+      "blush": "#F6BCD0",
+      "coral": "#E17D6B"
+    },
+    "radius": {
+      "panel": 24,
+      "card": 22,
+      "button": 18,
+      "input": 18
+    },
+    "shadow": "soft ink-blue shadow at low opacity"
+  },
+  "localArtifacts": [
+    {
+      "type": "overview-board",
+      "path": "frontend/design_exports/zerror-flat-ui-board.png",
+      "purpose": "single image board for Figma upload while editable frames are blocked"
+    },
+    {
+      "type": "use-figma-script",
+      "path": "frontend/design_exports/figma-build-flat-redesign.js",
+      "purpose": "creates editable Figma foundations and representative mobile frames after MCP call limit is lifted"
+    },
+    {
+      "type": "design-tokens",
+      "path": "frontend/design_exports/design-tokens.json",
+      "purpose": "machine-readable flat UI tokens for Figma and handoff validation"
+    }
+  ],
+  "assets": [
+    {
+      "path": "frontend/assets/images/flat_study_illustration.png",
+      "usage": "home hero"
+    },
+    {
+      "path": "frontend/assets/images/ai_chat_illustration.png",
+      "usage": "AI chat hero"
+    },
+    {
+      "path": "frontend/assets/images/empty_study_illustration.png",
+      "usage": "empty states"
+    },
+    {
+      "path": "frontend/assets/images/flat_chat_icon.png",
+      "usage": "home AI assistant entry"
+    }
+  ],
+  "representativeScreens": [
+    {
+      "name": "Home",
+      "source": "frontend/lib/screen/base/home_screen.dart",
+      "notes": "main shell, drawer, study hero, quick actions, AI assistant entry"
+    },
+    {
+      "name": "AI Chat",
+      "source": "frontend/lib/screen/base/ai_chat_screen.dart",
+      "notes": "mock front-end chat, quick prompts, thinking state, bottom input"
+    },
+    {
+      "name": "Error Archive",
+      "source": "frontend/lib/screen/base/error_archive_screen.dart",
+      "notes": "filter chips, archive cards, empty state"
+    },
+    {
+      "name": "Error Detail",
+      "source": "frontend/lib/screen/base/error_detail_screen.dart",
+      "notes": "analysis panels and artifact rows"
+    },
+    {
+      "name": "Smart Quiz",
+      "source": "frontend/lib/screen/base/smart_quiz_screen.dart",
+      "notes": "quiz generation setup"
+    },
+    {
+      "name": "Quiz Paper",
+      "source": "frontend/lib/screen/base/quiz_paper_screen.dart",
+      "notes": "question card flow"
+    },
+    {
+      "name": "Quiz Result",
+      "source": "frontend/lib/screen/base/quiz_result_screen.dart",
+      "notes": "result summary and answer review"
+    },
+    {
+      "name": "Auth",
+      "source": "frontend/lib/screen/base/login_screen.dart, frontend/lib/screen/base/register_screen.dart",
+      "notes": "login and register representative frames"
+    },
+    {
+      "name": "Preview/Edit",
+      "source": "frontend/lib/screen/capture/error_preview_screen.dart, frontend/lib/screen/capture/error_edit_screen.dart",
+      "notes": "outer shell follows flat UI; media/canvas preview keeps functional dark surface"
+    }
+  ],
+  "nextFigmaSteps": [
+    "Upload frontend/design_exports/zerror-flat-ui-board.png into the design file as a reference board.",
+    "Use frontend/design_exports/design-tokens.json as the token source when creating variables/styles.",
+    "Run frontend/design_exports/figma-build-flat-redesign.js with use_figma against file FBfQTUkBHS7TnI0dOvIiIV.",
+    "Create editable foundation frames for colors, typography, spacing, panel, button, input, chat bubble and empty state.",
+    "Recreate representative screens listed above as editable mobile frames using AppPalette tokens.",
+    "Place generated illustrations into the matching frames."
+  ]
+}

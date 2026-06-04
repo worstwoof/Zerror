@@ -54,16 +54,17 @@ class QuizResultScreen extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              _scoreBoard(score, timeSpent, correctCount, wrongQuestions.length),
+              _scoreBoard(
+                  score, timeSpent, correctCount, wrongQuestions.length),
               const SizedBox(height: 20),
               AppPanel(
-                color: AppPalette.matchaMist.withValues(alpha: 0.08),
+                color: AppPalette.mint.withOpacity(0.45),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.psychology_rounded,
-                      color: AppPalette.almondCream,
+                      color: AppPalette.textPrimary,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -74,7 +75,7 @@ class QuizResultScreen extends StatelessWidget {
                           const Text(
                             'AI 学情诊断',
                             style: TextStyle(
-                              color: AppPalette.almondCream,
+                              color: AppPalette.textPrimary,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
@@ -128,10 +129,10 @@ class QuizResultScreen extends StatelessWidget {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         decoration: BoxDecoration(
-          color: AppPalette.night.withValues(alpha: 0.94),
+          color: AppPalette.paper,
           border: Border(
             top: BorderSide(
-              color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              color: AppPalette.inkBlue.withOpacity(0.06),
             ),
           ),
         ),
@@ -143,7 +144,7 @@ class QuizResultScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   side: BorderSide(
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.14),
+                    color: AppPalette.inkBlue.withOpacity(0.12),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -279,7 +280,7 @@ class QuizResultScreen extends StatelessWidget {
                 child: CircularProgressIndicator(
                   value: score / 100,
                   strokeWidth: 10,
-                  backgroundColor: Colors.white.withValues(alpha: 0.06),
+                  backgroundColor: AppPalette.inkBlue.withOpacity(0.08),
                   color: AppPalette.matchaMist,
                   strokeCap: StrokeCap.round,
                 ),
@@ -289,7 +290,7 @@ class QuizResultScreen extends StatelessWidget {
                   Text(
                     '$score',
                     style: const TextStyle(
-                      color: AppPalette.almondCream,
+                      color: AppPalette.moodBlue,
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
                       height: 1,
@@ -314,13 +315,13 @@ class QuizResultScreen extends StatelessWidget {
               Container(
                 width: 1,
                 height: 30,
-                color: Colors.white.withValues(alpha: 0.08),
+                color: AppPalette.inkBlue.withOpacity(0.08),
               ),
-              _statItem('答错', '$wrong 题', const Color(0xFFE17D6B)),
+            _statItem('答错', '$wrong 题', AppPalette.coral),
               Container(
                 width: 1,
                 height: 30,
-                color: Colors.white.withValues(alpha: 0.08),
+                color: AppPalette.inkBlue.withOpacity(0.08),
               ),
               _statItem('用时', timeSpent, AppPalette.honeyOrange),
             ],
@@ -381,7 +382,7 @@ class QuizResultScreen extends StatelessWidget {
                   child: const Text(
                     '答错',
                     style: TextStyle(
-                      color: Color(0xFFE17D6B),
+                    color: AppPalette.coral,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -412,7 +413,7 @@ class QuizResultScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: AppPalette.inkBlue.withOpacity(0.04),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -432,7 +433,7 @@ class QuizResultScreen extends StatelessWidget {
                         child: Text(
                           displayedUserAnswer,
                           style: const TextStyle(
-                            color: Color(0xFFE17D6B),
+                    color: AppPalette.coral,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),

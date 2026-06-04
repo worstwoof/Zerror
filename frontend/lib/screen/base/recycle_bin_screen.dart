@@ -24,9 +24,16 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
-        title: const Text('错题回收站', style: TextStyle(color: AppPalette.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: const Text('错题回收站',
+            style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600)),
         actions: [
-          IconButton(icon: const Icon(Icons.delete_sweep_rounded, color: AppPalette.textPrimary), onPressed: () {}),
+          IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded,
+                  color: AppPalette.textPrimary),
+              onPressed: () {}),
         ],
       ),
       body: AppSurface(
@@ -51,14 +58,19 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                       label: Text(_filters[index]),
                       selected: isSelected,
                       selectedColor: AppPalette.matchaMist,
-                      backgroundColor: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                      backgroundColor:
+                          AppPalette.pastelGrey.withOpacity(0.08),
                       labelStyle: TextStyle(
-                        color: isSelected ? AppPalette.night : AppPalette.textSecondary,
+                        color: isSelected
+                            ? AppPalette.night
+                            : AppPalette.textSecondary,
                         fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.normal,
                       ),
                       side: BorderSide.none,
-                      onSelected: (_) => setState(() => _selectedFilterIndex = index),
+                      onSelected: (_) =>
+                          setState(() => _selectedFilterIndex = index),
                     ),
                   );
                 }),
@@ -68,9 +80,21 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
             Expanded(
               child: ListView(
                 children: const [
-                  _RecycleCard(subject: '线性代数', date: '2026-04-01', difficulty: 4, question: '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆，求 A* 的特征值。'),
-                  _RecycleCard(subject: '数据结构', date: '2026-03-28', difficulty: 3, question: '已知一棵二叉树的前序与中序遍历序列，画出原二叉树。'),
-                  _RecycleCard(subject: 'Java', date: '2026-03-25', difficulty: 5, question: '解释 JVM 中垃圾回收机制的分代回收原理。'),
+                  _RecycleCard(
+                      subject: '线性代数',
+                      date: '2026-04-01',
+                      difficulty: 4,
+                      question: '设矩阵 A 的特征值为 λ1, λ2, λ3，且 A 可逆，求 A* 的特征值。'),
+                  _RecycleCard(
+                      subject: '数据结构',
+                      date: '2026-03-28',
+                      difficulty: 3,
+                      question: '已知一棵二叉树的前序与中序遍历序列，画出原二叉树。'),
+                  _RecycleCard(
+                      subject: 'Java',
+                      date: '2026-03-25',
+                      difficulty: 5,
+                      question: '解释 JVM 中垃圾回收机制的分代回收原理。'),
                 ],
               ),
             ),
@@ -106,18 +130,27 @@ class _RecycleCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppPalette.matchaMist.withValues(alpha: 0.14),
+                    color: AppPalette.matchaMist.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(subject, style: const TextStyle(color: AppPalette.matchaMist, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text(subject,
+                      style: const TextStyle(
+                          color: AppPalette.matchaMist,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
                 ),
-                Text(date, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+                Text(date,
+                    style: const TextStyle(
+                        color: AppPalette.textSecondary, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 14),
-            Text(question, style: const TextStyle(color: AppPalette.textPrimary, fontSize: 15, height: 1.6)),
+            Text(question,
+                style: const TextStyle(
+                    color: AppPalette.textPrimary, fontSize: 15, height: 1.6)),
             const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -126,15 +159,25 @@ class _RecycleCard extends StatelessWidget {
                   children: List.generate(
                     5,
                     (index) => Icon(
-                      index < difficulty ? Icons.star_rounded : Icons.star_border_rounded,
-                      color: index < difficulty ? AppPalette.almondCream : AppPalette.textSecondary.withValues(alpha: 0.3),
+                      index < difficulty
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      color: index < difficulty
+                          ? AppPalette.almondCream
+                          : AppPalette.textSecondary.withOpacity(0.3),
                       size: 16,
                     ),
                   ),
                 ),
                 Row(
                   children: [
-                    TextButton(onPressed: () {}, child: const Text('彻底移除', style: TextStyle(color: Color(0xFFE17D6B)))),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text(
+                        '彻底移除',
+                        style: TextStyle(color: AppPalette.coral),
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: () {},
@@ -142,10 +185,14 @@ class _RecycleCard extends StatelessWidget {
                         backgroundColor: AppPalette.matchaMist,
                         foregroundColor: AppPalette.night,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                       ),
-                      child: const Text('去复习', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      child: const Text('去复习',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

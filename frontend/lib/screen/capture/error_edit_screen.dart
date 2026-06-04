@@ -720,9 +720,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
-        backgroundColor: AppPalette.night,
+        backgroundColor: AppPalette.cream,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
@@ -755,10 +755,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           : Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               decoration: BoxDecoration(
-                color: AppPalette.night.withValues(alpha: 0.94),
+                color: AppPalette.night.withOpacity(0.94),
                 border: Border(
                   top: BorderSide(
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                    color: AppPalette.pastelGrey.withOpacity(0.08),
                   ),
                 ),
               ),
@@ -856,10 +856,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
+                      color: Colors.white.withOpacity(0.03),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                        color: AppPalette.pastelGrey.withOpacity(0.08),
                       ),
                     ),
                     child: Column(
@@ -880,7 +880,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                             Icon(
                               Icons.edit_rounded,
                               color: AppPalette.textSecondary
-                                  .withValues(alpha: 0.82),
+                                  .withOpacity(0.82),
                               size: 16,
                             ),
                           ],
@@ -934,10 +934,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppPalette.night.withValues(alpha: 0.36),
+        color: AppPalette.night.withOpacity(0.36),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
         ),
       ),
       child: ClipRRect(
@@ -957,7 +957,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
 
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
-      color: AppPalette.matchaMist.withValues(alpha: 0.08),
+      color: AppPalette.matchaMist.withOpacity(0.08),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1068,10 +1068,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               margin: const EdgeInsets.symmetric(vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                color: AppPalette.night.withValues(alpha: 0.24),
+                color: AppPalette.night.withOpacity(0.24),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                  color: AppPalette.pastelGrey.withOpacity(0.08),
                 ),
               ),
               child: AppLatexText(
@@ -1136,7 +1136,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           ),
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: AppPalette.almondCream.withValues(alpha: 0.5),
+              color: AppPalette.almondCream.withOpacity(0.5),
             ),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -1229,7 +1229,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                 label: Text(reason),
                 selected: isSelected,
                 selectedColor: AppPalette.matchaMist,
-                backgroundColor: Colors.white.withValues(alpha: 0.05),
+                backgroundColor: Colors.white.withOpacity(0.05),
                 labelStyle: TextStyle(
                   color: isSelected ? AppPalette.night : AppPalette.textPrimary,
                   fontSize: 13,
@@ -1252,7 +1252,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               hintText: '写下你自己的避坑笔记...',
               hintStyle: const TextStyle(color: AppPalette.textSecondary),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.03),
+              fillColor: Colors.white.withOpacity(0.03),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -1288,10 +1288,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppPalette.night.withValues(alpha: 0.76),
+        color: AppPalette.night.withOpacity(0.76),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppPalette.matchaMist.withValues(alpha: 0.24),
+          color: AppPalette.matchaMist.withOpacity(0.24),
         ),
       ),
       child: Column(
@@ -1366,7 +1366,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: AppPalette.almondCream.withValues(alpha: 0.45),
+                      color: AppPalette.almondCream.withOpacity(0.45),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1510,10 +1510,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          color: AppPalette.pastelGrey.withOpacity(0.10),
         ),
       ),
       child: Column(
@@ -2130,7 +2130,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
+            color: Colors.white.withOpacity(0.03),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -2196,10 +2196,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppPalette.night.withValues(alpha: 0.55),
+              color: AppPalette.night.withOpacity(0.55),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                color: AppPalette.pastelGrey.withOpacity(0.08),
               ),
             ),
             child: SingleChildScrollView(
@@ -2282,7 +2282,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                   Container(
                     width: 2,
                     height: 42,
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.20),
+                    color: AppPalette.pastelGrey.withOpacity(0.20),
                   ),
               ],
             ),
@@ -2325,7 +2325,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -2396,7 +2396,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(
-                  color: AppPalette.almondCream.withValues(alpha: 0.45),
+                  color: AppPalette.almondCream.withOpacity(0.45),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -2443,7 +2443,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
         color: const Color(0xFF050505),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppPalette.almondCream.withValues(alpha: 0.18),
+          color: AppPalette.almondCream.withOpacity(0.18),
         ),
       ),
       child: Column(
@@ -2457,7 +2457,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: AppPalette.matchaMist.withValues(alpha: 0.64),
+                    color: AppPalette.matchaMist.withOpacity(0.64),
                   ),
                 ),
                 child: const Icon(
@@ -2539,7 +2539,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                 ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(
-                    color: AppPalette.almondCream.withValues(alpha: 0.45),
+                    color: AppPalette.almondCream.withOpacity(0.45),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2579,7 +2579,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     Positioned.fill(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
+                          color: Colors.white.withOpacity(0.08),
                         ),
                       ),
                     ),
@@ -2596,9 +2596,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                                   gradient: LinearGradient(
                                     colors: [
                                       AppPalette.matchaMist,
-                                      AppPalette.almondCream.withValues(
-                                        alpha: 0.86,
-                                      ),
+                                      AppPalette.almondCream.withOpacity(0.86),
                                     ],
                                   ),
                                 ),
@@ -2624,10 +2622,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            Colors.white.withValues(alpha: 0),
+                                            Colors.white.withOpacity(0),
                                             Colors.white
-                                                .withValues(alpha: 0.34),
-                                            Colors.white.withValues(alpha: 0),
+                                                .withOpacity(0.34),
+                                            Colors.white.withOpacity(0),
                                           ],
                                         ),
                                       ),
@@ -2665,19 +2663,19 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: isActive
-                ? AppPalette.matchaMist.withValues(alpha: activeFillAlpha)
-                : Colors.white.withValues(alpha: 0.04),
+                ? AppPalette.matchaMist.withOpacity(activeFillAlpha)
+                : Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: isActive
-                  ? AppPalette.matchaMist.withValues(alpha: activeBorderAlpha)
-                  : Colors.white.withValues(alpha: 0.08),
+                  ? AppPalette.matchaMist.withOpacity(activeBorderAlpha)
+                  : Colors.white.withOpacity(0.08),
             ),
             boxShadow: isCurrent
                 ? [
                     BoxShadow(
-                      color: AppPalette.matchaMist.withValues(
-                        alpha: 0.08 + pulseAmount * 0.10,
+                      color: AppPalette.matchaMist.withOpacity(
+                        0.08 + pulseAmount * 0.10,
                       ),
                       blurRadius: 10,
                       spreadRadius: 0.5,
@@ -2776,7 +2774,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -2819,7 +2817,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     ),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
-                        color: AppPalette.almondCream.withValues(alpha: 0.45),
+                        color: AppPalette.almondCream.withOpacity(0.45),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2845,7 +2843,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -2901,7 +2899,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(
-                  color: AppPalette.almondCream.withValues(alpha: 0.45),
+                  color: AppPalette.almondCream.withOpacity(0.45),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -2934,7 +2932,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -2987,7 +2985,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppPalette.almondCream.withValues(alpha: 0.10),
+        color: AppPalette.almondCream.withOpacity(0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -3005,7 +3003,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -3079,9 +3077,9 @@ class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
-        backgroundColor: AppPalette.night,
+        backgroundColor: AppPalette.cream,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
         title: const Text(

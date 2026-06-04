@@ -14,7 +14,7 @@ class PrivacySecurityScreen extends StatelessWidget {
     final store = AppStateScope.of(context);
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -71,7 +71,9 @@ class PrivacySecurityScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (var index = 0; index < store.securitySuggestions.length; index++) ...[
+                  for (var index = 0;
+                      index < store.securitySuggestions.length;
+                      index++) ...[
                     _SuggestionRow(text: store.securitySuggestions[index]),
                     if (index != store.securitySuggestions.length - 1)
                       const SizedBox(height: 10),
@@ -114,7 +116,7 @@ class PrivacySecurityScreen extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppPalette.textPrimary,
                         side: BorderSide(
-                          color: AppPalette.pastelGrey.withValues(alpha: 0.18),
+                          color: AppPalette.pastelGrey.withOpacity(0.18),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -188,7 +190,7 @@ class _SecurityItem extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppPalette.matchaMist.withValues(alpha: 0.16),
+            color: AppPalette.matchaMist.withOpacity(0.16),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(icon, color: AppPalette.textPrimary),
@@ -224,7 +226,7 @@ class _SecurityItem extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppPalette.almondCream.withValues(alpha: 0.14),
+                color: AppPalette.almondCream.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -314,9 +316,10 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
         child: const Icon(
           Icons.arrow_back_ios_new_rounded,

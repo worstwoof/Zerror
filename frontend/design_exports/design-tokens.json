@@ -1,0 +1,97 @@
+{
+  "name": "Zerror Flat UI Tokens",
+  "version": 1,
+  "colors": {
+    "inkBlue": {
+      "value": "#111A3A",
+      "usage": "primary text, dark buttons, focused controls"
+    },
+    "cream": {
+      "value": "#F8F2E8",
+      "usage": "app background"
+    },
+    "paper": {
+      "value": "#FFFBF3",
+      "usage": "cards, panels, inputs"
+    },
+    "mutedText": {
+      "value": "#8F887D",
+      "usage": "secondary text"
+    },
+    "moodBlue": {
+      "value": "#405EA9",
+      "usage": "primary action accents, AI hero"
+    },
+    "mint": {
+      "value": "#A9D9C8",
+      "usage": "study and success accent blocks"
+    },
+    "leaf": {
+      "value": "#B9CC7B",
+      "usage": "progress and learning accent blocks"
+    },
+    "peach": {
+      "value": "#FFC982",
+      "usage": "warm highlight, illustration blocks"
+    },
+    "blush": {
+      "value": "#F6BCD0",
+      "usage": "soft decorative and secondary accents"
+    },
+    "coral": {
+      "value": "#E17D6B",
+      "usage": "error, danger, wrong-answer states"
+    }
+  },
+  "radii": {
+    "panel": 24,
+    "card": 22,
+    "button": 18,
+    "input": 18,
+    "chip": 999
+  },
+  "spacing": {
+    "screenPadding": 24,
+    "panelPadding": 20,
+    "sectionGap": 24,
+    "itemGap": 12
+  },
+  "typography": {
+    "fontFallback": [
+      "HarmonyOS Sans SC",
+      "PingFang SC",
+      "Noto Sans SC",
+      "Microsoft YaHei",
+      "sans-serif"
+    ],
+    "title": {
+      "size": 26,
+      "weight": 800,
+      "lineHeight": 1.15
+    },
+    "sectionTitle": {
+      "size": 18,
+      "weight": 800,
+      "lineHeight": 1.25
+    },
+    "body": {
+      "size": 14,
+      "weight": 500,
+      "lineHeight": 1.5
+    },
+    "caption": {
+      "size": 12,
+      "weight": 500,
+      "lineHeight": 1.35
+    }
+  },
+  "effects": {
+    "softPanelShadow": {
+      "color": "#111A3A",
+      "opacity": 0.08,
+      "x": 0,
+      "y": 8,
+      "blur": 18
+    }
+  }
+}

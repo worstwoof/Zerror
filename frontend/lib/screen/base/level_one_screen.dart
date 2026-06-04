@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 class LevelOneScreen extends StatefulWidget {
   const LevelOneScreen({super.key});
 
@@ -8,10 +10,10 @@ class LevelOneScreen extends StatefulWidget {
 }
 
 class _LevelOneScreenState extends State<LevelOneScreen> {
-  final Color bgDark = const Color(0xFF1E2823);
-  final Color primaryGreen = const Color(0xFF70A88D);
-  final Color cardBg = const Color(0xFF2A352F);
-  final Color currentTextColor = Colors.white;
+  final Color bgDark = AppPalette.cream;
+  final Color primaryGreen = AppPalette.moodBlue;
+  final Color cardBg = AppPalette.paper;
+  final Color currentTextColor = AppPalette.textPrimary;
 
   bool _isVideoPlaying = false;
   bool _isSubmitted = false;
@@ -54,15 +56,15 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: primaryGreen.withValues(alpha: 0.2), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: primaryGreen.withOpacity(0.2), shape: BoxShape.circle),
               child: Icon(Icons.check_circle_rounded, color: primaryGreen, size: 48),
             ),
             const SizedBox(height: 24),
-            const Text('概念扫盲完成！', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text('概念扫盲完成！', style: TextStyle(color: AppPalette.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Text('你已经掌握了特征值的核心定义，底子打得很牢靠，准备迎接实战吧！',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, height: 1.5),
+              style: const TextStyle(color: AppPalette.textSecondary, fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -95,9 +97,9 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text('第 01 关：概念扫盲', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+        title: const Text('第 01 关：概念扫盲', style: TextStyle(color: AppPalette.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: const Icon(Icons.close_rounded, color: AppPalette.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -105,7 +107,7 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
         children: [
           // 背景层
           Positioned.fill(child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover)),
-          Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
+          Positioned.fill(child: Container(color: AppPalette.cream.withOpacity(0.78))),
 
           SafeArea(
             child: Column(
@@ -125,7 +127,7 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
                           children: [
                             Icon(Icons.edit_note_rounded, color: primaryGreen),
                             const SizedBox(width: 8),
-                            const Text('随堂测验 (2题)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Text('随堂测验 (2题)', style: TextStyle(color: AppPalette.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -142,7 +144,7 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   decoration: BoxDecoration(
                     color: bgDark,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, -5))],
+                    boxShadow: [BoxShadow(color: AppPalette.inkBlue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -5))],
                   ),
                   child: SafeArea(
                     top: false,
@@ -152,13 +154,13 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
                         onPressed: !_allAnswered ? null : (_isSubmitted ? _finishLevel : _submitAnswers),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryGreen,
-                          disabledBackgroundColor: Colors.white.withValues(alpha: 0.1),
+                          disabledBackgroundColor: AppPalette.inkBlue.withOpacity(0.08),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: Text(
                             _isSubmitted ? '完成本关' : '提交答案',
-                            style: TextStyle(color: !_allAnswered ? Colors.white54 : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                            style: TextStyle(color: !_allAnswered ? Colors.white.withOpacity(0.72) : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
                         ),
                       ),
                     ),
@@ -181,30 +183,30 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
         height: 200,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
           // 模拟黑板或视频封面
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
             colors: [const Color(0xFF1A2621), const Color(0xFF0F1713)],
           ),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
             // 封面水印字
             if (!_isVideoPlaying)
-              Text('什么是特征值？\n(Ax = λx 的几何意义)', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 18, fontWeight: FontWeight.bold)),
+              Text('什么是特征值？\n(Ax = λx 的几何意义)', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 18, fontWeight: FontWeight.bold)),
 
             // 播放状态动画
             if (_isVideoPlaying) ...[
-              Positioned.fill(child: Center(child: Text('正在播放 AI 动画...', style: TextStyle(color: primaryGreen.withValues(alpha: 0.6))))),
+              Positioned.fill(child: Center(child: Text('正在播放 AI 动画...', style: TextStyle(color: primaryGreen.withOpacity(0.6))))),
             ],
 
             // 播放/暂停按钮
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), shape: BoxShape.circle),
               child: Icon(_isVideoPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 40),
             ),
 
@@ -220,7 +222,7 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: _isVideoPlaying ? 0.4 : 0.0,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        backgroundColor: Colors.white.withOpacity(0.2),
                         valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
                         minHeight: 4,
                       ),
@@ -247,9 +249,9 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cardBg.withValues(alpha: 0.8),
+        color: cardBg.withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,9 +276,9 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: (userAnswer == isCorrectAnswer ? primaryGreen : Colors.redAccent).withValues(alpha: 0.1),
+                color: (userAnswer == isCorrectAnswer ? primaryGreen : Colors.redAccent).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: (userAnswer == isCorrectAnswer ? primaryGreen : Colors.redAccent).withValues(alpha: 0.3)),
+                border: Border.all(color: (userAnswer == isCorrectAnswer ? primaryGreen : Colors.redAccent).withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +293,7 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(q['analysis'], style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, height: 1.5)),
+                  Text(q['analysis'], style: const TextStyle(color: AppPalette.textPrimary, fontSize: 13, height: 1.5)),
                 ],
               ),
             )
@@ -307,18 +309,18 @@ class _LevelOneScreenState extends State<LevelOneScreen> {
     final bool isSelected = q['userAnswer'] == choiceValue;
 
     // 提交后的颜色反馈逻辑
-    Color borderColor = Colors.white.withValues(alpha: 0.1);
+    Color borderColor = AppPalette.inkBlue.withOpacity(0.08);
     Color bgColor = Colors.transparent;
-    Color textColor = Colors.white70;
+    Color textColor = AppPalette.textSecondary;
 
     if (_isSubmitted) {
       if (q['isTrue'] == choiceValue) {
-        borderColor = primaryGreen; bgColor = primaryGreen.withValues(alpha: 0.15); textColor = primaryGreen;
+        borderColor = primaryGreen; bgColor = primaryGreen.withOpacity(0.15); textColor = primaryGreen;
       } else if (isSelected) {
-        borderColor = Colors.redAccent; bgColor = Colors.redAccent.withValues(alpha: 0.15); textColor = Colors.redAccent;
+        borderColor = Colors.redAccent; bgColor = Colors.redAccent.withOpacity(0.15); textColor = Colors.redAccent;
       }
     } else if (isSelected) {
-      borderColor = primaryGreen; bgColor = primaryGreen.withValues(alpha: 0.1); textColor = primaryGreen;
+      borderColor = primaryGreen; bgColor = primaryGreen.withOpacity(0.1); textColor = primaryGreen;
     }
 
     return GestureDetector(

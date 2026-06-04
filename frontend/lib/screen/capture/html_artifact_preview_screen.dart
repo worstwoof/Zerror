@@ -46,7 +46,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -64,68 +64,26 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.infoTitle,
-                      style: const TextStyle(
-                        color: AppPalette.almondCream,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.infoNote ??
-                          '当前内容来自后端返回的 interactive_html artifact，已在 WebView 中本地加载。',
-                      style: const TextStyle(
-                        color: AppPalette.textSecondary,
-                        fontSize: 12.5,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(
+                  color: AppPalette.pastelGrey.withOpacity(0.10),
                 ),
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-                      ),
-                    ),
-                    child: WebViewWidget(
-                      controller: _controller,
-                      gestureRecognizers: widget.scrollable
-                          ? {
-                              Factory<OneSequenceGestureRecognizer>(
-                                () => EagerGestureRecognizer(),
-                              ),
-                            }
-                          : const <Factory<OneSequenceGestureRecognizer>>{},
-                    ),
-                  ),
-                ),
+              child: WebViewWidget(
+                controller: _controller,
+                gestureRecognizers: widget.scrollable
+                    ? {
+                        Factory<OneSequenceGestureRecognizer>(
+                          () => EagerGestureRecognizer(),
+                        ),
+                      }
+                    : const <Factory<OneSequenceGestureRecognizer>>{},
               ),
-            ],
+            ),
           ),
         ),
       ),

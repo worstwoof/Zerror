@@ -12,11 +12,12 @@ class FavoritesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = AppStateScope.of(context);
     final favorites = store.favorites;
-    final favoriteSubjects = favorites.map((item) => item.subject).toSet().length;
+    final favoriteSubjects =
+        favorites.map((item) => item.subject).toSet().length;
     final favoriteTags = favorites.expand((item) => item.tags).toSet().length;
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -27,11 +28,17 @@ class FavoritesScreen extends StatelessWidget {
             AppPanel(
               child: Row(
                 children: [
-                  Expanded(child: _FavoriteMetric(label: '收藏题目', value: '${store.favoriteCount}')),
+                  Expanded(
+                      child: _FavoriteMetric(
+                          label: '收藏题目', value: '${store.favoriteCount}')),
                   const _MetricDivider(),
-                  Expanded(child: _FavoriteMetric(label: '关联学科', value: '$favoriteSubjects')),
+                  Expanded(
+                      child: _FavoriteMetric(
+                          label: '关联学科', value: '$favoriteSubjects')),
                   const _MetricDivider(),
-                  Expanded(child: _FavoriteMetric(label: '高频标签', value: '$favoriteTags')),
+                  Expanded(
+                      child: _FavoriteMetric(
+                          label: '高频标签', value: '$favoriteTags')),
                 ],
               ),
             ),
@@ -53,7 +60,8 @@ class FavoritesScreen extends StatelessWidget {
                   : ListView.separated(
                       itemCount: favorites.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _FavoriteCard(item: favorites[index]),
+                      itemBuilder: (context, index) =>
+                          _FavoriteCard(item: favorites[index]),
                     ),
             ),
           ],
@@ -106,10 +114,15 @@ class _FavoriteMetric extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(color: AppPalette.textPrimary, fontSize: 26, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 26,
+              fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+        Text(label,
+            style:
+                const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
       ],
     );
   }
@@ -120,7 +133,10 @@ class _MetricDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 42, color: AppPalette.pastelGrey.withValues(alpha: 0.1));
+    return Container(
+        width: 1,
+        height: 42,
+        color: AppPalette.pastelGrey.withOpacity(0.1));
   }
 }
 
@@ -135,7 +151,8 @@ class _FavoriteCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => ErrorDetailScreen(errorId: item.id)),
+          MaterialPageRoute(
+              builder: (context) => ErrorDetailScreen(errorId: item.id)),
         );
       },
       borderRadius: BorderRadius.circular(24),
@@ -146,9 +163,10 @@ class _FavoriteCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppPalette.matchaMist.withValues(alpha: 0.16),
+                    color: AppPalette.matchaMist.withOpacity(0.16),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -161,7 +179,8 @@ class _FavoriteCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.bookmark_rounded, color: AppPalette.almondCream, size: 18),
+                const Icon(Icons.bookmark_rounded,
+                    color: AppPalette.almondCream, size: 18),
               ],
             ),
             const SizedBox(height: 12),
@@ -187,13 +206,14 @@ class _FavoriteCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.flag_rounded, color: AppPalette.honeyOrange, size: 18),
+                const Icon(Icons.flag_rounded,
+                    color: AppPalette.honeyOrange, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     '错因：${item.reason}',
                     style: TextStyle(
-                      color: AppPalette.almondCream.withValues(alpha: 0.92),
+                      color: AppPalette.almondCream.withOpacity(0.92),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -222,11 +242,13 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
-        child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppPalette.textPrimary, size: 18),
+        child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: AppPalette.textPrimary, size: 18),
       ),
     );
   }

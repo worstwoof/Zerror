@@ -189,7 +189,7 @@ class ImageAnalysisJob {
     }
     switch (status) {
       case 'pending':
-        return '待解析';
+        return '等待解析';
       case 'processing':
         return '解析中';
       case 'partial_success':
@@ -203,6 +203,7 @@ class ImageAnalysisJob {
     }
     return '后台整理中';
   }
+
 
   factory ImageAnalysisJob.fromJson(Map<String, dynamic> json) {
     final rawResult = _asStringMap(json['result']);
