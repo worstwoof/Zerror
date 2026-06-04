@@ -151,7 +151,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      height: 720,
+      height: 660,
       padding: const EdgeInsets.fromLTRB(22, 42, 22, 28),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFDFB),
@@ -170,18 +170,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const _HeroTitle(),
           const SizedBox(height: 30),
           SizedBox(
-            height: 360,
+            height: 320,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: const [
                 Positioned(
-                  top: 248,
+                  top: 232,
                   child: _OrbFloorGlow(),
                 ),
                 Positioned(
-                  top: 20,
-                  child: _FloatingSlimeOrb(size: 315),
+                  top: 18,
+                  child: _FloatingSlimeOrb(size: 268),
                 ),
                 Positioned(
                   top: 34,
@@ -362,8 +362,8 @@ class _OrbFloorGlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 300,
-      height: 90,
+      width: 282,
+      height: 82,
       child: Image.asset(
         'assets/images/ai_orb_shadow.png',
         fit: BoxFit.fill,
