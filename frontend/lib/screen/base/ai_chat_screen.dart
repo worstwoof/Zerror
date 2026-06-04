@@ -151,7 +151,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _hero() {
     return Container(
-      height: 680,
+      height: 720,
       padding: const EdgeInsets.fromLTRB(22, 42, 22, 28),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFDFB),
@@ -170,18 +170,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const _HeroTitle(),
           const SizedBox(height: 30),
           SizedBox(
-            height: 320,
+            height: 360,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: const [
                 Positioned(
-                  bottom: 12,
+                  top: 248,
                   child: _OrbFloorGlow(),
                 ),
                 Positioned(
-                  top: 18,
-                  child: _FloatingSlimeOrb(size: 266),
+                  top: 20,
+                  child: _FloatingSlimeOrb(size: 315),
                 ),
                 Positioned(
                   top: 34,
@@ -361,32 +361,13 @@ class _OrbFloorGlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      height: 70,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFF2A0C7).withOpacity(0.22),
-            const Color(0xFF776AE6).withOpacity(0.16),
-            const Color(0xFF92E4F3).withOpacity(0.10),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFEA9FCC).withOpacity(0.38),
-            blurRadius: 34,
-            spreadRadius: 10,
-            offset: const Offset(-18, 4),
-          ),
-          BoxShadow(
-            color: const Color(0xFF8372E8).withOpacity(0.22),
-            blurRadius: 36,
-            spreadRadius: 8,
-            offset: const Offset(28, 8),
-          ),
-        ],
+    return SizedBox(
+      width: 300,
+      height: 90,
+      child: Image.asset(
+        'assets/images/ai_orb_shadow.png',
+        fit: BoxFit.fill,
+        filterQuality: FilterQuality.high,
       ),
     );
   }
