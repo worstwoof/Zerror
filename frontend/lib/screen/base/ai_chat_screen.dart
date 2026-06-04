@@ -542,7 +542,7 @@ class _AnswerSection extends StatelessWidget {
   }
 }
 
-class _FloatingSlimeOrb extends StatelessWidget {
+class _FloatingSlimeOrb extends StatefulWidget {
   const _FloatingSlimeOrb({
     super.key,
     required this.size,
@@ -553,244 +553,72 @@ class _FloatingSlimeOrb extends StatelessWidget {
   final bool compact;
 
   @override
+  State<_FloatingSlimeOrb> createState() => _FloatingSlimeOrbState();
+}
+
+class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _float;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+    _float = Tween<double>(
+      begin: widget.compact ? -1.2 : -7,
+      end: widget.compact ? 1.2 : 7,
+    ).animate(curve);
+    _scale = Tween<double>(
+      begin: widget.compact ? 0.995 : 0.982,
+      end: widget.compact ? 1.005 : 1.018,
+    ).animate(curve);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final orbSize = size * (compact ? 0.72 : 0.66);
     return ExcludeSemantics(
       child: RepaintBoundary(
         child: SizedBox.square(
-          dimension: size,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                bottom: compact ? size * 0.16 : size * 0.10,
-                child: Container(
-                  width: orbSize * 1.12,
-                  height: orbSize * 0.20,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFFF7DB5).withOpacity(0.00),
-                        const Color(0xFFFF7DB5).withOpacity(compact ? 0.08 : 0.18),
-                        const Color(0xFF7A5CE8).withOpacity(0.00),
-                      ],
-                    ),
-                  ),
+          dimension: widget.size,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _float.value),
+                child: Transform.scale(
+                  scale: _scale.value,
+                  child: child,
                 ),
-              ),
-              Container(
-                width: orbSize * 1.16,
-                height: orbSize * 1.16,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFFFFF).withOpacity(0.10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF7DB5)
-                          .withOpacity(compact ? 0.08 : 0.18),
-                      blurRadius: compact ? 18 : 34,
-                      spreadRadius: compact ? 0 : 8,
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFF8EE9F0)
-                          .withOpacity(compact ? 0.08 : 0.16),
-                      blurRadius: compact ? 14 : 28,
-                      spreadRadius: compact ? 0 : 5,
-                    ),
-                  ],
-                ),
-              ),
-              ClipOval(
-                child: Container(
-                  width: orbSize,
-                  height: orbSize,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: Alignment(-0.42, -0.52),
-                      radius: 1.05,
-                      colors: [
-                        Color(0xFFF8FFFF),
-                        Color(0xFFC6F7F0),
-                        Color(0xFFFFB7D9),
-                        Color(0xFF765DE7),
-                      ],
-                      stops: [0.0, 0.34, 0.68, 1.0],
-                    ),
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      _OrbColorBlob(
-                        left: -orbSize * 0.18,
-                        bottom: orbSize * 0.02,
-                        size: orbSize * 0.72,
-                        color: const Color(0xFFFF76B4),
-                        opacity: 0.68,
-                      ),
-                      _OrbColorBlob(
-                        right: -orbSize * 0.12,
-                        top: orbSize * 0.06,
-                        size: orbSize * 0.72,
-                        color: const Color(0xFF66E9DE),
-                        opacity: 0.62,
-                      ),
-                      _OrbColorBlob(
-                        right: orbSize * 0.04,
-                        bottom: -orbSize * 0.18,
-                        size: orbSize * 0.64,
-                        color: const Color(0xFFFFC85C),
-                        opacity: 0.66,
-                      ),
-                      _OrbColorBlob(
-                        left: orbSize * 0.12,
-                        top: orbSize * 0.02,
-                        size: orbSize * 0.72,
-                        color: const Color(0xFF7D5AE8),
-                        opacity: 0.30,
-                      ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: const Alignment(-0.44, -0.58),
-                              radius: 0.58,
-                              colors: [
-                                Colors.white.withOpacity(0.72),
-                                Colors.white.withOpacity(0.16),
-                                Colors.white.withOpacity(0.0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (!compact) ...[
-                        Positioned(
-                          left: orbSize * 0.34,
-                          top: orbSize * 0.38,
-                          child: const _TriangleEye(size: 22),
-                        ),
-                        Positioned(
-                          right: orbSize * 0.34,
-                          top: orbSize * 0.38,
-                          child: const _TriangleEye(size: 22),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              );
+            },
+            child: Image.asset(
+              'assets/images/ai_slime_orb.png',
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              gaplessPlayback: true,
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _OrbColorBlob extends StatelessWidget {
-  const _OrbColorBlob({
-    this.left,
-    this.right,
-    this.top,
-    this.bottom,
-    required this.size,
-    required this.color,
-    required this.opacity,
-  });
-
-  final double? left;
-  final double? right;
-  final double? top;
-  final double? bottom;
-  final double size;
-  final Color color;
-  final double opacity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: left,
-      right: right,
-      top: top,
-      bottom: bottom,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              color.withOpacity(opacity),
-              color.withOpacity(opacity * 0.42),
-              color.withOpacity(0),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TriangleEye extends StatelessWidget {
-  const _TriangleEye({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withOpacity(0.46),
-            blurRadius: 10,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: ClipPath(
-        clipper: const _TriangleEyeClipper(),
-        child: Container(color: Colors.white.withOpacity(0.96)),
-      ),
-    );
-  }
-}
-
-class _TriangleEyeClipper extends CustomClipper<Path> {
-  const _TriangleEyeClipper();
-
-  @override
-  Path getClip(Size size) {
-    return Path()
-      ..moveTo(size.width * 0.50, size.height * 0.08)
-      ..quadraticBezierTo(
-        size.width * 0.96,
-        size.height * 0.70,
-        size.width * 0.76,
-        size.height * 0.90,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.50,
-        size.height * 0.70,
-        size.width * 0.24,
-        size.height * 0.90,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.04,
-        size.height * 0.70,
-        size.width * 0.50,
-        size.height * 0.08,
-      )
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class _AnswerSectionData {
