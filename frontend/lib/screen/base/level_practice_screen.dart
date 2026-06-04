@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 class LevelPracticeScreen extends StatefulWidget {
   const LevelPracticeScreen({super.key});
 
@@ -8,10 +10,10 @@ class LevelPracticeScreen extends StatefulWidget {
 }
 
 class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
-  final Color bgDark = const Color(0xFF1E2823);
-  final Color primaryGreen = const Color(0xFF70A88D);
-  final Color cardBg = const Color(0xFF2A352F);
-  final Color currentTextColor = Colors.white;
+  final Color bgDark = AppPalette.cream;
+  final Color primaryGreen = AppPalette.moodBlue;
+  final Color cardBg = AppPalette.paper;
+  final Color currentTextColor = AppPalette.textPrimary;
 
   int _currentIndex = 0;
   int? _selectedOptionIndex;
@@ -81,15 +83,15 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: primaryGreen.withValues(alpha: 0.2), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: primaryGreen.withOpacity(0.2), shape: BoxShape.circle),
               child: Icon(Icons.workspace_premium_rounded, color: primaryGreen, size: 48),
             ),
             const SizedBox(height: 24),
-            const Text('闯关成功！', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('闯关成功！', style: TextStyle(color: AppPalette.textPrimary, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Text('太棒了！你已顺利完成「特征多项式计算」的针对性训练，粗心率显著下降。',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14, height: 1.5),
+              style: const TextStyle(color: AppPalette.textSecondary, fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -125,14 +127,14 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: const Icon(Icons.close_rounded, color: AppPalette.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
           children: [
-            const Text('第 02 关：基础演练', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('第 02 关：基础演练', style: TextStyle(color: AppPalette.textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('${_currentIndex + 1} / ${_questions.length}', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+            Text('${_currentIndex + 1} / ${_questions.length}', style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
           ],
         ),
         centerTitle: true,
@@ -151,7 +153,7 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
       body: Stack(
         children: [
           Positioned.fill(child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover)),
-          Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.35))),
+          Positioned.fill(child: Container(color: AppPalette.cream.withOpacity(0.78))),
 
           SafeArea(
             child: Column(
@@ -163,7 +165,7 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
+                      backgroundColor: AppPalette.inkBlue.withOpacity(0.08),
                       valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
                       minHeight: 6,
                     ),
@@ -182,16 +184,16 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: cardBg.withValues(alpha: 0.8),
+                            color: cardBg.withOpacity(0.8),
                             borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                            border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: primaryGreen.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                                decoration: BoxDecoration(color: primaryGreen.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
                                 child: Text(currentQ['type'], style: TextStyle(color: primaryGreen, fontSize: 12, fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(height: 16),
@@ -201,8 +203,8 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                                  child: Text(currentQ['content'], style: const TextStyle(color: Colors.white70, fontSize: 16, fontFamily: 'monospace')),
+                                  decoration: BoxDecoration(color: AppPalette.inkBlue.withOpacity(0.06), borderRadius: BorderRadius.circular(12)),
+                                  child: Text(currentQ['content'], style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16, fontFamily: 'monospace')),
                                 ),
                               ],
                             ],
@@ -218,23 +220,23 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                           final bool isCorrect = idx == currentQ['correctIndex'];
 
                           // 提交后的颜色逻辑
-                          Color borderColor = Colors.white.withValues(alpha: 0.1);
-                          Color bgColor = cardBg.withValues(alpha: 0.6);
+                          Color borderColor = AppPalette.inkBlue.withOpacity(0.08);
+                          Color bgColor = cardBg.withOpacity(0.6);
                           Widget? trailingIcon;
 
                           if (_isAnswerSubmitted) {
                             if (isCorrect) {
                               borderColor = primaryGreen;
-                              bgColor = primaryGreen.withValues(alpha: 0.1);
+                              bgColor = primaryGreen.withOpacity(0.1);
                               trailingIcon = Icon(Icons.check_circle_rounded, color: primaryGreen);
                             } else if (isSelected && !isCorrect) {
                               borderColor = Colors.redAccent;
-                              bgColor = Colors.redAccent.withValues(alpha: 0.1);
+                              bgColor = Colors.redAccent.withOpacity(0.1);
                               trailingIcon = const Icon(Icons.cancel_rounded, color: Colors.redAccent);
                             }
                           } else if (isSelected) {
-                            borderColor = primaryGreen.withValues(alpha: 0.8);
-                            bgColor = primaryGreen.withValues(alpha: 0.05);
+                            borderColor = primaryGreen.withOpacity(0.8);
+                            bgColor = primaryGreen.withOpacity(0.05);
                           }
 
                           return GestureDetector(
@@ -254,12 +256,12 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                                     width: 28, height: 28,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: isSelected || (_isAnswerSubmitted && isCorrect) ? Colors.transparent : Colors.white.withValues(alpha: 0.3)),
+                                      border: Border.all(color: isSelected || (_isAnswerSubmitted && isCorrect) ? Colors.transparent : AppPalette.inkBlue.withOpacity(0.18)),
                                       color: isSelected && !_isAnswerSubmitted ? primaryGreen : Colors.transparent,
                                     ),
                                     child: Center(
                                       child: Text(String.fromCharCode(65 + idx), // A, B, C, D
-                                          style: TextStyle(color: isSelected && !_isAnswerSubmitted ? Colors.white : Colors.white70, fontWeight: FontWeight.bold)
+                                          style: TextStyle(color: isSelected && !_isAnswerSubmitted ? Colors.white : AppPalette.textSecondary, fontWeight: FontWeight.bold)
                                       ),
                                     ),
                                   ),
@@ -277,7 +279,7 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(color: primaryGreen.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: primaryGreen.withValues(alpha: 0.3))),
+                            decoration: BoxDecoration(color: primaryGreen.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: primaryGreen.withOpacity(0.3))),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -289,7 +291,7 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                Text(currentQ['analysis'], style: TextStyle(color: Colors.white.withValues(alpha: 0.8), height: 1.5, fontSize: 14)),
+                                Text(currentQ['analysis'], style: const TextStyle(color: AppPalette.textPrimary, height: 1.5, fontSize: 14)),
                               ],
                             ),
                           ),
@@ -304,7 +306,7 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   decoration: BoxDecoration(
                     color: bgDark,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, -5))],
+                    boxShadow: [BoxShadow(color: AppPalette.inkBlue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -5))],
                   ),
                   child: SafeArea(
                     top: false,
@@ -314,11 +316,11 @@ class _LevelPracticeScreenState extends State<LevelPracticeScreen> {
                         onPressed: _selectedOptionIndex == null ? null : (_isAnswerSubmitted ? _nextQuestion : _submitAnswer),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryGreen,
-                          disabledBackgroundColor: Colors.white.withValues(alpha: 0.1),
+                          disabledBackgroundColor: AppPalette.inkBlue.withOpacity(0.08),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: Text(_isAnswerSubmitted ? '下一题' : '确认答案', style: TextStyle(color: _selectedOptionIndex == null ? Colors.white54 : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: Text(_isAnswerSubmitted ? '下一题' : '确认答案', style: TextStyle(color: _selectedOptionIndex == null ? Colors.white.withOpacity(0.72) : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ),

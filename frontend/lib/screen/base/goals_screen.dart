@@ -13,7 +13,7 @@ class GoalsScreen extends StatelessWidget {
     final hasGoals = store.goalSteps.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -31,7 +31,8 @@ class GoalsScreen extends StatelessWidget {
                 children: [
                   const Text(
                     '当前主目标',
-                    style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+                    style: TextStyle(
+                        color: AppPalette.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -150,10 +151,11 @@ class _GoalStep extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppPalette.matchaMist.withValues(alpha: 0.16),
+              color: AppPalette.matchaMist.withOpacity(0.16),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.checklist_rounded, color: AppPalette.textPrimary),
+            child: const Icon(Icons.checklist_rounded,
+                color: AppPalette.textPrimary),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -225,7 +227,8 @@ class _Header extends StatelessWidget {
               ),
               Text(
                 subtitle,
-                style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+                style: const TextStyle(
+                    color: AppPalette.textSecondary, fontSize: 13),
               ),
             ],
           ),
@@ -249,11 +252,13 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
-        child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppPalette.textPrimary, size: 18),
+        child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: AppPalette.textPrimary, size: 18),
       ),
     );
   }

@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -12,17 +10,14 @@ import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
-import 'data_dashboard_screen.dart';
+import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
-import 'learning_plan_screen.dart';
 import 'login_screen.dart';
 import 'manual_entry_screen.dart';
 import 'profile_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'settings_screen.dart';
 import 'smart_quiz_screen.dart';
-import 'smart_review_screen.dart';
-import 'weakness_practice_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +27,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const Color _flatInk = AppPalette.inkBlue;
+  static const Color _flatCream = AppPalette.cream;
+  static const Color _flatMuted = AppPalette.textSecondary;
+  static const Color _flatBlue = AppPalette.moodBlue;
+  static const Color _flatGreen = AppPalette.leaf;
+  static const Color _flatMint = AppPalette.mint;
+  static const Color _flatPeach = AppPalette.peach;
+  static const Color _flatPink = AppPalette.blush;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final PageController _pageController;
   int _currentIndex = 0;
@@ -54,38 +58,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       extendBody: true,
       drawer: _buildDrawer(context, store),
       body: Stack(
         children: [
           const Positioned.fill(
             child: DecoratedBox(
-              decoration: BoxDecoration(gradient: AppPalette.appBackground),
+              decoration: BoxDecoration(color: _flatCream),
             ),
           ),
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/splash_bg.png',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-              excludeFromSemantics: true,
+          _flatBlob(
+            top: 94,
+            right: -28,
+            width: 150,
+            height: 106,
+            color: _flatMint.withOpacity(0.55),
+            radius: const BorderRadius.only(
+              topLeft: Radius.circular(42),
+              topRight: Radius.circular(30),
+              bottomLeft: Radius.circular(64),
+              bottomRight: Radius.circular(34),
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppPalette.night.withValues(alpha: 0.42),
-                    AppPalette.pineGreen.withValues(alpha: 0.36),
-                    AppPalette.night.withValues(alpha: 0.76),
-                  ],
-                ),
-              ),
+          _flatBlob(
+            top: 226,
+            left: -28,
+            width: 132,
+            height: 96,
+            color: _flatGreen.withOpacity(0.54),
+            radius: const BorderRadius.only(
+              topLeft: Radius.circular(34),
+              topRight: Radius.circular(56),
+              bottomLeft: Radius.circular(42),
+              bottomRight: Radius.circular(28),
             ),
+          ),
+          _flatBlob(
+            bottom: 142,
+            right: 26,
+            width: 94,
+            height: 94,
+            color: _flatPink.withOpacity(0.52),
+            radius: BorderRadius.circular(36),
           ),
           PageView(
             controller: _pageController,
@@ -113,13 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab(BuildContext context, AppStore store) {
-    if (store.totalErrors == 0) {
-      return _buildEmptyHomeTab(context, store);
-    }
-
-    final featuredReview = store.smartReviewQueue.isNotEmpty
-        ? store.smartReviewQueue.first
-        : store.errors.first;
     final topPadding = MediaQuery.of(context).padding.top + 38;
 
     return SingleChildScrollView(
@@ -128,186 +136,430 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHomeHeader(context, store),
-          const SizedBox(height: 10),
-          Text(
-            '\u4eca\u5929\u8fd8\u6709 ${store.pendingReviewCount} \u9053\u9519\u9898\u5f85\u590d\u4e60\uff0c\u4f18\u5148\u8865\u5f3a\u300c${store.weakestSubject}\u300d\u3002',
-            style: const TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 16,
-              height: 1.5,
-            ),
+          const SizedBox(height: 14),
+          _buildHomeBrief(store),
+          const SizedBox(height: 26),
+          _buildPrimaryCaptureCard(context, store),
+          const SizedBox(height: 16),
+          _buildSecondaryActions(context, store),
+          const SizedBox(height: 16),
+          _buildAiAssistantCard(context),
+          const SizedBox(height: 16),
+          _buildArchiveSummary(context, store),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHomeBrief(AppStore store) {
+    final description = store.totalErrors == 0
+        ? '先拍下第一道错题，后面只围绕录入、档案和组卷继续展开。'
+        : '已收录 ${store.totalErrors} 道错题，今天可以继续补充档案，或直接用档案生成一套练习。';
+
+    return Text(
+      description,
+      style: const TextStyle(
+        color: _flatMuted,
+        fontSize: 16,
+        height: 1.55,
+      ),
+    );
+  }
+
+  Widget _flatBlob({
+    double? top,
+    double? right,
+    double? bottom,
+    double? left,
+    required double width,
+    required double height,
+    required Color color,
+    required BorderRadiusGeometry radius,
+  }) {
+    return Positioned(
+      top: top,
+      right: right,
+      bottom: bottom,
+      left: left,
+      child: IgnorePointer(
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: radius,
           ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = (constraints.maxWidth - 36) / 4;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 14,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.camera_alt_rounded,
-                      label: '\u62cd\u7167\u5f55\u5165',
-                      onTap: () => _showAddActionSheet(context),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.bolt_rounded,
-                      label: '\u667a\u80fd\u7ec4\u5377',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const SmartQuizScreen()),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryCaptureCard(BuildContext context, AppStore store) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showAddActionSheet(context),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(24, 24, 22, 24),
+          decoration: BoxDecoration(
+            color: _flatBlue,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: _flatInk.withOpacity(0.14),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppPalette.paper.withOpacity(0.82),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        store.totalErrors == 0
+                            ? '从第一题开始'
+                            : '档案中已有 ${store.totalErrors} 题',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.folder_special_rounded,
-                      label: '\u9519\u9898\u6863\u6848',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const ErrorArchiveScreen()),
+                    const SizedBox(height: 18),
+                    const Text(
+                      '拍照录入',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.event_note_rounded,
-                      label: '\u5b66\u4e60\u8ba1\u5212',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const LearningPlanScreen()),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '拍下题目后进入预览，确认识别结果，再保存到错题档案。',
+                      style: TextStyle(
+                        color: Color(0xDDEFF2FF),
+                        fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _flatCream,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_rounded,
+                            color: _flatInk,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '开始录入',
+                            style: TextStyle(
+                              color: _flatInk,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+              Container(
+                width: 94,
+                height: 94,
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: _flatCream,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.42),
                   ),
-                ],
-              );
-            },
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'assets/images/flat_study_illustration.png',
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 28),
-          _featureCard(
-            title: '\u4eca\u65e5\u667a\u80fd\u590d\u4e60',
-            subtitle:
-                '\u7cfb\u7edf\u5df2\u7ecf\u4e3a\u4f60\u6311\u51fa ${store.smartReviewQueue.length} \u9053\u4f18\u5148\u9519\u9898\uff0c\u5148\u56de\u6536\u300c${featuredReview.topic}\u300d\u3002',
-            tag: '${store.pendingReviewCount} \u9053\u5f85\u590d\u4e60',
-            icon: Icons.menu_book_rounded,
-            actionLabel: '\u5f00\u59cb\u590d\u4e60',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SmartReviewScreen()),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryActions(BuildContext context, AppStore store) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 360 ? 10.0 : 14.0;
+        return Row(
+          children: [
+            Expanded(
+              child: _homeActionTile(
+                icon: _FlatHomeIconKind.archive,
+                color: _flatGreen,
+                title: '错题档案',
+                subtitle: '${store.totalErrors} 道已收录',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                ),
+              ),
             ),
+            SizedBox(width: spacing),
+            Expanded(
+              child: _homeActionTile(
+                icon: _FlatHomeIconKind.quiz,
+                color: _flatPeach,
+                title: '智能组卷',
+                subtitle: store.totalErrors == 0 ? '先录入错题' : '从档案出题',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAiAssistantCard(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(26),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiChatScreen()),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+          decoration: BoxDecoration(
+            color: AppPalette.paper.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(26),
+            border:
+                Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
+            boxShadow: [
+              BoxShadow(
+                color: AppPalette.inkBlue.withOpacity(0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
-          _featureCard(
-            title: '\u653b\u514b\u8584\u5f31\u70b9',
-            subtitle:
-                '\u5f53\u524d\u6700\u9700\u8981\u8865\u5f3a\u7684\u662f\u300c${store.weakestSubject}\u300d\uff0c\u5df2\u8986\u76d6 ${store.knowledgePointCount} \u4e2a\u8003\u70b9\u3002',
-            tag: '\u8fde\u7eed\u5b66\u4e60 ${store.studyStreakDays} \u5929',
-            icon: Icons.psychology_rounded,
-            actionLabel: '\u53bb\u8bad\u7ec3',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const WeaknessPracticeScreen()),
-            ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/flat_chat_icon.png',
+                  width: 58,
+                  height: 58,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI 助教',
+                      style: TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      '用对话拆题、复盘错因、安排下一次练习',
+                      style: TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppPalette.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _homeActionTile({
+    required _FlatHomeIconKind icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 150),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _flatInk.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _FlatHomeIcon(kind: icon, size: 54),
+              const SizedBox(height: 22),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _flatInk,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xB3111A3A),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArchiveSummary(BuildContext context, AppStore store) {
+    return AppPanel(
+      padding: const EdgeInsets.all(18),
+      borderRadius: 24,
+      color: Colors.white.withOpacity(0.72),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '档案概览',
+                  style: TextStyle(
+                    color: _flatInk,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: _flatInk,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 34),
+                ),
+                child: const Text('查看'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _summaryPill('错题', '${store.totalErrors}')),
+              const SizedBox(width: 10),
+              Expanded(child: _summaryPill('收藏', '${store.favoriteCount}')),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: _summaryPill('考点', '${store.knowledgePointCount}')),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyHomeTab(BuildContext context, AppStore store) {
-    final topPadding = MediaQuery.of(context).padding.top + 38;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(24, topPadding, 24, 120),
+  Widget _summaryPill(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+      decoration: BoxDecoration(
+        color: _flatBlue.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHomeHeader(context, store),
-          const SizedBox(height: 10),
-          const Text(
-            '你的错题档案还是空的。先录入第一道题，后面的复习、学科拓展和数据统计才会慢慢长出来。',
-            style: TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 16,
-              height: 1.5,
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _flatInk,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = (constraints.maxWidth - 36) / 4;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 14,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.camera_alt_rounded,
-                      label: '拍照录入',
-                      onTap: () => _showAddActionSheet(context),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.bolt_rounded,
-                      label: '智能组卷',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const SmartQuizScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.folder_special_rounded,
-                      label: '错题档案',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const ErrorArchiveScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.event_note_rounded,
-                      label: '学习计划',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const LearningPlanScreen()),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-          _featureCard(
-            title: '开始建立第一份错题档案',
-            subtitle: '拍题或手动录入都可以。只要有了第一道题，首页就会自动长出复习队列、收藏和学科扩展。',
-            tag: '当前 0 道错题',
-            icon: Icons.auto_stories_rounded,
-            actionLabel: '去录入',
-            onTap: () => _showAddActionSheet(context),
-          ),
-          const SizedBox(height: 18),
-          _featureCard(
-            title: '先搭好学习节奏',
-            subtitle: '现在可以先看计划页，但真正的复习推荐会在你录入错题之后按数据生成。',
-            tag: '空白起点',
-            icon: Icons.insights_rounded,
-            actionLabel: '查看计划',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _flatMuted,
+              fontSize: 12,
             ),
           ),
         ],
@@ -325,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppPalette.textPrimary,
+              color: _flatInk,
               fontSize: 46,
               fontWeight: FontWeight.w800,
               height: 1.04,
@@ -349,25 +601,25 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/images/auth_bg.png',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-              excludeFromSemantics: true,
+            Container(
+              decoration: const BoxDecoration(color: AppPalette.inkBlue),
             ),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppPalette.kombuGreen.withValues(alpha: 0.90),
-                      AppPalette.pineGreen.withValues(alpha: 0.86),
-                    ],
-                  ),
-                ),
+            Positioned(
+              top: 70,
+              right: -34,
+              child: FlatShape(
+                width: 118,
+                height: 90,
+                color: AppPalette.mint.withOpacity(0.22),
+              ),
+            ),
+            Positioned(
+              bottom: 124,
+              left: -28,
+              child: FlatShape(
+                width: 96,
+                height: 86,
+                color: AppPalette.peach.withOpacity(0.22),
               ),
             ),
             SafeArea(
@@ -385,7 +637,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
                                 color: AppPalette.pastelGrey
-                                    .withValues(alpha: 0.18)),
+                                    .withOpacity(0.18)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -400,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 store.userName,
                                 style: const TextStyle(
-                                  color: AppPalette.textPrimary,
+                                  color: AppPalette.almondCream,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -409,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'ID: ${store.userId}',
                                 style: const TextStyle(
-                                  color: AppPalette.textSecondary,
+                                  color: Color(0xB3FFF7EA),
                                   fontSize: 13,
                                 ),
                               ),
@@ -423,7 +675,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppPalette.almondCream.withValues(alpha: 0.12),
+                        color: AppPalette.almondCream.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -439,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     AppPanel(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 16),
-                      color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+                      color: AppPalette.pastelGrey.withOpacity(0.06),
                       child: Row(
                         children: [
                           Expanded(
@@ -461,20 +713,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           _drawerItem(
                             context,
+                            icon: Icons.auto_awesome_rounded,
+                            title: 'AI 助教',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AiChatScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
                             icon: Icons.restore_from_trash_rounded,
                             title: '\u9519\u9898\u56de\u6536\u7ad9',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                   builder: (_) => const RecycleBinScreen()),
-                            ),
-                          ),
-                          _drawerItem(
-                            context,
-                            icon: Icons.insert_chart_outlined_rounded,
-                            title: '\u5b66\u4e60\u6570\u636e\u770b\u677f',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const DataDashboardScreen()),
                             ),
                           ),
                           _drawerItem(
@@ -520,15 +772,14 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           value,
           style: const TextStyle(
-            color: AppPalette.textPrimary,
+            color: AppPalette.almondCream,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 4),
         Text(label,
-            style:
-                const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+            style: const TextStyle(color: Color(0xB3FFF7EA), fontSize: 12)),
       ],
     );
   }
@@ -544,8 +795,8 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: isDanger
-            ? Colors.redAccent.withValues(alpha: 0.10)
-            : AppPalette.pastelGrey.withValues(alpha: 0.08),
+            ? Colors.redAccent.withOpacity(0.10)
+            : AppPalette.pastelGrey.withOpacity(0.08),
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -558,14 +809,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               children: [
                 Icon(icon,
-                    color: isDanger ? Colors.redAccent : AppPalette.matchaMist),
+                    color: isDanger ? AppPalette.blush : AppPalette.matchaMist),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
                       color:
-                          isDanger ? Colors.redAccent : AppPalette.textPrimary,
+                          isDanger ? AppPalette.blush : AppPalette.almondCream,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -573,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (!isDanger)
                   const Icon(Icons.chevron_right_rounded,
-                      color: AppPalette.textSecondary),
+                      color: Color(0x99FFF7EA)),
               ],
             ),
           ),
@@ -585,9 +836,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomAppBar() {
     return BottomAppBar(
       height: 48,
-      color: const Color(0xFF1E211F),
-      elevation: 18,
-      shadowColor: Colors.black.withValues(alpha: 0.36),
+      color: AppPalette.paper,
+      elevation: 0,
+      shadowColor: AppPalette.inkBlue.withOpacity(0.08),
       shape: const CircularNotchedRectangle(),
       notchMargin: 6,
       padding: EdgeInsets.zero,
@@ -622,8 +873,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
   }) {
     final isSelected = _currentIndex == index;
-    const selectedColor = Colors.white;
-    const unselectedColor = Color(0xFF757575);
+    const selectedColor = AppPalette.moodBlue;
+    const unselectedColor = AppPalette.textSecondary;
     final contentColor = isSelected ? selectedColor : unselectedColor;
 
     return Material(
@@ -676,157 +927,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCenterAddButton(BuildContext context) {
     return FloatingActionButton(
       onPressed: () => _showAddActionSheet(context),
-      elevation: 10,
-      highlightElevation: 12,
-      backgroundColor: const Color(0xFFFCD9A8),
-      foregroundColor: const Color(0xFF121212),
+      elevation: 4,
+      highlightElevation: 6,
+      backgroundColor: AppPalette.inkBlue,
+      foregroundColor: Colors.white,
       shape: const CircleBorder(),
       child: const Icon(Icons.add_rounded, size: 32),
-    );
-  }
-
-  Widget _quickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppPalette.kombuGreen, AppPalette.pineGreen],
-                ),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Icon(icon, color: Colors.white, size: 30),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppPalette.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _featureCard({
-    required String title,
-    required String subtitle,
-    required String tag,
-    required IconData icon,
-    required String actionLabel,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppPalette.pineGreen,
-                AppPalette.kombuGreen,
-                AppPalette.artichoke
-              ],
-            ),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          color: AppPalette.almondCream,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppPalette.textSecondary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppPalette.almondCream,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        actionLabel,
-                        style: const TextStyle(
-                          color: AppPalette.night,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                width: 92,
-                height: 92,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: AppPalette.textPrimary, size: 44),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -864,12 +970,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: AppPalette.night.withValues(alpha: 0.88),
+            color: AppPalette.night.withOpacity(0.88),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: tint.withValues(alpha: 0.32)),
+            border: Border.all(color: tint.withOpacity(0.32)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.24),
+                color: Colors.black.withOpacity(0.24),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -937,7 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppPalette.textSecondary.withValues(alpha: 0.22),
+                      color: AppPalette.textSecondary.withOpacity(0.22),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -949,7 +1055,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppPalette.almondCream.withValues(alpha: 0.12),
+                        color: AppPalette.almondCream.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
@@ -1044,7 +1150,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         child: AppPanel(
           padding: const EdgeInsets.all(12),
-          color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+          color: AppPalette.pastelGrey.withOpacity(0.06),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1258,7 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 18,
           height: 18,
           decoration: BoxDecoration(
-            color: AppPalette.almondCream.withValues(alpha: 0.14),
+            color: AppPalette.almondCream.withOpacity(0.14),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -1385,7 +1491,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 34),
           decoration: const BoxDecoration(
-            color: AppPalette.night,
+            color: AppPalette.paper,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: SafeArea(
@@ -1397,16 +1503,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppPalette.textSecondary.withValues(alpha: 0.20),
+                    color: AppPalette.textSecondary.withOpacity(0.20),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
                 const SizedBox(height: 18),
                 _sheetAction(
                   icon: Icons.camera_alt_rounded,
-                  title: '\u62cd\u7167\u5f55\u5165',
-                  subtitle:
-                      '\u62cd\u4e00\u5f20\u9898\u76ee\u7167\u7247\uff0c\u81ea\u52a8\u8bc6\u522b\u8fdb\u5165\u9884\u89c8\u3002',
+                  title: '拍照录入',
+                  subtitle: '拍一张题目照片，自动识别进入预览。',
                   filled: true,
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -1416,9 +1521,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _sheetAction(
                   icon: Icons.photo_library_rounded,
-                  title: '\u4ece\u76f8\u518c\u5bfc\u5165',
-                  subtitle:
-                      '\u9009\u62e9\u5df2\u6709\u8bd5\u5377\u6216\u622a\u56fe\u5bfc\u5165\u9519\u9898\u6d41\u8f6c\u3002',
+                  title: '从相册导入',
+                  subtitle: '选择已有试卷或截图导入错题流转。',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _pickImage(ImageSource.gallery);
@@ -1427,9 +1531,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _sheetAction(
                   icon: Icons.edit_note_rounded,
-                  title: '\u624b\u52a8\u8bb0\u5f55',
-                  subtitle:
-                      '\u9002\u5408\u5f55\u5165\u516c\u5f0f\u9898\u3001\u4e3b\u89c2\u9898\u548c\u8865\u5145\u7b14\u8bb0\u3002',
+                  title: '手动记录',
+                  subtitle: '适合录入公式题、主观题和补充笔记。',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     Navigator.of(context).push(
@@ -1453,14 +1556,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
     bool filled = false,
   }) {
-    final background = filled
-        ? AppPalette.matchaMist
-        : AppPalette.pastelGrey.withValues(alpha: 0.08);
-    final titleColor = filled ? AppPalette.night : AppPalette.textPrimary;
+    final background = filled ? AppPalette.mint : AppPalette.cream;
+    final titleColor = AppPalette.textPrimary;
     final subtitleColor = filled
-        ? AppPalette.night.withValues(alpha: 0.70)
+        ? AppPalette.textPrimary.withOpacity(0.72)
         : AppPalette.textSecondary;
-    final iconColor = filled ? AppPalette.night : AppPalette.matchaMist;
+    final iconColor = AppPalette.textPrimary;
 
     return Material(
       color: background,
@@ -1476,7 +1577,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: filled ? 0.14 : 0.12),
+                  color: filled
+                      ? AppPalette.paper.withOpacity(0.68)
+                      : AppPalette.peach.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: iconColor),
@@ -1546,6 +1649,174 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Icon(Icons.person_rounded,
           color: AppPalette.textPrimary, size: iconSize),
     );
+  }
+}
+
+enum _FlatHomeIconKind { archive, quiz, capture }
+
+class _FlatHomeIcon extends StatelessWidget {
+  const _FlatHomeIcon({required this.kind, this.size = 54});
+
+  final _FlatHomeIconKind kind;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _FlatHomeIconPainter(kind),
+    );
+  }
+}
+
+class _FlatHomeIconPainter extends CustomPainter {
+  const _FlatHomeIconPainter(this.kind);
+
+  final _FlatHomeIconKind kind;
+
+  static const _ink = AppPalette.inkBlue;
+  static const _cream = AppPalette.paper;
+  static const _mint = AppPalette.mint;
+  static const _leaf = AppPalette.leaf;
+  static const _peach = AppPalette.peach;
+  static const _blush = AppPalette.blush;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final stroke = Paint()
+      ..color = _ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s * 0.045
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()..style = PaintingStyle.fill;
+
+    fill.color = switch (kind) {
+      _FlatHomeIconKind.archive => _mint,
+      _FlatHomeIconKind.quiz => _blush,
+      _FlatHomeIconKind.capture => _peach,
+    };
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(s * 0.02, s * 0.06, s * 0.90, s * 0.82),
+        topLeft: Radius.circular(s * 0.24),
+        topRight: Radius.circular(s * 0.32),
+        bottomLeft: Radius.circular(s * 0.28),
+        bottomRight: Radius.circular(s * 0.20),
+      ),
+      fill,
+    );
+
+    switch (kind) {
+      case _FlatHomeIconKind.archive:
+        _paintArchive(canvas, s, stroke, fill);
+      case _FlatHomeIconKind.quiz:
+        _paintQuiz(canvas, s, stroke, fill);
+      case _FlatHomeIconKind.capture:
+        _paintCapture(canvas, s, stroke, fill);
+    }
+  }
+
+  void _paintArchive(Canvas canvas, double s, Paint stroke, Paint fill) {
+    fill.color = _leaf;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.23, s * 0.26, s * 0.50, s * 0.42),
+        Radius.circular(s * 0.07),
+      ),
+      fill,
+    );
+    fill.color = _cream;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.29, s * 0.18, s * 0.48, s * 0.44),
+        Radius.circular(s * 0.07),
+      ),
+      fill,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.29, s * 0.18, s * 0.48, s * 0.44),
+        Radius.circular(s * 0.07),
+      ),
+      stroke,
+    );
+    canvas.drawLine(
+        Offset(s * 0.39, s * 0.34), Offset(s * 0.65, s * 0.34), stroke);
+    canvas.drawLine(
+        Offset(s * 0.39, s * 0.46), Offset(s * 0.60, s * 0.46), stroke);
+    canvas.drawCircle(
+        Offset(s * 0.66, s * 0.65), s * 0.09, Paint()..color = _peach);
+    canvas.drawCircle(Offset(s * 0.66, s * 0.65), s * 0.09, stroke);
+  }
+
+  void _paintQuiz(Canvas canvas, double s, Paint stroke, Paint fill) {
+    fill.color = _cream;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.28, s * 0.18, s * 0.44, s * 0.55),
+        Radius.circular(s * 0.08),
+      ),
+      fill,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.28, s * 0.18, s * 0.44, s * 0.55),
+        Radius.circular(s * 0.08),
+      ),
+      stroke,
+    );
+    final check = Path()
+      ..moveTo(s * 0.38, s * 0.36)
+      ..lineTo(s * 0.45, s * 0.43)
+      ..lineTo(s * 0.61, s * 0.29);
+    canvas.drawPath(check, stroke);
+    canvas.drawLine(
+        Offset(s * 0.39, s * 0.55), Offset(s * 0.61, s * 0.55), stroke);
+    final bolt = Path()
+      ..moveTo(s * 0.63, s * 0.10)
+      ..lineTo(s * 0.50, s * 0.41)
+      ..lineTo(s * 0.64, s * 0.39)
+      ..lineTo(s * 0.51, s * 0.72);
+    fill.color = _peach;
+    canvas.drawPath(bolt, fill);
+    canvas.drawPath(bolt, stroke);
+  }
+
+  void _paintCapture(Canvas canvas, double s, Paint stroke, Paint fill) {
+    fill.color = _cream;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.20, s * 0.30, s * 0.60, s * 0.38),
+        Radius.circular(s * 0.10),
+      ),
+      fill,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.20, s * 0.30, s * 0.60, s * 0.38),
+        Radius.circular(s * 0.10),
+      ),
+      stroke,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.31, s * 0.22, s * 0.22, s * 0.13),
+        Radius.circular(s * 0.04),
+      ),
+      stroke,
+    );
+    fill.color = _mint;
+    canvas.drawCircle(Offset(s * 0.50, s * 0.49), s * 0.13, fill);
+    canvas.drawCircle(Offset(s * 0.50, s * 0.49), s * 0.13, stroke);
+    fill.color = _ink;
+    canvas.drawCircle(Offset(s * 0.69, s * 0.39), s * 0.035, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlatHomeIconPainter oldDelegate) {
+    return oldDelegate.kind != kind;
   }
 }
 
@@ -1714,7 +1985,7 @@ class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
     final isQueued = task?.status == AnalysisTaskStatus.queued;
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -1747,7 +2018,7 @@ class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
                       color: AppPalette.kombuGreen,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                        color: AppPalette.pastelGrey.withOpacity(0.08),
                       ),
                     ),
                     child: ClipRRect(
@@ -1798,7 +2069,7 @@ class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppPalette.almondCream.withValues(alpha: 0.10),
+                    color: AppPalette.almondCream.withOpacity(0.10),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(

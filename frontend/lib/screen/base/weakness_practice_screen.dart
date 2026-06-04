@@ -17,9 +17,9 @@ class WeaknessPracticeScreen extends StatefulWidget {
 }
 
 class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
-  final Color bgDark = AppPalette.night;
+  final Color bgDark = AppPalette.paper;
   final Color primaryGreen = AppPalette.matchaMist;
-  final Color cardBg = AppPalette.kombuGreen;
+  final Color cardBg = AppPalette.paper;
   final Color currentSubTextColor = AppPalette.textSecondary;
 
   int _currentActiveLevel = 1;
@@ -94,25 +94,13 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
           const DecoratedBox(
             decoration: BoxDecoration(gradient: AppPalette.appBackground),
           ),
-          Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppPalette.pineGreen.withValues(alpha: 0.16),
-                  AppPalette.night.withValues(alpha: 0.72),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox.shrink(),
           Positioned(
             top: -80,
             right: -40,
             child: _buildAmbientBlob(
               220,
-              AppPalette.matchaMist.withValues(alpha: 0.14),
+              AppPalette.mint.withOpacity(0.34),
             ),
           ),
           Positioned(
@@ -120,7 +108,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
             left: -40,
             child: _buildAmbientBlob(
               180,
-              AppPalette.pineGreen.withValues(alpha: 0.16),
+              AppPalette.blush.withOpacity(0.28),
             ),
           ),
           SafeArea(
@@ -144,7 +132,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: AppPalette.almondCream.withValues(alpha: 0.14),
+                          color: AppPalette.almondCream.withOpacity(0.14),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -212,16 +200,16 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
         decoration: BoxDecoration(
-          color: bgDark.withValues(alpha: 0.92),
+          color: bgDark,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           border: Border(
             top: BorderSide(
-              color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              color: AppPalette.inkBlue.withOpacity(0.06),
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
+              color: AppPalette.inkBlue.withOpacity(0.06),
               blurRadius: 22,
               offset: const Offset(0, -6),
             ),
@@ -233,21 +221,20 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
             _currentActiveLevel > 4
                 ? Icons.verified_rounded
                 : Icons.bolt_rounded,
-            color: AppPalette.night,
+            color: Colors.white,
           ),
           label: Text(
-            _currentActiveLevel > 4
-                ? '本轮特训已完成'
-                : '开始第 0$_currentActiveLevel 关',
+            _currentActiveLevel > 4 ? '本轮特训已完成' : '开始第 0$_currentActiveLevel 关',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppPalette.night,
+              color: Colors.white,
             ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppPalette.almondCream,
-            disabledBackgroundColor: AppPalette.laurelGreen.withValues(alpha: 0.5),
+            backgroundColor: AppPalette.inkBlue,
+            disabledBackgroundColor:
+                AppPalette.laurelGreen.withOpacity(0.5),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
@@ -271,17 +258,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppPalette.pineGreen.withValues(alpha: 0.92),
-                AppPalette.kombuGreen.withValues(alpha: 0.90),
-              ],
-            ),
+            color: AppPalette.mint.withOpacity(0.58),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: AppPalette.laurelGreen.withValues(alpha: 0.14),
+              color: AppPalette.inkBlue.withOpacity(0.06),
             ),
           ),
           child: Column(
@@ -295,13 +275,13 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppPalette.almondCream.withValues(alpha: 0.14),
+                      color: AppPalette.paper.withOpacity(0.72),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: const Text(
                       'AI 定制路径',
                       style: TextStyle(
-                        color: AppPalette.almondCream,
+                        color: AppPalette.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -351,10 +331,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+        color: AppPalette.paper.withOpacity(0.94),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          color: AppPalette.inkBlue.withOpacity(0.06),
         ),
       ),
       child: Column(
@@ -374,7 +354,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 ),
                 child: const Icon(
                   Icons.psychology_rounded,
-                  color: AppPalette.night,
+                  color: AppPalette.textPrimary,
                   size: 24,
                 ),
               ),
@@ -440,13 +420,13 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
     final isLocked = level > _currentActiveLevel;
 
     final nodeColor = isCompleted
-        ? AppPalette.almondCream
-        : (isActive ? primaryGreen : Colors.white.withValues(alpha: 0.18));
+        ? AppPalette.moodBlue
+        : (isActive ? primaryGreen : AppPalette.inkBlue.withOpacity(0.18));
     final cardColor = isActive
-        ? primaryGreen.withValues(alpha: 0.12)
-        : AppPalette.pastelGrey.withValues(alpha: 0.05);
+        ? primaryGreen.withOpacity(0.16)
+        : AppPalette.paper.withOpacity(0.92);
     final textColor = isLocked
-        ? AppPalette.textSecondary.withValues(alpha: 0.5)
+        ? AppPalette.textSecondary.withOpacity(0.5)
         : AppPalette.textPrimary;
 
     return IntrinsicHeight(
@@ -460,10 +440,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 height: 34,
                 decoration: BoxDecoration(
                   color: isCompleted
-                      ? AppPalette.almondCream
+                      ? AppPalette.moodBlue
                       : isActive
-                          ? primaryGreen.withValues(alpha: 0.18)
-                          : cardBg.withValues(alpha: 0.90),
+                          ? primaryGreen.withOpacity(0.18)
+                          : AppPalette.cream,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: nodeColor,
@@ -474,7 +454,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                   child: isCompleted
                       ? const Icon(
                           Icons.check_rounded,
-                          color: AppPalette.night,
+                          color: Colors.white,
                           size: 18,
                         )
                       : Text(
@@ -498,9 +478,9 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           isCompleted
-                              ? AppPalette.almondCream
-                              : Colors.white.withValues(alpha: 0.14),
-                          Colors.white.withValues(alpha: 0.06),
+                              ? AppPalette.moodBlue
+                              : AppPalette.inkBlue.withOpacity(0.10),
+                          AppPalette.inkBlue.withOpacity(0.06),
                         ],
                       ),
                     ),
@@ -518,13 +498,13 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isActive
-                      ? primaryGreen.withValues(alpha: 0.35)
-                      : AppPalette.pastelGrey.withValues(alpha: 0.08),
+                      ? primaryGreen.withOpacity(0.35)
+                      : AppPalette.inkBlue.withOpacity(0.06),
                 ),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: primaryGreen.withValues(alpha: 0.08),
+                          color: primaryGreen.withOpacity(0.08),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),
@@ -568,7 +548,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                         Text(
                           subtitle,
                           style: TextStyle(
-                            color: textColor.withValues(alpha: 0.72),
+                            color: textColor.withOpacity(0.72),
                             fontSize: 13,
                             height: 1.5,
                           ),
@@ -582,10 +562,10 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                     height: 52,
                     decoration: BoxDecoration(
                       color: isCompleted
-                          ? AppPalette.almondCream.withValues(alpha: 0.16)
+                          ? AppPalette.moodBlue.withOpacity(0.14)
                           : isActive
-                              ? primaryGreen.withValues(alpha: 0.14)
-                              : Colors.white.withValues(alpha: 0.05),
+                              ? primaryGreen.withOpacity(0.14)
+                              : AppPalette.cream,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
@@ -593,7 +573,7 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
                           ? Icons.check_circle_rounded
                           : (isLocked ? Icons.lock_outline_rounded : icon),
                       color: isCompleted
-                          ? AppPalette.almondCream
+                          ? AppPalette.moodBlue
                           : (isActive ? primaryGreen : currentSubTextColor),
                       size: 28,
                     ),
@@ -618,12 +598,12 @@ class _WeaknessPracticeScreenState extends State<WeaknessPracticeScreen> {
             ? '进行中'
             : '未解锁';
     final bgColor = isCompleted
-        ? AppPalette.almondCream.withValues(alpha: 0.18)
+        ? AppPalette.moodBlue.withOpacity(0.14)
         : isActive
-            ? primaryGreen.withValues(alpha: 0.18)
-            : Colors.white.withValues(alpha: 0.06);
+            ? primaryGreen.withOpacity(0.18)
+            : AppPalette.inkBlue.withOpacity(0.06);
     final textColor = isCompleted
-        ? AppPalette.almondCream
+        ? AppPalette.moodBlue
         : isActive
             ? primaryGreen
             : currentSubTextColor;
@@ -671,10 +651,10 @@ class _InsightChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppPalette.cream,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.inkBlue.withOpacity(0.06),
         ),
       ),
       child: Text(

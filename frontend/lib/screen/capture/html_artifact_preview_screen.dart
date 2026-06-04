@@ -33,7 +33,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -57,7 +57,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+                  color: AppPalette.pastelGrey.withOpacity(0.10),
                 ),
               ),
               child: WebViewWidget(controller: _controller),

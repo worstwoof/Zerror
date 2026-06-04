@@ -79,10 +79,10 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
           : Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               decoration: BoxDecoration(
-                color: AppPalette.night.withValues(alpha: 0.94),
+                color: AppPalette.paper,
                 border: Border(
                   top: BorderSide(
-                    color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                    color: AppPalette.inkBlue.withOpacity(0.06),
                   ),
                 ),
               ),
@@ -152,7 +152,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
                     Text(
                       '$_questionCount 题',
                       style: const TextStyle(
-                        color: AppPalette.almondCream,
+                        color: AppPalette.moodBlue,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -165,7 +165,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
                   max: 50,
                   divisions: 9,
                   activeColor: AppPalette.matchaMist,
-                  inactiveColor: AppPalette.matchaMist.withValues(alpha: 0.2),
+                  inactiveColor: AppPalette.matchaMist.withOpacity(0.2),
                   label: '$_questionCount',
                   onChanged: (value) {
                     setState(() => _questionCount = value.toInt());
@@ -189,17 +189,16 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
               return FilterChip(
                 label: Text(subject),
                 selected: isSelected,
-                selectedColor: AppPalette.matchaMist.withValues(alpha: 0.18),
-                backgroundColor: AppPalette.pastelGrey.withValues(alpha: 0.08),
+                selectedColor: AppPalette.matchaMist.withOpacity(0.18),
+                backgroundColor: AppPalette.pastelGrey.withOpacity(0.08),
                 checkmarkColor: AppPalette.matchaMist,
                 labelStyle: TextStyle(
-                  color: isSelected
-                      ? AppPalette.matchaMist
-                      : AppPalette.textSecondary,
+                  color:
+                      isSelected ? AppPalette.textPrimary : AppPalette.textSecondary,
                 ),
                 side: BorderSide(
                   color: isSelected
-                      ? AppPalette.matchaMist.withValues(alpha: 0.4)
+                      ? AppPalette.matchaMist.withOpacity(0.4)
                       : Colors.transparent,
                 ),
                 onSelected: (selected) {
@@ -258,8 +257,8 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
       borderRadius: BorderRadius.circular(22),
       child: AppPanel(
         color: isSelected
-            ? AppPalette.matchaMist.withValues(alpha: 0.10)
-            : AppPalette.pastelGrey.withValues(alpha: 0.07),
+            ? AppPalette.matchaMist.withOpacity(0.10)
+            : AppPalette.pastelGrey.withOpacity(0.07),
         child: Row(
           children: [
             Container(
@@ -267,13 +266,13 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
               height: 44,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppPalette.matchaMist
-                    : Colors.white.withValues(alpha: 0.05),
+                    ? AppPalette.mint
+                    : AppPalette.peach.withOpacity(0.35),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 icon,
-                color: isSelected ? AppPalette.night : AppPalette.textSecondary,
+                color: AppPalette.textPrimary,
               ),
             ),
             const SizedBox(width: 14),
@@ -305,7 +304,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
               isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
               color: isSelected
                   ? AppPalette.matchaMist
-                  : AppPalette.textSecondary.withValues(alpha: 0.3),
+                  : AppPalette.textSecondary.withOpacity(0.3),
             ),
           ],
         ),

@@ -16,7 +16,7 @@ class SmartReviewScreen extends StatefulWidget {
 
 class _SmartReviewScreenState extends State<SmartReviewScreen> {
   final Color primaryGreen = AppPalette.matchaMist;
-  final Color cardBg = AppPalette.kombuGreen;
+  final Color cardBg = AppPalette.paper;
 
   int _currentIndex = 0;
   bool _isAnswerRevealed = false;
@@ -48,7 +48,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Icon(
           Icons.verified_rounded,
-          color: AppPalette.almondCream,
+          color: AppPalette.moodBlue,
           size: 48,
         ),
         content: const Text(
@@ -68,8 +68,8 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppPalette.almondCream,
-                    foregroundColor: AppPalette.night,
+                    backgroundColor: AppPalette.inkBlue,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -96,7 +96,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppPalette.textPrimary,
                     side: BorderSide(
-                      color: AppPalette.pastelGrey.withValues(alpha: 0.18),
+                      color: AppPalette.pastelGrey.withOpacity(0.18),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -128,7 +128,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
 
     if (reviewList.isEmpty) {
       return Scaffold(
-        backgroundColor: AppPalette.night,
+        backgroundColor: AppPalette.cream,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -171,7 +171,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
             Text(
               '${_currentIndex + 1} / ${reviewList.length}',
               style: TextStyle(
-                color: AppPalette.textSecondary.withValues(alpha: 0.8),
+                color: AppPalette.textSecondary.withOpacity(0.8),
                 fontSize: 12,
               ),
             ),
@@ -200,7 +200,8 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.share_rounded, color: AppPalette.textPrimary),
+            icon:
+                const Icon(Icons.share_rounded, color: AppPalette.textPrimary),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -219,34 +220,22 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
               decoration: BoxDecoration(gradient: AppPalette.appBackground),
             ),
           ),
-          Positioned.fill(
-            child: Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
-          ),
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0x28324A36), Color(0xCC171712)],
-                ),
-              ),
-            ),
-          ),
           Positioned(
             top: -70,
             right: -30,
-            child: _buildAmbientBlob(
-              220,
-              AppPalette.matchaMist.withValues(alpha: 0.12),
+            child: _buildFlatBlob(
+              width: 150,
+              height: 112,
+              color: AppPalette.mint.withOpacity(0.46),
             ),
           ),
           Positioned(
             bottom: 160,
             left: -60,
-            child: _buildAmbientBlob(
-              200,
-              AppPalette.pineGreen.withValues(alpha: 0.14),
+            child: _buildFlatBlob(
+              width: 132,
+              height: 96,
+              color: AppPalette.blush.withOpacity(0.38),
             ),
           ),
           SafeArea(
@@ -264,15 +253,15 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                       curve: Curves.easeInOut,
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: cardBg.withValues(alpha: 0.86),
+                        color: cardBg.withOpacity(0.96),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
-                          color: AppPalette.pastelGrey.withValues(alpha: 0.1),
+                          color: AppPalette.inkBlue.withOpacity(0.06),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 20,
+                            color: AppPalette.inkBlue.withOpacity(0.06),
+                            blurRadius: 18,
                             offset: const Offset(0, 10),
                           ),
                         ],
@@ -290,7 +279,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                                   vertical: 7,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: primaryGreen.withValues(alpha: 0.14),
+                                  color: primaryGreen.withOpacity(0.14),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
@@ -356,7 +345,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                                 children: [
                                   _buildFeedbackButton(
                                     '忘记了',
-                                    const Color(0xFFE17D6B),
+            AppPalette.coral,
                                     () => _handleFeedback(
                                       store,
                                       current,
@@ -407,10 +396,10 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+            color: AppPalette.paper.withOpacity(0.90),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+              color: AppPalette.inkBlue.withOpacity(0.06),
             ),
           ),
           child: Column(
@@ -430,7 +419,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                   Text(
                     '${(progress * 100).round()}%',
                     style: const TextStyle(
-                      color: AppPalette.almondCream,
+                      color: AppPalette.moodBlue,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -451,9 +440,9 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
                   value: progress,
-                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  backgroundColor: AppPalette.inkBlue.withOpacity(0.08),
                   valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppPalette.almondCream,
+                    AppPalette.moodBlue,
                   ),
                   minHeight: 8,
                 ),
@@ -472,10 +461,10 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 18),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
+          color: AppPalette.cream,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+            color: AppPalette.inkBlue.withOpacity(0.06),
           ),
         ),
         child: Column(
@@ -484,7 +473,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: primaryGreen.withValues(alpha: 0.14),
+                color: primaryGreen.withOpacity(0.14),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -524,13 +513,13 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         _infoBlock(
           title: '我的回忆',
           content: current.myAnswer,
-          tint: AppPalette.honeyOrange.withValues(alpha: 0.12),
+          tint: AppPalette.honeyOrange.withOpacity(0.12),
         ),
         const SizedBox(height: 14),
         _infoBlock(
           title: 'AI 解析',
           content: current.aiAnalysis,
-          tint: primaryGreen.withValues(alpha: 0.12),
+          tint: primaryGreen.withOpacity(0.12),
         ),
       ],
     );
@@ -547,7 +536,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
       decoration: BoxDecoration(
         color: tint,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,7 +574,7 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
         child: ElevatedButton(
           onPressed: onTap,
           style: ElevatedButton.styleFrom(
-            backgroundColor: color.withValues(alpha: 0.16),
+            backgroundColor: color.withOpacity(0.16),
             foregroundColor: color,
             elevation: 0,
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -602,16 +591,23 @@ class _SmartReviewScreenState extends State<SmartReviewScreen> {
     );
   }
 
-  Widget _buildAmbientBlob(double size, Color color) {
+  Widget _buildFlatBlob({
+    required double width,
+    required double height,
+    required Color color,
+  }) {
     return IgnorePointer(
       child: Container(
-        width: size,
-        height: size,
+        width: width,
+        height: height,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color, blurRadius: 120, spreadRadius: 12),
-          ],
+          color: color,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(34),
+            topRight: Radius.circular(56),
+            bottomLeft: Radius.circular(42),
+            bottomRight: Radius.circular(28),
+          ),
         ),
       ),
     );

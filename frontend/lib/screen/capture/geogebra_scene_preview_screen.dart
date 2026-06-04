@@ -66,9 +66,9 @@ class _GeoGebraScenePreviewScreenState
     );
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
-        backgroundColor: AppPalette.night,
+        backgroundColor: AppPalette.cream,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
         title: Text(
@@ -104,7 +104,7 @@ class _GeoGebraScenePreviewScreenState
                             color: Colors.white,
                             border: Border.all(
                               color:
-                                  AppPalette.pastelGrey.withValues(alpha: 0.10),
+                                  AppPalette.pastelGrey.withOpacity(0.10),
                             ),
                           ),
                           child: WebViewWidget(controller: _controller),
@@ -131,10 +131,10 @@ class _GeoGebraScenePreviewScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          color: AppPalette.pastelGrey.withOpacity(0.10),
         ),
       ),
       child: Column(
@@ -184,16 +184,16 @@ class _GeoGebraScenePreviewScreenState
         return ChoiceChip(
           selected: selected,
           label: Text(title),
-          selectedColor: AppPalette.almondCream.withValues(alpha: 0.22),
-          backgroundColor: Colors.white.withValues(alpha: 0.06),
+          selectedColor: AppPalette.almondCream.withOpacity(0.22),
+          backgroundColor: Colors.white.withOpacity(0.06),
           labelStyle: TextStyle(
             color: selected ? AppPalette.almondCream : AppPalette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
           side: BorderSide(
             color: selected
-                ? AppPalette.almondCream.withValues(alpha: 0.45)
-                : AppPalette.pastelGrey.withValues(alpha: 0.12),
+                ? AppPalette.almondCream.withOpacity(0.45)
+                : AppPalette.pastelGrey.withOpacity(0.12),
           ),
           onSelected: (_) {
             setState(() {
@@ -263,10 +263,10 @@ class _GeoGebraScenePreviewScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          color: AppPalette.pastelGrey.withOpacity(0.10),
         ),
       ),
       child: Column(
@@ -308,10 +308,10 @@ class _GeoGebraScenePreviewScreenState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(14),
         border:
-            Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.10)),
+            Border.all(color: AppPalette.pastelGrey.withOpacity(0.10)),
       ),
       child: Column(
         children: [
@@ -391,7 +391,7 @@ class _GeoGebraScenePreviewScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

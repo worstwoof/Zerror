@@ -21,7 +21,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
-        title: const Text('系统设置', style: TextStyle(color: AppPalette.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: const Text('系统设置',
+            style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600)),
       ),
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(24, 72, 24, 24),
@@ -37,7 +41,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   _settingTile('清理缓存', '128 MB', onTap: () {}),
-                  Divider(color: AppPalette.pastelGrey.withValues(alpha: 0.08), height: 1),
+                  Divider(
+                      color: AppPalette.pastelGrey.withOpacity(0.08),
+                      height: 1),
                   _settingTile('当前版本', 'v1.0.0 (Beta)'),
                 ],
               ),
@@ -51,7 +57,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _settingTile(String title, String trailing, {VoidCallback? onTap}) {
     return ListTile(
       title: Text(title, style: const TextStyle(color: AppPalette.textPrimary)),
-      trailing: Text(trailing, style: const TextStyle(color: AppPalette.textSecondary)),
+      trailing: Text(trailing,
+          style: const TextStyle(color: AppPalette.textSecondary)),
       onTap: onTap,
     );
   }

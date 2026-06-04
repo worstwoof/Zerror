@@ -69,9 +69,9 @@ class _ManimVideoPreviewScreenState extends State<ManimVideoPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       appBar: AppBar(
-        backgroundColor: AppPalette.night,
+        backgroundColor: AppPalette.cream,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
         title: Text(
@@ -211,7 +211,7 @@ class _ManimVideoPreviewScreenState extends State<ManimVideoPreviewScreen> {
           ),
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: AppPalette.almondCream.withValues(alpha: 0.45),
+              color: AppPalette.almondCream.withOpacity(0.45),
             ),
           ),
         ),

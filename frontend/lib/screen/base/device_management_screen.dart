@@ -12,7 +12,7 @@ class DeviceManagementScreen extends StatelessWidget {
     final store = AppStateScope.of(context);
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -121,7 +121,7 @@ class _MetricChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+        color: AppPalette.pastelGrey.withOpacity(0.06),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -168,15 +168,15 @@ class _DeviceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppPanel(
       color: highlight
-          ? AppPalette.matchaMist.withValues(alpha: 0.12)
-          : AppPalette.pastelGrey.withValues(alpha: 0.07),
+          ? AppPalette.matchaMist.withOpacity(0.12)
+          : AppPalette.pastelGrey.withOpacity(0.07),
       child: Row(
         children: [
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppPalette.matchaMist.withValues(alpha: 0.16),
+              color: AppPalette.matchaMist.withOpacity(0.16),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -212,7 +212,8 @@ class _DeviceCard extends StatelessWidget {
           Text(
             status,
             style: TextStyle(
-              color: offline ? AppPalette.textSecondary : AppPalette.almondCream,
+              color:
+                  offline ? AppPalette.textSecondary : AppPalette.almondCream,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -281,9 +282,10 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
         child: const Icon(
           Icons.arrow_back_ios_new_rounded,

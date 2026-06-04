@@ -94,7 +94,7 @@ class ErrorDetailScreen extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color:
-                                AppPalette.matchaMist.withValues(alpha: 0.15),
+                                AppPalette.matchaMist.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -168,7 +168,7 @@ class ErrorDetailScreen extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.flag_rounded,
-                      color: Color(0xFFE17D6B),
+          color: AppPalette.coral,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -176,7 +176,7 @@ class ErrorDetailScreen extends StatelessWidget {
                       child: AppLatexText(
                         '当时错因：${error.reason}',
                         style: const TextStyle(
-                          color: Color(0xFFE17D6B),
+                  color: AppPalette.coral,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
@@ -187,7 +187,7 @@ class ErrorDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               AppPanel(
-                color: AppPalette.honeyOrange.withValues(alpha: 0.08),
+                color: AppPalette.honeyOrange.withOpacity(0.08),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -210,7 +210,7 @@ class ErrorDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               AppPanel(
-                color: AppPalette.matchaMist.withValues(alpha: 0.08),
+                color: AppPalette.matchaMist.withOpacity(0.08),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -272,8 +272,8 @@ class ErrorDetailScreen extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
                             color: error.isFavorite
-                                ? AppPalette.almondCream.withValues(alpha: 0.4)
-                                : AppPalette.pastelGrey.withValues(alpha: 0.16),
+                                ? AppPalette.almondCream.withOpacity(0.4)
+                                : AppPalette.pastelGrey.withOpacity(0.16),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -304,7 +304,7 @@ class ErrorDetailScreen extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
                             color:
-                                AppPalette.pastelGrey.withValues(alpha: 0.16),
+                                AppPalette.pastelGrey.withOpacity(0.16),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -349,7 +349,7 @@ class ErrorDetailScreen extends StatelessWidget {
                     side: BorderSide(
                       color: error.isMastered
                           ? AppPalette.matchaMist
-                          : AppPalette.pastelGrey.withValues(alpha: 0.16),
+                          : AppPalette.pastelGrey.withOpacity(0.16),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -393,7 +393,7 @@ class _GeneratedArtifactsPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return AppPanel(
-      color: AppPalette.almondCream.withValues(alpha: 0.08),
+      color: AppPalette.almondCream.withOpacity(0.08),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -439,10 +439,10 @@ class _GeneratedArtifactsPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: AppPalette.paper.withOpacity(0.94),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+          color: AppPalette.pastelGrey.withOpacity(0.10),
         ),
       ),
       child: Row(

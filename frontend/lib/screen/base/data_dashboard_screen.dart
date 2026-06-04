@@ -13,7 +13,8 @@ class DataDashboardScreen extends StatelessWidget {
     final distribution = store.subjectDistribution.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final maxCount = distribution.isEmpty ? 1 : distribution.first.value;
-    final maxMinutes = store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
+    final maxMinutes =
+        store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -25,7 +26,10 @@ class DataDashboardScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: AppPalette.textPrimary),
         title: const Text(
           '学习数据看板',
-          style: TextStyle(color: AppPalette.textPrimary, fontSize: 18, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600),
         ),
       ),
       body: AppSurface(
@@ -35,15 +39,19 @@ class DataDashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppPanel(
-                color: AppPalette.matchaMist.withValues(alpha: 0.08),
+                color: AppPalette.matchaMist.withOpacity(0.08),
                 child: Row(
                   children: [
-                    const Icon(Icons.auto_awesome_rounded, color: AppPalette.almondCream),
+                    const Icon(Icons.auto_awesome_rounded,
+                        color: AppPalette.almondCream),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'AI 洞察：当前最值得优先补强的是「${store.weakestSubject}」，现在还有 ${store.pendingReviewCount} 道错题等待回收。',
-                        style: const TextStyle(color: AppPalette.textPrimary, fontSize: 13, height: 1.5),
+                        style: const TextStyle(
+                            color: AppPalette.textPrimary,
+                            fontSize: 13,
+                            height: 1.5),
                       ),
                     ),
                   ],
@@ -58,9 +66,11 @@ class DataDashboardScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  _overviewCard('收录错题', '${store.totalErrors}', AppPalette.textPrimary),
+                  _overviewCard(
+                      '收录错题', '${store.totalErrors}', AppPalette.textPrimary),
                   const SizedBox(width: 16),
-                  _overviewCard('成功消灭', '${store.masteredCount}', AppPalette.matchaMist),
+                  _overviewCard(
+                      '成功消灭', '${store.masteredCount}', AppPalette.matchaMist),
                 ],
               ),
               const SizedBox(height: 28),
@@ -74,7 +84,8 @@ class DataDashboardScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(store.weeklyReviewMinutes.length, (index) {
+                  children:
+                      List.generate(store.weeklyReviewMinutes.length, (index) {
                     final labels = ['一', '二', '三', '四', '五', '六', '日'];
                     return _BarItem(
                       label: labels[index],
@@ -99,7 +110,8 @@ class DataDashboardScreen extends StatelessWidget {
                         ratio: distribution[i].value / maxCount,
                         count: '${distribution[i].value} 题',
                       ),
-                      if (i != distribution.length - 1) const SizedBox(height: 18),
+                      if (i != distribution.length - 1)
+                        const SizedBox(height: 18),
                     ],
                   ],
                 ),
@@ -117,9 +129,15 @@ class DataDashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 13)),
+            Text(title,
+                style: const TextStyle(
+                    color: AppPalette.textSecondary, fontSize: 13)),
             const SizedBox(height: 8),
-            Text(value, style: TextStyle(color: valueColor, fontSize: 32, fontWeight: FontWeight.bold)),
+            Text(value,
+                style: TextStyle(
+                    color: valueColor,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -141,7 +159,7 @@ class _BarItem extends StatelessWidget {
           width: 14,
           height: 120,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: AppPalette.inkBlue.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.bottomCenter,
@@ -156,14 +174,17 @@ class _BarItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Text(label, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+        Text(label,
+            style:
+                const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
       ],
     );
   }
 }
 
 class _ProgressItem extends StatelessWidget {
-  const _ProgressItem({required this.subject, required this.ratio, required this.count});
+  const _ProgressItem(
+      {required this.subject, required this.ratio, required this.count});
 
   final String subject;
   final double ratio;
@@ -179,9 +200,14 @@ class _ProgressItem extends StatelessWidget {
           children: [
             Text(
               subject,
-              style: const TextStyle(color: AppPalette.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500),
             ),
-            Text(count, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+            Text(count,
+                style: const TextStyle(
+                    color: AppPalette.textSecondary, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 8),
@@ -189,7 +215,7 @@ class _ProgressItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: ratio.clamp(0.0, 1.0),
-            backgroundColor: Colors.white.withValues(alpha: 0.08),
+            backgroundColor: AppPalette.inkBlue.withOpacity(0.08),
             color: AppPalette.matchaMist,
             minHeight: 8,
           ),

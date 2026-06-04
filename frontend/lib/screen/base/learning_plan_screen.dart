@@ -41,7 +41,7 @@ class LearningPlanScreen extends StatelessWidget {
         : '核心错题回收';
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: SingleChildScrollView(
@@ -128,7 +128,8 @@ class LearningPlanScreen extends StatelessWidget {
                 icon: Icons.show_chart_rounded,
               ),
               const SizedBox(height: 12),
-              _ForgettingCurvePanel(pendingReviewCount: store.pendingReviewCount),
+              _ForgettingCurvePanel(
+                  pendingReviewCount: store.pendingReviewCount),
               const SizedBox(height: 18),
               const AppSectionTitle(
                 title: '本周节奏',
@@ -168,7 +169,7 @@ class _PlanTaskCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppPalette.matchaMist.withValues(alpha: 0.16),
+                  color: AppPalette.matchaMist.withOpacity(0.16),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
@@ -365,33 +366,33 @@ class _CalendarDayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final config = switch (entry.state) {
       CalendarState.done => (
-          background: AppPalette.matchaMist.withValues(alpha: 0.18),
+          background: AppPalette.matchaMist.withOpacity(0.18),
           foreground: AppPalette.textPrimary,
-          border: AppPalette.matchaMist.withValues(alpha: 0.20),
+          border: AppPalette.matchaMist.withOpacity(0.20),
           icon: Icons.check_rounded,
         ),
       CalendarState.review => (
-          background: AppPalette.almondCream.withValues(alpha: 0.18),
+          background: AppPalette.almondCream.withOpacity(0.18),
           foreground: AppPalette.almondCream,
-          border: AppPalette.almondCream.withValues(alpha: 0.24),
+          border: AppPalette.almondCream.withOpacity(0.24),
           icon: Icons.refresh_rounded,
         ),
       CalendarState.today => (
           background: AppPalette.pineGreen,
           foreground: AppPalette.textPrimary,
-          border: AppPalette.matchaMist.withValues(alpha: 0.22),
+          border: AppPalette.matchaMist.withOpacity(0.22),
           icon: Icons.flash_on_rounded,
         ),
       CalendarState.upcoming => (
-          background: AppPalette.pastelGrey.withValues(alpha: 0.06),
+          background: AppPalette.pastelGrey.withOpacity(0.06),
           foreground: AppPalette.textSecondary,
-          border: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          border: AppPalette.pastelGrey.withOpacity(0.08),
           icon: Icons.schedule_rounded,
         ),
       CalendarState.rest => (
-          background: AppPalette.jungleGreen.withValues(alpha: 0.45),
+          background: AppPalette.jungleGreen.withOpacity(0.45),
           foreground: AppPalette.textSecondary,
-          border: AppPalette.pastelGrey.withValues(alpha: 0.06),
+          border: AppPalette.pastelGrey.withOpacity(0.06),
           icon: Icons.coffee_rounded,
         ),
     };
@@ -521,7 +522,8 @@ class _RhythmPanel extends StatelessWidget {
       );
     }
 
-    final maxMinutes = store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
+    final maxMinutes =
+        store.weeklyReviewMinutes.reduce((a, b) => a > b ? a : b);
     return AppPanel(
       child: Column(
         children: [
@@ -553,7 +555,9 @@ class _RhythmPanel extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(store.weeklyReviewMinutes.length, (index) {
-              final ratio = maxMinutes == 0 ? 0.0 : store.weeklyReviewMinutes[index] / maxMinutes;
+              final ratio = maxMinutes == 0
+                  ? 0.0
+                  : store.weeklyReviewMinutes[index] / maxMinutes;
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -574,7 +578,10 @@ class _RhythmPanel extends StatelessWidget {
                           gradient: const LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [AppPalette.matchaMist, AppPalette.pineGreen],
+                            colors: [
+                              AppPalette.matchaMist,
+                              AppPalette.pineGreen
+                            ],
                           ),
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -638,7 +645,7 @@ class _MetricDivider extends StatelessWidget {
     return Container(
       width: 1,
       height: 40,
-      color: AppPalette.pastelGrey.withValues(alpha: 0.10),
+      color: AppPalette.pastelGrey.withOpacity(0.10),
     );
   }
 }
@@ -730,9 +737,10 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
         child: const Icon(
           Icons.arrow_back_ios_new_rounded,
@@ -748,7 +756,7 @@ class _ForgettingCurvePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = AppPalette.pastelGrey.withValues(alpha: 0.08)
+      ..color = AppPalette.pastelGrey.withOpacity(0.08)
       ..strokeWidth = 1;
 
     for (int i = 0; i < 4; i++) {
@@ -757,7 +765,7 @@ class _ForgettingCurvePainter extends CustomPainter {
     }
 
     final axisPaint = Paint()
-      ..color = AppPalette.pastelGrey.withValues(alpha: 0.14)
+      ..color = AppPalette.pastelGrey.withOpacity(0.14)
       ..strokeWidth = 1.2;
     canvas.drawLine(
       Offset(0, size.height - 1),

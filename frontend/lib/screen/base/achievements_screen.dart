@@ -33,7 +33,7 @@ class AchievementsScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -148,7 +148,7 @@ class AchievementsScreen extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.18),
+              color: accent.withOpacity(0.18),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(icon, color: accent, size: 28),
@@ -205,17 +205,23 @@ class _AchievementOverviewItem extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: const TextStyle(color: AppPalette.textPrimary, fontSize: 26, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700),
                 ),
                 TextSpan(
                   text: unit,
-                  style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+                  style: const TextStyle(
+                      color: AppPalette.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(
+                  color: AppPalette.textSecondary, fontSize: 12)),
         ],
       ),
     );
@@ -227,7 +233,10 @@ class _VerticalDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 46, color: AppPalette.pastelGrey.withValues(alpha: 0.1));
+    return Container(
+        width: 1,
+        height: 46,
+        color: AppPalette.pastelGrey.withOpacity(0.1));
   }
 }
 
@@ -249,7 +258,7 @@ class _MiniBadge extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppPalette.matchaMist.withValues(alpha: 0.16),
+                color: AppPalette.matchaMist.withOpacity(0.16),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: AppPalette.textPrimary),
@@ -258,7 +267,10 @@ class _MiniBadge extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppPalette.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -281,11 +293,13 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          color: AppPalette.pastelGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+          border:
+              Border.all(color: AppPalette.pastelGrey.withOpacity(0.08)),
         ),
-        child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppPalette.textPrimary, size: 18),
+        child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: AppPalette.textPrimary, size: 18),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 class FinalExamScreen extends StatefulWidget {
   const FinalExamScreen({super.key});
 
@@ -9,9 +11,9 @@ class FinalExamScreen extends StatefulWidget {
 }
 
 class _FinalExamScreenState extends State<FinalExamScreen> {
-  final Color bgDark = const Color(0xFF1E2823);
-  final Color primaryGreen = const Color(0xFF70A88D);
-  final Color cardBg = const Color(0xFF2A352F);
+  final Color bgDark = AppPalette.cream;
+  final Color primaryGreen = AppPalette.moodBlue;
+  final Color cardBg = AppPalette.paper;
 
   late Timer _timer;
   int _secondsRemaining = 45 * 60; // 模拟考试 45 分钟
@@ -60,11 +62,11 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('💯 测评报告', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('💯 测评报告', style: TextStyle(color: AppPalette.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             Text('综合得分：92 / 100', style: TextStyle(color: primaryGreen, fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            const Text('薄弱点已被彻底攻克！特征多项式计算准确率达到 100%。知芽已将相关错题移出“每日高频复习”列表。', style: TextStyle(color: Colors.white70, height: 1.5)),
+            const Text('薄弱点已被彻底攻克！特征多项式计算准确率达到 100%。知芽已将相关错题移出“每日高频复习”列表。', style: TextStyle(color: AppPalette.textSecondary, height: 1.5)),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
@@ -88,11 +90,11 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
         backgroundColor: bgDark,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppPalette.textPrimary, size: 20), onPressed: () => Navigator.pop(context)),
         title: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
-            color: _secondsRemaining < 300 ? Colors.redAccent.withValues(alpha: 0.2) : primaryGreen.withValues(alpha: 0.2), // 最后5分钟变红
+            color: _secondsRemaining < 300 ? Colors.redAccent.withOpacity(0.2) : primaryGreen.withOpacity(0.2), // 最后5分钟变红
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -105,7 +107,7 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: _submitExam, child: const Text('交卷', style: TextStyle(color: Colors.white70, fontSize: 16))),
+          TextButton(onPressed: _submitExam, child: const Text('交卷', style: TextStyle(color: AppPalette.moodBlue, fontSize: 16))),
         ],
       ),
       body: PageView.builder(
@@ -116,9 +118,9 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('单选题 ${index + 1}/10', style: const TextStyle(color: Colors.white54, fontSize: 14)),
+                Text('单选题 ${index + 1}/10', style: const TextStyle(color: AppPalette.textSecondary, fontSize: 14)),
                 const SizedBox(height: 16),
-                const Text('设方阵 A 的特征值为 λ，则矩阵 A² - 2A + E 的特征值为？', style: TextStyle(color: Colors.white, fontSize: 18, height: 1.5)),
+                const Text('设方阵 A 的特征值为 λ，则矩阵 A² - 2A + E 的特征值为？', style: TextStyle(color: AppPalette.textPrimary, fontSize: 18, height: 1.5)),
                 const SizedBox(height: 32),
 
                 ...List.generate(4, (optIdx) {
@@ -132,15 +134,15 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isSelected ? primaryGreen.withValues(alpha: 0.1) : cardBg,
+                        color: isSelected ? primaryGreen.withOpacity(0.1) : cardBg,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: isSelected ? primaryGreen : Colors.white.withValues(alpha: 0.1)),
+                        border: Border.all(color: isSelected ? primaryGreen : AppPalette.inkBlue.withOpacity(0.08)),
                       ),
                       child: Row(
                         children: [
-                          Icon(isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: isSelected ? primaryGreen : Colors.white54),
+                          Icon(isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: isSelected ? primaryGreen : AppPalette.textSecondary),
                           const SizedBox(width: 16),
-                          Text(options[optIdx], style: const TextStyle(color: Colors.white, fontSize: 16)),
+                          Text(options[optIdx], style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16)),
                         ],
                       ),
                     ),
@@ -154,14 +156,14 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
       // 底部答题卡进度条
       bottomNavigationBar: Container(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16, top: 16, left: 24, right: 24),
-        decoration: BoxDecoration(color: cardBg, border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))),
+        decoration: BoxDecoration(color: cardBg, border: Border(top: BorderSide(color: AppPalette.inkBlue.withOpacity(0.06)))),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('已作答: ${_answers.length} / 10', style: const TextStyle(color: Colors.white70)),
+            Text('已作答: ${_answers.length} / 10', style: const TextStyle(color: AppPalette.textSecondary)),
             LinearProgressIndicator(
               value: _answers.length / 10,
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              backgroundColor: AppPalette.inkBlue.withOpacity(0.08),
               valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
             ).paddingBox(), // 伪代码，实际可以用 Container 包裹限制宽度
           ],
