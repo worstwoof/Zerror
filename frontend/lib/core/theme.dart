@@ -4,7 +4,9 @@ class AppPalette {
   static const Color inkBlue = Color(0xFF111A3A);
   static const Color cream = Color(0xFFF8F2E8);
   static const Color paper = Color(0xFFFFFBF3);
-  static const Color mutedText = Color(0xFF8F887D);
+  static const Color mutedText = Color(0xFF5F5A51);
+  static const Color warmAccentText = Color(0xFF8A5615);
+  static const Color fieldBorder = Color(0x33111A3A);
   static const Color moodBlue = Color(0xFF405EA9);
   static const Color mint = Color(0xFFA9D9C8);
   static const Color leaf = Color(0xFFB9CC7B);
@@ -153,9 +155,9 @@ class AppTheme {
       highlightColor: AppPalette.inkBlue.withOpacity(0.04),
       dividerColor: AppPalette.inkBlue.withOpacity(0.08),
       textSelectionTheme: const TextSelectionThemeData(
-        cursorColor: AppPalette.honeyOrange,
-        selectionColor: Color(0x66FFD6A0),
-        selectionHandleColor: AppPalette.honeyOrange,
+        cursorColor: AppPalette.moodBlue,
+        selectionColor: Color(0x33405EA9),
+        selectionHandleColor: AppPalette.moodBlue,
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppPalette.inkBlue,

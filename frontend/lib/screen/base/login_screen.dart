@@ -149,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         '去注册',
                         style: TextStyle(
-                            color: AppPalette.almondCream,
+                            color: AppPalette.moodBlue,
                             fontWeight: FontWeight.bold),
                       ),
                     ),

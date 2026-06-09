@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -12,15 +13,19 @@ class AiChatScreen extends StatefulWidget {
   State<AiChatScreen> createState() => _AiChatScreenState();
 }
 
-class _AiChatScreenState extends State<AiChatScreen> {
+class _AiChatScreenState extends State<AiChatScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  AnimationController? _flipController;
   final List<_ChatMessage> _messages = const [
     _ChatMessage(
       text: '我可以帮你拆解错题、安排复习、生成同类题。先把今天最卡的一道题发给我吧。',
       isUser: false,
     ),
   ].toList();
+  bool _showChat = false;
+  bool _isFlipping = false;
   bool _isThinking = false;
 
   static const List<String> _prompts = [
@@ -31,10 +36,45 @@ class _AiChatScreenState extends State<AiChatScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _ensureFlipController();
+  }
+
+  AnimationController _ensureFlipController() {
+    final existing = _flipController;
+    if (existing != null) return existing;
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 780),
+    )
+      ..addListener(() {
+        if (!_showChat && _flipController!.value >= 0.5) {
+          setState(() => _showChat = true);
+        }
+      })
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed && _isFlipping) {
+          setState(() => _isFlipping = false);
+        }
+      });
+    _flipController = controller;
+    return controller;
+  }
+
+  @override
   void dispose() {
+    _flipController?.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startChat() {
+    if (_showChat || _isFlipping) return;
+    setState(() => _isFlipping = true);
+    _ensureFlipController().forward(from: 0);
   }
 
   Future<void> _send([String? preset]) async {
@@ -86,73 +126,127 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Scaffold(
       backgroundColor: AppPalette.cream,
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
-        centerTitle: true,
-        title: const Text(
-          'AI 助教',
-          style: TextStyle(
-            color: AppPalette.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
       body: AppSurface(
         topSafe: false,
         bottomSafe: false,
         padding: EdgeInsets.zero,
-        child: Column(
+        child: Stack(
           children: [
-            Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
-                children: [
-                  _hero(),
-                  const SizedBox(height: 18),
-                  _quickPrompts(),
-                  const SizedBox(height: 18),
-                  ..._messages.map(
-                    (message) => Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: message.isUser
-                          ? AppChatBubble(
-                              text: message.text,
-                              isUser: true,
-                              label: '你',
-                            )
-                          : _AssistantAnswerCard(text: message.text),
-                    ),
-                  ),
-                  if (_isThinking)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 14),
-                      child: _AssistantThinkingCard(),
-                    ),
-                ],
-              ),
-            ),
-            SafeArea(
-              top: false,
-              child: AppChatInputBar(
-                controller: _controller,
-                onSend: () => _send(),
-                hintText: '输入题干、错因或复习目标',
-              ),
-            ),
+            Positioned.fill(child: _flippingBody()),
+            _floatingBackButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _hero() {
+  Widget _floatingBackButton() {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 18, top: 8),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => Navigator.of(context).pop(),
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: AppPalette.textPrimary,
+                size: 30,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _flippingBody() {
+    final flipController = _ensureFlipController();
+    return AnimatedBuilder(
+      animation: flipController,
+      builder: (context, child) {
+        final progress = flipController.value;
+        final angle =
+            progress < 0.5 ? progress * math.pi : progress * math.pi - math.pi;
+        final scale = 1 - math.sin(progress * math.pi) * 0.025;
+
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.0012)
+            ..scaleByDouble(scale, scale, 1, 1)
+            ..rotateY(angle),
+          child: _showChat ? _chatFace() : _introFace(),
+        );
+      },
+    );
+  }
+
+  Widget _introFace() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelHeight = math.max(0.0, constraints.maxHeight);
+        final topInset = MediaQuery.paddingOf(context).top;
+        return SingleChildScrollView(
+          padding: EdgeInsets.zero,
+          child: _hero(math.max(620.0, panelHeight), topInset),
+        );
+      },
+    );
+  }
+
+  Widget _chatFace() {
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+            children: [
+              _quickPrompts(),
+              const SizedBox(height: 18),
+              ..._messages.map(
+                (message) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: message.isUser
+                      ? AppChatBubble(
+                          text: message.text,
+                          isUser: true,
+                          label: '你',
+                        )
+                      : _AssistantAnswerCard(text: message.text),
+                ),
+              ),
+              if (_isThinking)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 14),
+                  child: _AssistantThinkingCard(),
+                ),
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: AppChatInputBar(
+            controller: _controller,
+            onSend: () => _send(),
+            hintText: '输入题干、错因或复习目标',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _hero(double height, double topInset) {
     return Container(
-      height: 684,
-      padding: const EdgeInsets.fromLTRB(22, 42, 22, 28),
+      height: height,
+      padding: EdgeInsets.fromLTRB(22, topInset + 86, 22, 104),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFDFB),
         borderRadius: BorderRadius.circular(38),
@@ -168,28 +262,27 @@ class _AiChatScreenState extends State<AiChatScreen> {
       child: Column(
         children: [
           const _HeroTitle(),
-          const SizedBox(height: 30),
-          SizedBox(
-            height: 320,
+          const SizedBox(height: 26),
+          const SizedBox(
+            height: 300,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
-              children: const [
+              children: [
                 Positioned(
-                  top: 18,
-                  child: _FloatingSlimeOrb(size: 268),
-                ),
-                Positioned(
-                  top: 34,
-                  left: 42,
-                  child: _HelloBubble(),
+                  top: 4,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _FloatingSlimeOrb(size: 250),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          const Spacer(),
           const Text(
-            'Get instant help and support\nwith any task or problem',
+            '随时陪你拆解问题\n把任务一步步变轻松',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppPalette.textSecondary,
@@ -198,9 +291,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           GestureDetector(
-            onTap: () => _send('帮我把这道错题拆成三步讲清楚'),
+            onTap: _startChat,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 320),
@@ -222,7 +315,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Get started',
+                        '开始对话',
                         style: TextStyle(
                           color: AppPalette.textPrimary,
                           fontSize: 15,
@@ -241,6 +334,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -290,64 +384,14 @@ class _HeroTitle extends StatelessWidget {
           letterSpacing: 0,
         ),
         children: [
-          TextSpan(text: 'Your '),
+          TextSpan(text: '你的 '),
           TextSpan(
-            text: 'Smart\nAssistant',
+            text: 'ZERROR',
             style: TextStyle(color: _accent),
           ),
-          TextSpan(text: ' for\nAny Tasks'),
+          TextSpan(text: '\n陪你完成任务'),
         ],
       ),
-    );
-  }
-}
-
-class _HelloBubble extends StatelessWidget {
-  const _HelloBubble();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.94),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppPalette.inkBlue.withOpacity(0.06),
-                blurRadius: 14,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: const Text(
-            'Hello!',
-            style: TextStyle(
-              color: AppPalette.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Positioned(
-          right: 14,
-          bottom: -8,
-          child: Transform.rotate(
-            angle: 0.8,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.94),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -366,7 +410,7 @@ class _AssistantAnswerCard extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 8, right: 8, bottom: 8),
           child: Text(
-            'Zerror AI',
+            'Zerror 助手',
             style: TextStyle(
               color: AppPalette.textSecondary,
               fontSize: 11,
@@ -545,7 +589,6 @@ class _AnswerSection extends StatelessWidget {
 
 class _FloatingSlimeOrb extends StatefulWidget {
   const _FloatingSlimeOrb({
-    super.key,
     required this.size,
     this.compact = false,
   });
@@ -562,6 +605,9 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
   late final AnimationController _controller;
   late final Animation<double> _float;
   late final Animation<double> _scale;
+  Animation<double>? _shadowScaleX;
+  Animation<double>? _shadowScaleY;
+  Animation<double>? _shadowOpacity;
 
   @override
   void initState() {
@@ -582,6 +628,31 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
       begin: widget.compact ? 0.995 : 0.982,
       end: widget.compact ? 1.005 : 1.018,
     ).animate(curve);
+    _ensureShadowAnimations();
+  }
+
+  void _ensureShadowAnimations() {
+    if (_shadowScaleX != null &&
+        _shadowScaleY != null &&
+        _shadowOpacity != null) {
+      return;
+    }
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+    _shadowScaleX = Tween<double>(
+      begin: widget.compact ? 1 : 0.92,
+      end: widget.compact ? 1 : 1.08,
+    ).animate(curve);
+    _shadowScaleY = Tween<double>(
+      begin: widget.compact ? 1 : 0.84,
+      end: widget.compact ? 1 : 1.04,
+    ).animate(curve);
+    _shadowOpacity = Tween<double>(
+      begin: widget.compact ? 1 : 0.68,
+      end: widget.compact ? 1 : 0.96,
+    ).animate(curve);
   }
 
   @override
@@ -592,33 +663,134 @@ class _FloatingSlimeOrbState extends State<_FloatingSlimeOrb>
 
   @override
   Widget build(BuildContext context) {
+    Widget orbImage() {
+      return AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, _float.value),
+            child: Transform.scale(
+              scale: _scale.value,
+              child: child,
+            ),
+          );
+        },
+        child: Image.asset(
+          'assets/images/ai_slime_orb.png',
+          width: widget.size,
+          height: widget.size,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
+        ),
+      );
+    }
+
+    if (widget.compact) {
+      return ExcludeSemantics(
+        child: RepaintBoundary(
+          child: SizedBox.square(
+            dimension: widget.size,
+            child: orbImage(),
+          ),
+        ),
+      );
+    }
+
+    final shadowHeight = widget.size * 0.46;
+    _ensureShadowAnimations();
+    final shadowScaleX = _shadowScaleX!;
+    final shadowScaleY = _shadowScaleY!;
+    final shadowOpacity = _shadowOpacity!;
+
     return ExcludeSemantics(
       child: RepaintBoundary(
-        child: SizedBox.square(
-          dimension: widget.size,
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, _float.value),
-                child: Transform.scale(
-                  scale: _scale.value,
-                  child: child,
+        child: SizedBox(
+          width: widget.size,
+          height: widget.size + shadowHeight * 0.94,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                top: widget.size * 0.94,
+                left: widget.size * 0.02,
+                right: widget.size * 0.02,
+                height: shadowHeight,
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: shadowOpacity.value,
+                      child: Transform.scale(
+                        alignment: Alignment.center,
+                        scaleX: shadowScaleX.value,
+                        scaleY: shadowScaleY.value,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: const CustomPaint(
+                    painter: _OrbGroundShadowPainter(),
+                  ),
                 ),
-              );
-            },
-            child: Image.asset(
-              'assets/images/ai_slime_orb.png',
-              width: widget.size,
-              height: widget.size,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              gaplessPlayback: true,
-            ),
+              ),
+              orbImage(),
+            ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _OrbGroundShadowPainter extends CustomPainter {
+  const _OrbGroundShadowPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width * 0.50, size.height * 0.58);
+    final colorShadow = Paint()
+      ..shader = const RadialGradient(
+        colors: [
+          Color(0x55DD6EAA),
+          Color(0x356D5DE6),
+          Color(0x00FFFFFF),
+        ],
+        stops: [0.0, 0.50, 1.0],
+      ).createShader(
+        Rect.fromCircle(
+          center: center,
+          radius: size.width * 0.66,
+        ),
+      )
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: size.width,
+        height: size.height * 0.54,
+      ),
+      colorShadow,
+    );
+
+    final baseShadow = Paint()
+      ..color = const Color(0x16F18BA7)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 34);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.50, size.height * 0.68),
+        width: size.width * 1.02,
+        height: size.height * 0.40,
+      ),
+      baseShadow,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrbGroundShadowPainter oldDelegate) {
+    return false;
   }
 }
 

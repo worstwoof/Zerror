@@ -306,16 +306,16 @@ class _RegisterScreenState extends State<RegisterScreen>
           fontSize: 15,
         ),
         floatingLabelStyle: const TextStyle(
-          color: AppPalette.almondCream,
+          color: AppPalette.warmAccentText,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Icon(icon, color: AppPalette.textSecondary, size: 22),
         enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0x66F8F3EA), width: 1),
+          borderSide: BorderSide(color: AppPalette.fieldBorder, width: 1.2),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: AppPalette.honeyOrange, width: 2),
+          borderSide: BorderSide(color: AppPalette.moodBlue, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),

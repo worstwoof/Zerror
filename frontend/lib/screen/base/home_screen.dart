@@ -10,10 +10,13 @@ import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
+import 'achievements_screen.dart';
 import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
+import 'favorites_screen.dart';
 import 'login_screen.dart';
 import 'manual_entry_screen.dart';
+import 'privacy_security_screen.dart';
 import 'profile_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'settings_screen.dart';
@@ -305,12 +308,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.white.withOpacity(0.42),
                   ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'assets/images/flat_study_illustration.png',
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.medium,
+                child: const Center(
+                  child: _FlatHomeIcon(
+                    kind: _FlatHomeIconKind.capture,
+                    size: 78,
                   ),
                 ),
               ),
@@ -380,20 +381,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          child: Row(
+          child: const Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/images/flat_chat_icon.png',
-                  width: 58,
-                  height: 58,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                ),
+              _FlatHomeIcon(
+                kind: _FlatHomeIconKind.assistant,
+                size: 58,
               ),
-              const SizedBox(width: 16),
-              const Expanded(
+              SizedBox(width: 16),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -417,8 +412,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              const Icon(
+              SizedBox(width: 12),
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppPalette.textSecondary,
               ),
@@ -711,6 +706,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: [
+                          _drawerItem(
+                            context,
+                            icon: Icons.workspace_premium_rounded,
+                            title: '我的成就',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AchievementsScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
+                            icon: Icons.favorite_rounded,
+                            title: '我的收藏',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const FavoritesScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
+                            icon: Icons.security_rounded,
+                            title: '隐私与安全',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PrivacySecurityScreen()),
+                            ),
+                          ),
                           _drawerItem(
                             context,
                             icon: Icons.auto_awesome_rounded,
@@ -1652,7 +1675,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-enum _FlatHomeIconKind { archive, quiz, capture }
+enum _FlatHomeIconKind { archive, quiz, capture, assistant }
 
 class _FlatHomeIcon extends StatelessWidget {
   const _FlatHomeIcon({required this.kind, this.size = 54});
@@ -1675,143 +1698,168 @@ class _FlatHomeIconPainter extends CustomPainter {
   final _FlatHomeIconKind kind;
 
   static const _ink = AppPalette.inkBlue;
-  static const _cream = AppPalette.paper;
+  static const _paper = AppPalette.paper;
   static const _mint = AppPalette.mint;
-  static const _leaf = AppPalette.leaf;
   static const _peach = AppPalette.peach;
-  static const _blush = AppPalette.blush;
+  static const _blue = AppPalette.moodBlue;
+  static const _coral = AppPalette.coral;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final s = size.width;
-    final stroke = Paint()
-      ..color = _ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.045
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    final s = size.shortestSide;
+    canvas.save();
+    canvas.translate((size.width - s) / 2, (size.height - s) / 2);
+
     final fill = Paint()..style = PaintingStyle.fill;
 
-    fill.color = switch (kind) {
-      _FlatHomeIconKind.archive => _mint,
-      _FlatHomeIconKind.quiz => _blush,
-      _FlatHomeIconKind.capture => _peach,
-    };
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTWH(s * 0.02, s * 0.06, s * 0.90, s * 0.82),
-        topLeft: Radius.circular(s * 0.24),
-        topRight: Radius.circular(s * 0.32),
-        bottomLeft: Radius.circular(s * 0.28),
-        bottomRight: Radius.circular(s * 0.20),
-      ),
-      fill,
-    );
+    fill.color = _baseFor(kind);
+    canvas.drawRRect(_rr(s, 0.08, 0.08, 0.84, 0.84, 0.24), fill);
+
+    fill.color = _accentFor(kind);
+    canvas.drawCircle(Offset(s * 0.76, s * 0.24), s * 0.105, fill);
 
     switch (kind) {
       case _FlatHomeIconKind.archive:
-        _paintArchive(canvas, s, stroke, fill);
+        _paintArchive(canvas, s, fill);
       case _FlatHomeIconKind.quiz:
-        _paintQuiz(canvas, s, stroke, fill);
+        _paintQuiz(canvas, s, fill);
       case _FlatHomeIconKind.capture:
-        _paintCapture(canvas, s, stroke, fill);
+        _paintCapture(canvas, s, fill);
+      case _FlatHomeIconKind.assistant:
+        _paintAssistant(canvas, s, fill);
     }
+
+    canvas.restore();
   }
 
-  void _paintArchive(Canvas canvas, double s, Paint stroke, Paint fill) {
-    fill.color = _leaf;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.23, s * 0.26, s * 0.50, s * 0.42),
-        Radius.circular(s * 0.07),
-      ),
-      fill,
-    );
-    fill.color = _cream;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.29, s * 0.18, s * 0.48, s * 0.44),
-        Radius.circular(s * 0.07),
-      ),
-      fill,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.29, s * 0.18, s * 0.48, s * 0.44),
-        Radius.circular(s * 0.07),
-      ),
-      stroke,
-    );
-    canvas.drawLine(
-        Offset(s * 0.39, s * 0.34), Offset(s * 0.65, s * 0.34), stroke);
-    canvas.drawLine(
-        Offset(s * 0.39, s * 0.46), Offset(s * 0.60, s * 0.46), stroke);
-    canvas.drawCircle(
-        Offset(s * 0.66, s * 0.65), s * 0.09, Paint()..color = _peach);
-    canvas.drawCircle(Offset(s * 0.66, s * 0.65), s * 0.09, stroke);
+  Color _baseFor(_FlatHomeIconKind kind) {
+    return switch (kind) {
+      _FlatHomeIconKind.archive => const Color(0xFFFFFBF3),
+      _FlatHomeIconKind.quiz => const Color(0xFFFFF0D7),
+      _FlatHomeIconKind.capture => const Color(0xFFEAF0FF),
+      _FlatHomeIconKind.assistant => const Color(0xFFFFF3DF),
+    };
   }
 
-  void _paintQuiz(Canvas canvas, double s, Paint stroke, Paint fill) {
-    fill.color = _cream;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.28, s * 0.18, s * 0.44, s * 0.55),
-        Radius.circular(s * 0.08),
-      ),
-      fill,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.28, s * 0.18, s * 0.44, s * 0.55),
-        Radius.circular(s * 0.08),
-      ),
-      stroke,
-    );
-    final check = Path()
-      ..moveTo(s * 0.38, s * 0.36)
-      ..lineTo(s * 0.45, s * 0.43)
-      ..lineTo(s * 0.61, s * 0.29);
-    canvas.drawPath(check, stroke);
-    canvas.drawLine(
-        Offset(s * 0.39, s * 0.55), Offset(s * 0.61, s * 0.55), stroke);
-    final bolt = Path()
-      ..moveTo(s * 0.63, s * 0.10)
-      ..lineTo(s * 0.50, s * 0.41)
-      ..lineTo(s * 0.64, s * 0.39)
-      ..lineTo(s * 0.51, s * 0.72);
-    fill.color = _peach;
-    canvas.drawPath(bolt, fill);
-    canvas.drawPath(bolt, stroke);
+  Color _accentFor(_FlatHomeIconKind kind) {
+    return switch (kind) {
+      _FlatHomeIconKind.archive => _peach,
+      _FlatHomeIconKind.quiz => _coral.withAlpha(92),
+      _FlatHomeIconKind.capture => _mint,
+      _FlatHomeIconKind.assistant => _peach,
+    };
   }
 
-  void _paintCapture(Canvas canvas, double s, Paint stroke, Paint fill) {
-    fill.color = _cream;
+  RRect _rr(
+    double s,
+    double x,
+    double y,
+    double width,
+    double height,
+    double radius,
+  ) {
+    return RRect.fromRectAndRadius(
+      Rect.fromLTWH(s * x, s * y, s * width, s * height),
+      Radius.circular(s * radius),
+    );
+  }
+
+  void _paintArchive(Canvas canvas, double s, Paint fill) {
+    fill.color = _ink;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.20, s * 0.30, s * 0.60, s * 0.38),
-        Radius.circular(s * 0.10),
-      ),
+      _rr(s, 0.22, 0.36, 0.56, 0.34, 0.09),
       fill,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.20, s * 0.30, s * 0.60, s * 0.38),
-        Radius.circular(s * 0.10),
-      ),
-      stroke,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(s * 0.31, s * 0.22, s * 0.22, s * 0.13),
-        Radius.circular(s * 0.04),
-      ),
-      stroke,
     );
     fill.color = _mint;
-    canvas.drawCircle(Offset(s * 0.50, s * 0.49), s * 0.13, fill);
-    canvas.drawCircle(Offset(s * 0.50, s * 0.49), s * 0.13, stroke);
+    canvas.drawRRect(
+      _rr(s, 0.25, 0.29, 0.29, 0.15, 0.06),
+      fill,
+    );
+
+    fill.color = _paper;
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.48, 0.40, 0.06, 0.03),
+      fill,
+    );
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.58, 0.27, 0.06, 0.03),
+      fill,
+    );
+  }
+
+  void _paintQuiz(Canvas canvas, double s, Paint fill) {
+    fill.color = _paper;
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.23, 0.40, 0.56, 0.08),
+      fill,
+    );
+
+    fill.color = _coral;
+    canvas.drawRRect(
+      _rr(s, 0.39, 0.18, 0.22, 0.12, 0.045),
+      fill,
+    );
+
     fill.color = _ink;
-    canvas.drawCircle(Offset(s * 0.69, s * 0.39), s * 0.035, fill);
+    _drawCheck(canvas, s, 0.39, 0.40, fill);
+    canvas.drawRRect(_rr(s, 0.50, 0.41, 0.15, 0.045, 0.022), fill);
+    _drawCheck(canvas, s, 0.39, 0.56, fill);
+    canvas.drawRRect(_rr(s, 0.50, 0.57, 0.13, 0.045, 0.022), fill);
+  }
+
+  void _paintCapture(Canvas canvas, double s, Paint fill) {
+    fill.color = _blue;
+    canvas.drawRRect(
+      _rr(s, 0.22, 0.34, 0.56, 0.36, 0.10),
+      fill,
+    );
+    fill.color = _blue;
+    canvas.drawRRect(
+      _rr(s, 0.33, 0.26, 0.22, 0.12, 0.045),
+      fill,
+    );
+    fill.color = _paper;
+    canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.13, fill);
+    fill.color = _mint;
+    canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.075, fill);
+    fill.color = _paper;
+    canvas.drawCircle(Offset(s * 0.67, s * 0.43), s * 0.032, fill);
+  }
+
+  void _paintAssistant(Canvas canvas, double s, Paint fill) {
+    fill.color = _ink;
+    canvas.drawRRect(
+      _rr(s, 0.22, 0.30, 0.58, 0.38, 0.12),
+      fill,
+    );
+    final tail = Path()
+      ..moveTo(s * 0.36, s * 0.66)
+      ..lineTo(s * 0.28, s * 0.78)
+      ..lineTo(s * 0.52, s * 0.66)
+      ..close();
+    canvas.drawPath(tail, fill);
+
+    fill.color = _paper;
+    canvas.drawRRect(_rr(s, 0.34, 0.43, 0.34, 0.055, 0.026), fill);
+    canvas.drawRRect(_rr(s, 0.34, 0.54, 0.24, 0.055, 0.026), fill);
+  }
+
+  void _drawCheck(
+    Canvas canvas,
+    double s,
+    double x,
+    double y,
+    Paint fill,
+  ) {
+    final path = Path()
+      ..moveTo(s * x, s * y)
+      ..lineTo(s * (x + 0.035), s * (y + 0.035))
+      ..lineTo(s * (x + 0.11), s * (y - 0.055))
+      ..lineTo(s * (x + 0.14), s * (y - 0.025))
+      ..lineTo(s * (x + 0.04), s * (y + 0.085))
+      ..lineTo(s * (x - 0.03), s * (y + 0.015))
+      ..close();
+    canvas.drawPath(path, fill);
   }
 
   @override
