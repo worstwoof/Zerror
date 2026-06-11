@@ -371,8 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             color: AppPalette.paper.withOpacity(0.94),
             borderRadius: BorderRadius.circular(26),
-            border:
-                Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
+            border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
             boxShadow: [
               BoxShadow(
                 color: AppPalette.inkBlue.withOpacity(0.06),
@@ -631,8 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
-                                color: AppPalette.pastelGrey
-                                    .withOpacity(0.18)),
+                                color: AppPalette.pastelGrey.withOpacity(0.18)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -1317,7 +1315,10 @@ class _HomeScreenState extends State<HomeScreen> {
     BackgroundAnalysisTask task,
   ) {
     if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
-      return Row(
+      final hasPartialWarning = (task.errorMessage ?? '').trim().isNotEmpty;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
         children: [
           TextButton.icon(
             onPressed: () {
@@ -1331,7 +1332,16 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 12),
+          if (hasPartialWarning)
+            TextButton.icon(
+              onPressed: () => store.retryAnalysisTask(task.id),
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+              label: const Text('重试详解'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.textPrimary,
+                padding: EdgeInsets.zero,
+              ),
+            ),
           TextButton(
             onPressed: () => store.dismissAnalysisTask(task.id),
             style: TextButton.styleFrom(
@@ -1425,6 +1435,14 @@ class _HomeScreenState extends State<HomeScreen> {
               '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
         );
       case AnalysisTaskStatus.completed:
+        if ((task.errorMessage ?? '').trim().isNotEmpty) {
+          return (
+            icon: Icons.fact_check_rounded,
+            color: AppPalette.almondCream,
+            label: '基础结果',
+            note: '已保留识别结果，可先入档或重试详解',
+          );
+        }
         return (
           icon: Icons.check_circle_rounded,
           color: AppPalette.matchaMist,

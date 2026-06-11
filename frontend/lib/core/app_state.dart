@@ -1176,9 +1176,37 @@ class AppStore extends ChangeNotifier {
       return;
     }
 
-    final hasTerminalError = job.status == 'failed' ||
-        job.status == 'need_retry' ||
-        (job.status == 'partial_success' && job.error.trim().isNotEmpty);
+    final hasPartialResult =
+        job.status == 'partial_success' && job.partialResult != null;
+    if (hasPartialResult) {
+      BackgroundAnalysisTask? partialTask;
+      final warningMessage = job.error.trim().isEmpty ? null : job.error.trim();
+      _replaceAnalysisTask(
+        taskId,
+        (current) {
+          partialTask = current.copyWith(
+            status: AnalysisTaskStatus.completed,
+            serverJobId: job.jobId,
+            serverJobCreated: true,
+            progress: job.progress,
+            statusMessage: job.displayMessage,
+            extractedText: job.partialResult!.extractedText,
+            analysis: job.partialResult!.analysis,
+            errorMessage: warningMessage,
+            clearErrorMessage: warningMessage == null,
+          );
+          return partialTask!;
+        },
+      );
+      final taskToNotify = partialTask;
+      if (taskToNotify != null && _shouldNotifyAnalysisCompletion(taskId)) {
+        unawaited(_notifyAnalysisCompleted(taskToNotify));
+      }
+      return;
+    }
+
+    final hasTerminalError =
+        job.status == 'failed' || job.status == 'need_retry';
     if (hasTerminalError) {
       _markAnalysisTaskFailed(
         taskId,

@@ -118,7 +118,11 @@ def get_settings() -> Settings:
         vivo_quality_text_model=_get_setting(
             "VIVO_QUALITY_TEXT_MODEL",
             file_values,
-            "qwen3.5-plus",
+            _get_setting(
+                "VIVO_TEXT_MODEL",
+                file_values,
+                "Doubao-Seed-2.0-mini",
+            ),
         ),
         vivo_quality_text_thinking_mode=_get_setting(
             "VIVO_QUALITY_TEXT_THINKING_MODE",
