@@ -55,6 +55,7 @@ class PracticePaperEntryScreen extends StatelessWidget {
           infoTitle: 'A4 打印讲义预览',
           infoNote: '这份讲义由组卷接口生成，包含专题梳理、例题讲解、练习区和参考答案。',
           scrollable: true,
+          exportable: true,
         ),
       ),
     );

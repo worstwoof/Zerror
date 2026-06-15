@@ -409,6 +409,25 @@ class GeneratedPracticeQuestion {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'subject': subject,
+      'topic': topic,
+      'stem': stem,
+      'options': options,
+      'answer': answer,
+      'answer_index': answerIndex,
+      'solution_outline': solutionOutline,
+      'solution_steps': solutionSteps,
+      'reason_hint': reasonHint,
+      'difficulty': difficulty,
+      'estimated_minutes': estimatedMinutes,
+      'source_error_ids': sourceErrorIds,
+    };
+  }
+
   Map<String, dynamic> toQuizMap() {
     final isChoice = options.isNotEmpty && answerIndex != null;
     return {
@@ -511,6 +530,23 @@ class PracticePaperResult {
       answerKey: _stringList(json['answer_key']),
       printableHtml: (json['printable_html'] ?? '').toString(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'subtitle': subtitle,
+      'subject_focus': subjectFocus,
+      'topic_focus': topicFocus,
+      'strategy_label': strategyLabel,
+      'estimated_minutes': estimatedMinutes,
+      'handout_overview': handoutOverview,
+      'learning_targets': learningTargets,
+      'warmup_notes': warmupNotes,
+      'questions': questions.map((item) => item.toJson()).toList(),
+      'answer_key': answerKey,
+      'printable_html': printableHtml,
+    };
   }
 
   static List<String> _stringList(dynamic value) {

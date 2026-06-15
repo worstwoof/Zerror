@@ -180,6 +180,14 @@ class PracticePaperService:
         source_json = json.dumps(source_errors, ensure_ascii=False, indent=2)
 
         return f"""
+CRITICAL JSON CONTRACT:
+- Return exactly one JSON object. Do not return Markdown, code fences, comments, headings, analysis notes, or any text before or after the JSON.
+- Do not write self-correction, uncertainty, hidden reasoning, draft notes, or phrases like "I wrote this wrong" inside any JSON value.
+- Every string value must be complete, concise, and directly usable by a student or teacher.
+- The raw response must be valid JSON before any repair. Do not use trailing commas. Do not put unescaped double quotes inside string values.
+- In raw JSON text, every LaTeX backslash must be escaped as two backslashes. Write "\\\\(2\\\\sqrt{{6}}\\\\)" and "\\\\(x=\\\\frac{{13}}{{6}}\\\\)" in the JSON source. Do not write "\\(2\\sqrt{{6}}\\)" or "\\(x=\\frac{{13}}{{6}}\\)" with single backslashes in JSON source.
+- For MathJax delimiters in JSON source, write "\\\\(" and "\\\\)" for inline math, and "\\\\[" and "\\\\]" for display math.
+- If you are unsure about a calculation, choose a simpler valid question instead of writing uncertainty or correction notes.
 只返回 JSON，不要 Markdown，不要代码围栏。
 你是“错题都队”的教辅编辑和学科命题老师。请基于用户错题档案，生成一份可打印的专题针对性练习讲义。
 
@@ -261,6 +269,11 @@ class PracticePaperService:
         question_count = min(max(1, request.question_count), 15)
 
         return f"""
+CRITICAL JSON CONTRACT:
+- Return exactly one valid JSON object and nothing else. No Markdown, code fences, comments, notes, or self-correction text.
+- Do not include hidden reasoning, uncertainty, or draft phrases inside JSON values. If unsure, write a simpler valid question.
+- Escape all LaTeX backslashes in raw JSON source. Use "\\\\(2\\\\sqrt{{6}}\\\\)" and "\\\\(x=\\\\frac{{13}}{{6}}\\\\)", never single-backslash LaTeX in JSON source.
+- Use "\\\\(" "\\\\)" and "\\\\[" "\\\\]" as MathJax delimiters in raw JSON source.
 只返回 JSON，不要 Markdown，不要代码围栏。
 你是教辅命题老师。上一次完整讲义生成可能超时，请用轻量模式基于错题档案生成稳定可用的专题练习。
 
@@ -1085,8 +1098,8 @@ class PracticePaperService:
         try:
             json.loads(value)
         except json.JSONDecodeError as exc:
-            start = max(0, exc.pos - 80)
-            end = min(len(value), exc.pos + 80)
+            start = max(0, exc.pos - 60)
+            end = min(len(value), exc.pos + 60)
             near = value[start:end].replace("\n", "\\n")
             return f"{exc.msg} at pos={exc.pos} near={near!r}"
         return ""

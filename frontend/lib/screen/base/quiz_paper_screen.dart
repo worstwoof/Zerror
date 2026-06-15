@@ -210,6 +210,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           infoTitle: 'A4 打印讲义预览',
           infoNote: '这份讲义由组卷接口生成，包含题目区、作答留白和参考答案。可在支持打印的 WebView 或浏览器中按 A4 版式输出。',
           scrollable: true,
+          exportable: true,
         ),
       ),
     );

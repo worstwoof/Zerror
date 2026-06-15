@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/theme.dart';
@@ -15,6 +16,7 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
     this.infoTitle = 'HTML 学科扩展预览',
     this.infoNote,
     this.scrollable = false,
+    this.exportable = false,
   });
 
   final String title;
@@ -22,6 +24,7 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
   final String infoTitle;
   final String? infoNote;
   final bool scrollable;
+  final bool exportable;
 
   @override
   State<HtmlArtifactPreviewScreen> createState() =>
@@ -29,6 +32,7 @@ class HtmlArtifactPreviewScreen extends StatefulWidget {
 }
 
 class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
+  static const MethodChannel _printChannel = MethodChannel('zerror/print');
   late final WebViewController _controller;
 
   @override
@@ -64,6 +68,17 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          if (widget.exportable)
+            IconButton(
+              tooltip: '导出 PDF',
+              onPressed: _exportPdf,
+              icon: const Icon(
+                Icons.picture_as_pdf_outlined,
+                color: AppPalette.textPrimary,
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -82,8 +97,14 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
                 controller: _controller,
                 gestureRecognizers: widget.scrollable
                     ? {
-                        Factory<OneSequenceGestureRecognizer>(
-                          () => EagerGestureRecognizer(),
+                        Factory<VerticalDragGestureRecognizer>(
+                          () => VerticalDragGestureRecognizer(),
+                        ),
+                        Factory<HorizontalDragGestureRecognizer>(
+                          () => HorizontalDragGestureRecognizer(),
+                        ),
+                        Factory<ScaleGestureRecognizer>(
+                          () => ScaleGestureRecognizer(),
                         ),
                       }
                     : const <Factory<OneSequenceGestureRecognizer>>{},
@@ -95,11 +116,35 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     );
   }
 
+  Future<void> _exportPdf() async {
+    try {
+      await _printChannel.invokeMethod<void>('printHtml', {
+        'title': _safePrintTitle(widget.title),
+        'html': _prepareHtmlForPreview(widget.htmlContent, scrollable: true),
+      });
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导出 PDF 失败：${error.message ?? error.code}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('当前设备暂不支持导出 PDF：$error')),
+      );
+    }
+  }
+
+  String _safePrintTitle(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+    return normalized.isEmpty ? '专题讲义' : normalized;
+  }
+
   String _prepareHtmlForPreview(String rawHtml, {required bool scrollable}) {
     final normalized = rawHtml.trim();
     final previewFitHead = scrollable
         ? '''
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes" />
+<meta name="viewport" content="width=device-width, initial-scale=0.75, minimum-scale=0.25, maximum-scale=5.0, user-scalable=yes" />
 <style id="zerror-preview-fit">
   html, body {
     margin: 0;
@@ -128,6 +173,8 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     touch-action: pan-x pan-y pinch-zoom;
   }
   .sheet {
+    width: 210mm !important;
+    min-width: 210mm !important;
     max-width: none !important;
   }
   img, svg, canvas, video {
@@ -153,77 +200,6 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     fallback.src = 'https://unpkg.com/mathjax@3/es5/tex-svg.js';
     document.head.appendChild(fallback);
   }
-  function zerrorEnableSingleFingerPan() {
-    var active = false;
-    var lastX = 0;
-    var lastY = 0;
-    function rootElement() {
-      return document.scrollingElement || document.documentElement;
-    }
-    function horizontalPanEnabled() {
-      var root = rootElement();
-      var viewport = window.visualViewport;
-      var viewportWidth = viewport ? viewport.width : window.innerWidth;
-      var scale = viewport ? viewport.scale : 1;
-      return scale > 0.58 && root.scrollWidth > viewportWidth + 2;
-    }
-    function updateHorizontalPanBounds() {
-      var enabled = horizontalPanEnabled();
-      var root = rootElement();
-      document.documentElement.style.overflowX = enabled ? 'auto' : 'hidden';
-      document.body.style.overflowX = enabled ? 'auto' : 'hidden';
-      if (!enabled) {
-        root.scrollLeft = 0;
-        document.documentElement.scrollLeft = 0;
-        document.body.scrollLeft = 0;
-      }
-    }
-    function scrollByDelta(dx, dy) {
-      var root = rootElement();
-      if (!horizontalPanEnabled()) {
-        dx = 0;
-      }
-      root.scrollLeft += dx;
-      root.scrollTop += dy;
-      if (root !== document.body) {
-        document.body.scrollLeft += dx;
-        document.body.scrollTop += dy;
-      }
-    }
-    document.addEventListener('touchstart', function (event) {
-      if (event.touches.length !== 1) {
-        active = false;
-        return;
-      }
-      active = true;
-      lastX = event.touches[0].clientX;
-      lastY = event.touches[0].clientY;
-    }, { passive: false });
-    document.addEventListener('touchmove', function (event) {
-      if (!active || event.touches.length !== 1) {
-        active = false;
-        return;
-      }
-      var currentX = event.touches[0].clientX;
-      var currentY = event.touches[0].clientY;
-      scrollByDelta(lastX - currentX, lastY - currentY);
-      lastX = currentX;
-      lastY = currentY;
-      event.preventDefault();
-    }, { passive: false });
-    document.addEventListener('touchend', function () {
-      active = false;
-    }, { passive: false });
-    document.addEventListener('touchcancel', function () {
-      active = false;
-    }, { passive: false });
-    window.addEventListener('resize', updateHorizontalPanBounds);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateHorizontalPanBounds);
-      window.visualViewport.addEventListener('scroll', updateHorizontalPanBounds);
-    }
-    updateHorizontalPanBounds();
-  }
 </script>
 <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" onerror="zerrorLoadMathJaxFallback()"></script>
 <script>
@@ -234,7 +210,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
       viewport.name = 'viewport';
       document.head.appendChild(viewport);
     }
-    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes');
+    viewport.setAttribute('content', 'width=device-width, initial-scale=0.75, minimum-scale=0.25, maximum-scale=5.0, user-scalable=yes');
     document.documentElement.style.height = 'auto';
     document.documentElement.style.minHeight = '100%';
     document.documentElement.style.maxHeight = 'none';
@@ -249,7 +225,6 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     document.body.style.overflowX = 'auto';
     document.body.style.overflowY = 'auto';
     document.body.style.touchAction = 'pan-x pan-y pinch-zoom';
-    zerrorEnableSingleFingerPan();
     if (window.MathJax && window.MathJax.typesetPromise) {
       window.MathJax.typesetPromise();
     }

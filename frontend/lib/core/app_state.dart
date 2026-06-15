@@ -330,6 +330,80 @@ class BackgroundPracticePaperTask {
           clearErrorMessage ? null : errorMessage ?? this.errorMessage,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'created_at': createdAt.toIso8601String(),
+      'status': status.name,
+      'source_errors':
+          sourceErrors.map((item) => item.toJson()).toList(growable: false),
+      'question_count': questionCount,
+      'selected_subjects': selectedSubjects,
+      'strategy_label': strategyLabel,
+      'progress': progress,
+      'status_message': statusMessage,
+      'paper': paper?.toJson(),
+      'error_message': errorMessage,
+    };
+  }
+
+  factory BackgroundPracticePaperTask.fromJson(Map<String, dynamic> json) {
+    final restoredStatus = _taskStatusFromJson(json['status']);
+    final normalizedStatus = restoredStatus == AnalysisTaskStatus.queued ||
+            restoredStatus == AnalysisTaskStatus.analyzing
+        ? AnalysisTaskStatus.failed
+        : restoredStatus;
+    final sourceErrors = _mapList(json['source_errors'])
+        .map(ErrorRecord.fromJson)
+        .toList(growable: false);
+    final paperJson = json['paper'];
+    return BackgroundPracticePaperTask(
+      id: (json['id'] ?? 'paper-restored').toString(),
+      createdAt:
+          DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+              DateTime.now(),
+      status: normalizedStatus,
+      sourceErrors: sourceErrors,
+      questionCount:
+          int.tryParse((json['question_count'] ?? '').toString()) ??
+              sourceErrors.length,
+      selectedSubjects: (json['selected_subjects'] as List<dynamic>? ??
+              const [])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(growable: false),
+      strategyLabel: (json['strategy_label'] ?? '').toString(),
+      progress: normalizedStatus == restoredStatus
+          ? int.tryParse((json['progress'] ?? '').toString()) ?? 0
+          : 0,
+      statusMessage: normalizedStatus == restoredStatus
+          ? json['status_message']?.toString()
+          : '上次生成被中断，可点击重试',
+      paper: paperJson is Map<String, dynamic>
+          ? PracticePaperResult.fromJson(paperJson)
+          : paperJson is Map
+              ? PracticePaperResult.fromJson(
+                  paperJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+      errorMessage: normalizedStatus == restoredStatus
+          ? json['error_message']?.toString()
+          : 'App 退出或被系统回收后，当前版本无法继续原来的组卷请求，请重试生成。',
+    );
+  }
+
+  static AnalysisTaskStatus _taskStatusFromJson(dynamic value) {
+    final raw = value?.toString();
+    for (final status in AnalysisTaskStatus.values) {
+      if (status.name == raw) {
+        return status;
+      }
+    }
+    return AnalysisTaskStatus.failed;
+  }
 }
 
 class AppStore extends ChangeNotifier {
@@ -361,7 +435,9 @@ class AppStore extends ChangeNotifier {
         _passwordUpdatedAt = snapshot?.passwordUpdatedAt ?? DateTime.now(),
         _devices = snapshot != null && snapshot.devices.isNotEmpty
             ? snapshot.devices.toList(growable: true)
-            : _defaultDevices(session);
+            : _defaultDevices(session) {
+    _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
+  }
 
   static const UserProfileData _defaultProfile = UserProfileData(
     name: '新用户',
@@ -459,6 +535,17 @@ class AppStore extends ChangeNotifier {
     return snapshot.errors.map(ErrorRecord.fromJson).toList(growable: true);
   }
 
+  static List<BackgroundPracticePaperTask> _restorePracticePaperTasks(
+    AppPersistenceSnapshot? snapshot,
+  ) {
+    if (snapshot == null || snapshot.practicePaperTasks.isEmpty) {
+      return <BackgroundPracticePaperTask>[];
+    }
+    return snapshot.practicePaperTasks
+        .map(BackgroundPracticePaperTask.fromJson)
+        .toList(growable: true);
+  }
+
   AppPersistenceSnapshot get snapshot {
     return AppPersistenceSnapshot(
       favoriteIds: favorites.map((item) => item.id).toSet(),
@@ -468,6 +555,10 @@ class AppStore extends ChangeNotifier {
       passwordUpdatedAt: _passwordUpdatedAt,
       devices: _devices,
       errors: _errors.map((item) => item.toJson()).toList(growable: false),
+      practicePaperTasks:
+          _practicePaperTasks.map((item) => item.toJson()).toList(
+                growable: false,
+              ),
     );
   }
 
@@ -878,7 +969,7 @@ class AppStore extends ChangeNotifier {
       statusMessage: '已加入后台组卷队列',
     );
     _practicePaperTasks.insert(0, task);
-    notifyListeners();
+    _commit();
     unawaited(_runPracticePaperTask(task.id));
     return task;
   }
@@ -893,7 +984,7 @@ class AppStore extends ChangeNotifier {
       clearPaper: true,
       clearErrorMessage: true,
     );
-    notifyListeners();
+    _commit();
     unawaited(_runPracticePaperTask(id));
   }
 
@@ -902,7 +993,7 @@ class AppStore extends ChangeNotifier {
     if (index == -1) return;
     _runningPracticePaperTaskIds.remove(id);
     _practicePaperTasks.removeAt(index);
-    notifyListeners();
+    _commit();
   }
 
   List<ErrorRecord> addErrorRecords(Iterable<NewErrorDraft> drafts) {
@@ -1612,7 +1703,7 @@ class AppStore extends ChangeNotifier {
     final index = _practicePaperTasks.indexWhere((item) => item.id == id);
     if (index == -1) return;
     _practicePaperTasks[index] = update(_practicePaperTasks[index]);
-    notifyListeners();
+    _commit();
   }
 
   Future<void> _reloadForCurrentSession() async {
@@ -1643,6 +1734,7 @@ class AppStore extends ChangeNotifier {
     _analysisTasks.clear();
     _practicePaperTasks.clear();
     _runningPracticePaperTaskIds.clear();
+    _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
     _profile =
         snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;

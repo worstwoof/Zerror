@@ -117,6 +117,7 @@ class AppPersistenceSnapshot {
     this.passwordUpdatedAt,
     this.devices = const [],
     this.errors = const [],
+    this.practicePaperTasks = const [],
   });
 
   final Set<String> favoriteIds;
@@ -126,6 +127,7 @@ class AppPersistenceSnapshot {
   final DateTime? passwordUpdatedAt;
   final List<DeviceSession> devices;
   final List<Map<String, dynamic>> errors;
+  final List<Map<String, dynamic>> practicePaperTasks;
 
   Map<String, dynamic> toJson() {
     return {
@@ -136,6 +138,7 @@ class AppPersistenceSnapshot {
       'password_updated_at': passwordUpdatedAt?.toIso8601String(),
       'devices': devices.map((item) => item.toJson()).toList(growable: false),
       'errors': errors,
+      'practice_paper_tasks': practicePaperTasks,
     };
   }
 
@@ -177,6 +180,7 @@ class AppPersistenceSnapshot {
               .toList(growable: false)
           : const [],
       errors: _toStringMapList(json['errors']),
+      practicePaperTasks: _toStringMapList(json['practice_paper_tasks']),
     );
   }
 
