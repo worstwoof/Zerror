@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
-import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
-import '../../data/ai_api_client.dart';
-import 'practice_paper_entry_screen.dart';
 
 class SmartQuizScreen extends StatefulWidget {
   const SmartQuizScreen({super.key});
@@ -15,12 +12,49 @@ class SmartQuizScreen extends StatefulWidget {
 }
 
 class _SmartQuizScreenState extends State<SmartQuizScreen> {
-  final AiApiClient _aiApiClient = const AiApiClient();
   final List<String> _selectedSubjects = ['全部学科'];
 
   int _questionCount = 15;
   int _selectedStrategy = 0;
-  bool _isGenerating = false;
+
+  static const Color _quizPanel = Colors.white;
+  static const Color _quizPanelSoft = Color(0xFFF6F9FF);
+  static const Color _quizAccent = Color(0xFF38558F);
+  static const Color _quizAccentSoft = Color(0xFFE7ECF6);
+  static const Color _quizMint = Color(0xFF3E8F7A);
+  static const Color _quizMintSoft = Color(0xFFE5F6F1);
+  static const Color _quizCoral = Color(0xFFC86D63);
+  static const Color _quizCoralSoft = Color(0xFFFFEFEC);
+  static const Color _quizViolet = Color(0xFF7662B8);
+  static const Color _quizVioletSoft = Color(0xFFF0ECFF);
+  static const Color _quizBottomBar = Color(0xFFF8FBFF);
+  static const Color _quizActionButton = Color(0xFFE7F3FF);
+
+  static const List<Color> _subjectTints = [
+    _quizAccent,
+    _quizMint,
+    _quizCoral,
+    _quizViolet,
+  ];
+
+  static const List<Color> _subjectSoftTints = [
+    _quizAccentSoft,
+    _quizMintSoft,
+    _quizCoralSoft,
+    _quizVioletSoft,
+  ];
+
+  static const List<Color> _strategyTints = [
+    _quizAccent,
+    _quizCoral,
+    _quizViolet,
+  ];
+
+  static const List<Color> _strategySoftTints = [
+    _quizAccentSoft,
+    _quizCoralSoft,
+    _quizVioletSoft,
+  ];
 
   static const List<(String, String, IconData)> _strategies = [
     ('抗遗忘复习', '优先抓取处于临界遗忘点的历史错题', Icons.timeline_rounded),
@@ -28,7 +62,7 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
     ('举一反三拓展', '围绕已有错题自动生成变式训练', Icons.hub_rounded),
   ];
 
-  Future<void> _startGenerate() async {
+  void _startGenerate() {
     final store = AppStateScope.of(context);
     final sourceErrors = _selectedErrors(store);
     if (sourceErrors.isEmpty) {
@@ -38,41 +72,16 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
       return;
     }
 
-    setState(() => _isGenerating = true);
-    try {
-      final paper = await _aiApiClient.generatePracticePaper(
-        errors: sourceErrors.map((item) => item.toJson()).toList(growable: false),
-        questionCount: _questionCount,
-        selectedSubjects: List<String>.from(_selectedSubjects),
-        strategyLabel: _strategies[_selectedStrategy].$1,
-      );
-      if (!mounted) return;
-      setState(() => _isGenerating = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PracticePaperEntryScreen(
-            paper: paper,
-            selectedSubjects: List<String>.from(_selectedSubjects),
-            strategyLabel: paper.strategyLabel.isEmpty
-                ? _strategies[_selectedStrategy].$1
-                : paper.strategyLabel,
-          ),
-        ),
-      );
-    } on AiApiException catch (error) {
-      if (!mounted) return;
-      setState(() => _isGenerating = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isGenerating = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('生成失败：$error')),
-      );
-    }
+    store.enqueuePracticePaperTask(
+      sourceErrors: sourceErrors,
+      questionCount: _questionCount,
+      selectedSubjects: List<String>.from(_selectedSubjects),
+      strategyLabel: _strategies[_selectedStrategy].$1,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('智能组卷已放到后台，回首页右上角查看进度')),
+    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   List<ErrorRecord> _selectedErrors(AppStore store) {
@@ -87,7 +96,9 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
     final filtered = store.errors
         .where((item) => selected.contains(item.subject))
         .toList(growable: false);
-    return filtered.isNotEmpty ? filtered : store.errors.toList(growable: false);
+    return filtered.isNotEmpty
+        ? filtered
+        : store.errors.toList(growable: false);
   }
 
   @override
@@ -117,56 +128,52 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
       ),
       body: AppSurface(
         padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
-        child: _isGenerating
-            ? _buildGeneratingState()
-            : _buildConfigForm(subjects),
+        child: _buildConfigForm(subjects),
       ),
-      bottomNavigationBar: _isGenerating
-          ? null
-          : Container(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-              decoration: BoxDecoration(
-                color: AppPalette.paper,
-                border: Border(
-                  top: BorderSide(
-                    color: AppPalette.inkBlue.withOpacity(0.06),
-                  ),
-                ),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: AppPrimaryButton(
-                  label: '开始生成专属试卷',
-                  icon: Icons.auto_awesome,
-                  onPressed: _startGenerate,
-                ),
-              ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        decoration: BoxDecoration(
+          color: _quizBottomBar,
+          border: Border(
+            top: BorderSide(
+              color: AppPalette.inkBlue.withOpacity(0.08),
             ),
-    );
-  }
-
-  Widget _buildGeneratingState() {
-    return Center(
-      child: AppPanel(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            RoseThreeLoader(size: 156),
-            SizedBox(height: 24),
-            Text(
-              'AI 正在编排专题讲义...',
-              style: TextStyle(
-                color: AppPalette.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '正在根据错题档案生成练习题、答案栏和 A4 打印版式',
-              style: TextStyle(color: AppPalette.textSecondary, fontSize: 13),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppPalette.inkBlue.withOpacity(0.10),
+              blurRadius: 18,
+              offset: const Offset(0, -6),
             ),
           ],
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _startGenerate,
+            icon: const Icon(Icons.auto_awesome, color: _quizAccent),
+            label: const Text(
+              '开始生成专属试卷',
+              style: TextStyle(
+                color: _quizAccent,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _quizActionButton,
+              foregroundColor: _quizAccent,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 16,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              side: BorderSide(color: _quizAccent.withOpacity(0.16)),
+              elevation: 0,
+            ),
+          ),
         ),
       ),
     );
@@ -181,9 +188,12 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             title: '组卷题量',
             subtitle: '控制练习强度和完成时长',
             icon: Icons.tune_rounded,
+            iconBackgroundColor: _quizAccentSoft,
+            iconColor: _quizAccent,
           ),
           const SizedBox(height: 16),
           AppPanel(
+            color: _quizPanel,
             child: Column(
               children: [
                 Row(
@@ -199,24 +209,31 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
                     Text(
                       '$_questionCount 题',
                       style: const TextStyle(
-                        color: AppPalette.moodBlue,
+                        color: _quizAccent,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                Slider(
-                  value: _questionCount.toDouble(),
-                  min: 5,
-                  max: 50,
-                  divisions: 9,
-                  activeColor: AppPalette.matchaMist,
-                  inactiveColor: AppPalette.matchaMist.withOpacity(0.2),
-                  label: '$_questionCount',
-                  onChanged: (value) {
-                    setState(() => _questionCount = value.toInt());
-                  },
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: _quizAccent,
+                    inactiveTrackColor: _quizAccentSoft,
+                    thumbColor: _quizAccent,
+                    overlayColor: _quizAccent.withOpacity(0.10),
+                    valueIndicatorColor: _quizAccent,
+                  ),
+                  child: Slider(
+                    value: _questionCount.toDouble(),
+                    min: 5,
+                    max: 50,
+                    divisions: 9,
+                    label: '$_questionCount',
+                    onChanged: (value) {
+                      setState(() => _questionCount = value.toInt());
+                    },
+                  ),
                 ),
               ],
             ),
@@ -226,27 +243,34 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             title: '选择范围',
             subtitle: '可以多选，也可以直接覆盖全部学科',
             icon: Icons.category_rounded,
+            iconBackgroundColor: _quizMintSoft,
+            iconColor: _quizMint,
           ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: subjects.map((subject) {
+            children: subjects.asMap().entries.map((entry) {
+              final subjectIndex = entry.key;
+              final subject = entry.value;
               final isSelected = _selectedSubjects.contains(subject);
+              final tint = _subjectTint(subjectIndex);
+              final softTint = _subjectSoftTint(subjectIndex);
               return FilterChip(
                 label: Text(subject),
                 selected: isSelected,
-                selectedColor: AppPalette.matchaMist.withOpacity(0.18),
-                backgroundColor: AppPalette.pastelGrey.withOpacity(0.08),
-                checkmarkColor: AppPalette.matchaMist,
+                selectedColor: softTint,
+                backgroundColor:
+                    subjectIndex.isEven ? _quizPanelSoft : softTint,
+                checkmarkColor: tint,
                 labelStyle: TextStyle(
-                  color:
-                      isSelected ? AppPalette.textPrimary : AppPalette.textSecondary,
+                  color: isSelected ? tint : AppPalette.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 ),
                 side: BorderSide(
                   color: isSelected
-                      ? AppPalette.matchaMist.withOpacity(0.4)
-                      : Colors.transparent,
+                      ? tint.withOpacity(0.26)
+                      : AppPalette.inkBlue.withOpacity(0.08),
                 ),
                 onSelected: (selected) {
                   setState(() {
@@ -281,6 +305,8 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             title: 'AI 抽题策略',
             subtitle: '选一个更符合当前状态的出题方式',
             icon: Icons.psychology_rounded,
+            iconBackgroundColor: _quizVioletSoft,
+            iconColor: _quizViolet,
           ),
           const SizedBox(height: 16),
           ...List.generate(_strategies.length, (index) {
@@ -299,27 +325,25 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
   Widget _strategyCard(
       int index, String title, String subtitle, IconData icon) {
     final isSelected = _selectedStrategy == index;
+    final tint = _strategyTint(index);
+    final softTint = _strategySoftTint(index);
     return InkWell(
       onTap: () => setState(() => _selectedStrategy = index),
       borderRadius: BorderRadius.circular(22),
       child: AppPanel(
-        color: isSelected
-            ? AppPalette.matchaMist.withOpacity(0.10)
-            : AppPalette.pastelGrey.withOpacity(0.07),
+        color: isSelected ? softTint : _quizPanel,
         child: Row(
           children: [
             Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppPalette.mint
-                    : AppPalette.peach.withOpacity(0.35),
+                color: isSelected ? tint : softTint,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 icon,
-                color: AppPalette.textPrimary,
+                color: isSelected ? Colors.white : tint,
               ),
             ),
             const SizedBox(width: 14),
@@ -349,13 +373,28 @@ class _SmartQuizScreenState extends State<SmartQuizScreen> {
             ),
             Icon(
               isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-              color: isSelected
-                  ? AppPalette.matchaMist
-                  : AppPalette.textSecondary.withOpacity(0.3),
+              color:
+                  isSelected ? tint : AppPalette.textSecondary.withOpacity(0.3),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Color _subjectTint(int index) {
+    return _subjectTints[index % _subjectTints.length];
+  }
+
+  Color _subjectSoftTint(int index) {
+    return _subjectSoftTints[index % _subjectSoftTints.length];
+  }
+
+  Color _strategyTint(int index) {
+    return _strategyTints[index % _strategyTints.length];
+  }
+
+  Color _strategySoftTint(int index) {
+    return _strategySoftTints[index % _strategySoftTints.length];
   }
 }

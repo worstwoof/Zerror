@@ -3,8 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/theme.dart';
+import '../../data/ai_api_client.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -17,22 +19,74 @@ class _AiChatScreenState extends State<AiChatScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AiApiClient _aiApiClient = const AiApiClient();
   AnimationController? _flipController;
   final List<_ChatMessage> _messages = const [
-    _ChatMessage(
-      text: '我可以帮你拆解错题、安排复习、生成同类题。先把今天最卡的一道题发给我吧。',
-      isUser: false,
+    _ChatMessage.assistant(
+      AssistantChatReply(
+        mode: 'quick_answer',
+        title: 'AI 助教已就绪',
+        summary: '可以快问快答，也可以直接按错题档案帮你找薄弱点、关联知识点、安排考前短复习。',
+        sections: [
+          AssistantReplySection(
+            title: '现在能做什么',
+            body: '选择上方模式后发问，我会优先读取你的错题档案和待复习记录。',
+            bullets: [
+              '快问快答：先给短结论',
+              '错题记忆：按历史错因继续追问',
+              '考前复习：分钟级安排',
+            ],
+          ),
+        ],
+        linkedKnowledge: [],
+        followUpPrompts: [
+          '帮我总结今天最该补的薄弱点',
+          '根据错题档案安排 20 分钟复习',
+        ],
+        sprintMinutes: 0,
+        fallback: false,
+        rawModelOutput: '',
+      ),
     ),
   ].toList();
+  _AssistantMode _activeMode = _AssistantMode.quickAnswer;
   bool _showChat = false;
   bool _isFlipping = false;
   bool _isThinking = false;
 
-  static const List<String> _prompts = [
-    '帮我总结今天的薄弱点',
-    '生成 3 道同类变式题',
-    '把这道题讲得更简单',
-    '安排明天 20 分钟复习',
+  static const List<_AssistantQuickAction> _quickActions = [
+    _AssistantQuickAction(
+      mode: _AssistantMode.quickAnswer,
+      title: '快问快答',
+      note: '先给短结论',
+      prompt: '用 3 句话快速回答我现在最该补什么',
+      icon: Icons.flash_on_rounded,
+      color: AppPalette.mint,
+    ),
+    _AssistantQuickAction(
+      mode: _AssistantMode.errorMemory,
+      title: '错题记忆',
+      note: '读取档案上下文',
+      prompt: '根据我的错题档案，找出最近反复犯的错',
+      icon: Icons.folder_special_rounded,
+      color: AppPalette.peach,
+    ),
+    _AssistantQuickAction(
+      mode: _AssistantMode.knowledgeLink,
+      title: '关联知识点',
+      note: '主动连前后内容',
+      prompt: '帮我把这些错题关联到前后知识点',
+      icon: Icons.hub_rounded,
+      color: AppPalette.blush,
+    ),
+    _AssistantQuickAction(
+      mode: _AssistantMode.examSprint,
+      title: '考前短复习',
+      note: '10-45 分钟冲刺',
+      prompt: '我考前只有 30 分钟，帮我安排冲刺复习',
+      icon: Icons.timer_rounded,
+      color: AppPalette.leaf,
+    ),
   ];
 
   @override
@@ -77,37 +131,175 @@ class _AiChatScreenState extends State<AiChatScreen>
     _ensureFlipController().forward(from: 0);
   }
 
-  Future<void> _send([String? preset]) async {
+  Future<void> _send({
+    String? preset,
+    _AssistantMode? mode,
+  }) async {
     final text = (preset ?? _controller.text).trim();
     if (text.isEmpty || _isThinking) return;
+    final selectedMode = mode ?? _activeMode;
+    final store = AppStateScope.of(context);
 
     setState(() {
-      _messages.add(_ChatMessage(text: text, isUser: true));
+      _activeMode = selectedMode;
+      _messages.add(_ChatMessage.user(text));
       _controller.clear();
       _isThinking = true;
     });
     _scrollToBottom();
 
-    await Future.delayed(const Duration(milliseconds: 760));
+    late final AssistantChatReply reply;
+    try {
+      reply = await _aiApiClient.askAssistant(
+        message: text,
+        mode: selectedMode.apiName,
+        context: _assistantContext(store),
+        errors: _assistantErrors(store, selectedMode),
+      );
+    } on AiApiException catch (error) {
+      reply = _fallbackAssistantReply(
+        text,
+        selectedMode,
+        store,
+        error.message,
+      );
+    } catch (error) {
+      reply = _fallbackAssistantReply(
+        text,
+        selectedMode,
+        store,
+        'AI 助教暂时不可用，我先按本地错题档案整理。',
+      );
+    }
     if (!mounted) return;
     setState(() {
-      _messages.add(_ChatMessage(text: _mockReply(text), isUser: false));
+      _messages.add(_ChatMessage.assistant(reply));
       _isThinking = false;
     });
     _scrollToBottom();
   }
 
-  String _mockReply(String text) {
-    if (text.contains('同类') || text.contains('变式')) {
-      return '我会按三档给你排题：概念理解、公式代入、综合应用。先做 1 道基础题找手感，再做 2 道变式题检查迁移能力。';
+  Map<String, dynamic> _assistantContext(AppStore store) {
+    return {
+      'total_errors': store.totalErrors,
+      'pending_review_count': store.pendingReviewCount,
+      'mastered_count': store.masteredCount,
+      'weakest_subject': store.weakestSubject,
+      'weakest_topic': store.weakestTopic,
+      'weakest_subject_pending_count': store.weakestSubjectPendingCount,
+      'weakest_topic_pending_count': store.weakestTopicPendingCount,
+      'subject_distribution': store.subjectDistribution,
+    };
+  }
+
+  List<Map<String, dynamic>> _assistantErrors(
+    AppStore store,
+    _AssistantMode mode,
+  ) {
+    final pool = <ErrorRecord>[
+      if (mode != _AssistantMode.quickAnswer) ...store.pendingReviewErrors,
+      ...store.errors,
+    ];
+    final seen = <String>{};
+    final result = <Map<String, dynamic>>[];
+    for (final item in pool) {
+      if (!seen.add(item.id)) continue;
+      result.add({
+        'id': item.id,
+        'subject': item.subject,
+        'topic': item.topic,
+        'question': _clipForAssistant(item.question, 260),
+        'reason': _clipForAssistant(item.reason, 120),
+        'tags': item.tags.take(6).toList(growable: false),
+        'my_answer': _clipForAssistant(item.myAnswer, 120),
+        'ai_analysis': _clipForAssistant(item.aiAnalysis, 220),
+        'is_mastered': item.isMastered,
+      });
+      if (result.length >= 10) break;
     }
-    if (text.contains('复习') || text.contains('明天')) {
-      return '明天建议分三段：5 分钟回看错因，10 分钟做两道同类题，5 分钟复述解题步骤。重点只抓一个薄弱点，效果会更稳。';
+    return result;
+  }
+
+  AssistantChatReply _fallbackAssistantReply(
+    String text,
+    _AssistantMode mode,
+    AppStore store,
+    String reason,
+  ) {
+    final topic = store.weakestTopic == '核心错题回收' ? '当前错题' : store.weakestTopic;
+    final subject =
+        store.weakestSubject == '暂无' ? '当前学科' : store.weakestSubject;
+    final summary = store.hasLearningHistory
+        ? '先按本地错题档案看，当前最该回收的是「$subject · $topic」。'
+        : '先把题干或你的错误步骤发来，我会从第一道题开始建立上下文记忆。';
+
+    return AssistantChatReply(
+      mode: mode.apiName,
+      title: '${mode.title} · 本地整理',
+      summary: summary,
+      sections: [
+        AssistantReplySection(
+          title: '服务状态',
+          body: reason,
+          bullets: const ['我先用本地错题档案生成建议，稍后可继续追问。'],
+        ),
+        AssistantReplySection(
+          title: mode.sectionTitle,
+          body: _fallbackBodyForMode(mode, text, subject, topic),
+          bullets: _fallbackBulletsForMode(mode),
+        ),
+      ],
+      linkedKnowledge: store.hasLearningHistory ? [topic, subject] : const [],
+      followUpPrompts: [
+        '把这个知识点讲得更简单',
+        '按错题档案生成 3 个追问题',
+        '给我安排 20 分钟复习',
+      ],
+      sprintMinutes: mode == _AssistantMode.examSprint ? 30 : 0,
+      fallback: true,
+      rawModelOutput: '',
+    );
+  }
+
+  String _fallbackBodyForMode(
+    _AssistantMode mode,
+    String text,
+    String subject,
+    String topic,
+  ) {
+    switch (mode) {
+      case _AssistantMode.errorMemory:
+        return '这次先从「$subject · $topic」里找重复错因，再把你问的“$text”接到最近错题上。';
+      case _AssistantMode.knowledgeLink:
+        return '围绕「$topic」先补定义和公式条件，再连接相邻题型，最后检查易混边界。';
+      case _AssistantMode.examSprint:
+        return '考前不要铺太开，只抓「$topic」做回看、同类题和步骤复述。';
+      case _AssistantMode.quickAnswer:
+        return '先给结论，再找题干条件，最后决定是算、判定，还是回到错题档案补同类练习。';
     }
-    if (text.contains('薄弱')) {
-      return '从当前档案看，可以先按学科、题型、错因三类整理。优先复盘重复出错的知识点，再处理偶发失误。';
+  }
+
+  List<String> _fallbackBulletsForMode(_AssistantMode mode) {
+    switch (mode) {
+      case _AssistantMode.examSprint:
+        return const [
+          '0-8 分钟：回看错因和公式条件',
+          '8-22 分钟：做 2 道同类题',
+          '22-30 分钟：复述步骤和检查点',
+        ];
+      case _AssistantMode.knowledgeLink:
+        return const ['前置定义', '相邻题型', '最容易混淆的条件'];
+      case _AssistantMode.errorMemory:
+        return const ['找重复错因', '对照最近错题', '用一句话复述修正动作'];
+      case _AssistantMode.quickAnswer:
+        return const ['先判断题型', '再列已知条件', '最后给下一步动作'];
     }
-    return '我会先把题目拆成题型、条件、关键公式、易错点、复盘动作五块。你把题干发来后，我就按这个结构帮你整理。';
+  }
+
+  String _clipForAssistant(String text, int limit) {
+    final normalized = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.length <= limit) return normalized;
+    return '${normalized.substring(0, limit - 1)}…';
   }
 
   void _scrollToBottom() {
@@ -202,14 +394,16 @@ class _AiChatScreenState extends State<AiChatScreen>
   }
 
   Widget _chatFace() {
+    final store = AppStateScope.of(context);
+    final topPadding = MediaQuery.paddingOf(context).top + 70;
     return Column(
       children: [
         Expanded(
           child: ListView(
             controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+            padding: EdgeInsets.fromLTRB(20, topPadding, 20, 22),
             children: [
-              _quickPrompts(),
+              _assistantModePanel(store),
               const SizedBox(height: 18),
               ..._messages.map(
                 (message) => Padding(
@@ -220,7 +414,10 @@ class _AiChatScreenState extends State<AiChatScreen>
                           isUser: true,
                           label: '你',
                         )
-                      : _AssistantAnswerCard(text: message.text),
+                      : _AssistantAnswerCard(
+                          reply: message.reply!,
+                          onPrompt: (prompt) => _send(preset: prompt),
+                        ),
                 ),
               ),
               if (_isThinking)
@@ -236,7 +433,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           child: AppChatInputBar(
             controller: _controller,
             onSend: () => _send(),
-            hintText: '输入题干、错因或复习目标',
+            hintText: '${_activeMode.title}：输入题干、错因或复习目标',
           ),
         ),
       ],
@@ -340,28 +537,89 @@ class _AiChatScreenState extends State<AiChatScreen>
     );
   }
 
-  Widget _quickPrompts() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: _prompts.map((prompt) {
-        return ActionChip(
-          avatar: const Icon(
-            Icons.auto_awesome_rounded,
-            color: AppPalette.inkBlue,
-            size: 16,
+  Widget _assistantModePanel(AppStore store) {
+    return AppPanel(
+      padding: const EdgeInsets.all(16),
+      borderRadius: 26,
+      color: Colors.white.withOpacity(0.78),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppPalette.moodBlue.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.psychology_alt_rounded,
+                  color: AppPalette.moodBlue,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'AI 助教',
+                      style: TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      store.hasLearningHistory
+                          ? '${store.totalErrors} 道错题 · ${store.pendingReviewCount} 道待复习 · 重点 ${store.weakestTopic}'
+                          : '先发题干也可以，我会从第一题开始建立记忆',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          label: Text(prompt),
-          backgroundColor: AppPalette.paper.withOpacity(0.94),
-          side: BorderSide(color: AppPalette.inkBlue.withOpacity(0.06)),
-          labelStyle: const TextStyle(
-            color: AppPalette.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth > 420
+                  ? (constraints.maxWidth - 12) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: _quickActions.map((action) {
+                  return SizedBox(
+                    width: itemWidth,
+                    child: _AssistantModeButton(
+                      action: action,
+                      selected: _activeMode == action.mode,
+                      busy: _isThinking,
+                      onTap: () {
+                        setState(() => _activeMode = action.mode);
+                        _send(preset: action.prompt, mode: action.mode);
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
-          onPressed: () => _send(prompt),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 }
@@ -396,26 +654,145 @@ class _HeroTitle extends StatelessWidget {
   }
 }
 
-class _AssistantAnswerCard extends StatelessWidget {
-  const _AssistantAnswerCard({required this.text});
+class _AssistantModeButton extends StatelessWidget {
+  const _AssistantModeButton({
+    required this.action,
+    required this.selected,
+    required this.busy,
+    required this.onTap,
+  });
 
-  final String text;
+  final _AssistantQuickAction action;
+  final bool selected;
+  final bool busy;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final sections = _buildSections(text);
+    final borderColor = selected
+        ? AppPalette.moodBlue.withOpacity(0.38)
+        : AppPalette.inkBlue.withOpacity(0.06);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: busy ? null : onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: selected
+                ? action.color.withOpacity(0.62)
+                : action.color.withOpacity(0.28),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(selected ? 0.78 : 0.54),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(
+                  action.icon,
+                  color: AppPalette.inkBlue,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      action.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      action.note,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssistantAnswerCard extends StatelessWidget {
+  const _AssistantAnswerCard({
+    required this.reply,
+    required this.onPrompt,
+  });
+
+  final AssistantChatReply reply;
+  final ValueChanged<String> onPrompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = reply.sections.isEmpty
+        ? [
+            AssistantReplySection(
+              title: '助教建议',
+              body: reply.summary,
+              bullets: const [],
+            )
+          ]
+        : reply.sections;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8, right: 8, bottom: 8),
-          child: Text(
-            'Zerror 助手',
-            style: TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
+        Padding(
+          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+          child: Row(
+            children: [
+              const Text(
+                'Zerror 助手',
+                style: TextStyle(
+                  color: AppPalette.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (reply.fallback) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppPalette.peach.withOpacity(0.34),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    '本地整理',
+                    style: TextStyle(
+                      color: AppPalette.warmAccentText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         Container(
@@ -436,32 +813,62 @@ class _AssistantAnswerCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: const [
-                  SizedBox(
+                children: [
+                  const SizedBox(
                     width: 34,
                     height: 34,
                     child: _FloatingSlimeOrb(size: 34, compact: true),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      '我先帮你把思路整理成卡片',
-                      style: TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          reply.title,
+                          style: const TextStyle(
+                            color: AppPalette.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          reply.summary,
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 12,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              ...sections.map(
-                (section) => Padding(
+              ...List.generate(
+                sections.length,
+                (index) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _AnswerSection(section: section),
+                  child: _AnswerSection(
+                    section: sections[index],
+                    color: _sectionColor(index),
+                  ),
                 ),
               ),
+              if (reply.linkedKnowledge.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                _LinkedKnowledgeChips(items: reply.linkedKnowledge),
+              ],
+              if (reply.followUpPrompts.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _FollowUpPromptRow(
+                  prompts: reply.followUpPrompts,
+                  onPrompt: onPrompt,
+                ),
+              ],
             ],
           ),
         ),
@@ -469,33 +876,93 @@ class _AssistantAnswerCard extends StatelessWidget {
     );
   }
 
-  List<_AnswerSectionData> _buildSections(String text) {
-    return [
-      _AnswerSectionData(
-        icon: Icons.search_rounded,
-        title: '题目理解',
-        body: text,
-        color: AppPalette.mint,
-      ),
-      const _AnswerSectionData(
-        icon: Icons.route_rounded,
-        title: '解题步骤',
-        body: '先定位题型，再列出已知条件，最后把公式或方法代入到可检查的结构里。',
-        color: AppPalette.peach,
-      ),
-      const _AnswerSectionData(
-        icon: Icons.warning_amber_rounded,
-        title: '易错提醒',
-        body: '注意符号、单位、边界条件和题干里的隐藏限制，做完后用一句话复述你的解法。',
-        color: AppPalette.blush,
-      ),
-      const _AnswerSectionData(
-        icon: Icons.refresh_rounded,
-        title: '复盘动作',
-        body: '把这道题加入同类练习，间隔 1 天再做一次，确认不是靠记忆答对。',
-        color: AppPalette.leaf,
-      ),
+  Color _sectionColor(int index) {
+    const colors = [
+      AppPalette.mint,
+      AppPalette.peach,
+      AppPalette.blush,
+      AppPalette.leaf,
     ];
+    return colors[index % colors.length];
+  }
+}
+
+class _LinkedKnowledgeChips extends StatelessWidget {
+  const _LinkedKnowledgeChips({required this.items});
+
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.take(8).map((item) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppPalette.moodBlue.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppPalette.moodBlue.withOpacity(0.10)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.bubble_chart_rounded,
+                color: AppPalette.moodBlue,
+                size: 14,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                item,
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _FollowUpPromptRow extends StatelessWidget {
+  const _FollowUpPromptRow({
+    required this.prompts,
+    required this.onPrompt,
+  });
+
+  final List<String> prompts;
+  final ValueChanged<String> onPrompt;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: prompts.take(4).map((prompt) {
+        return ActionChip(
+          avatar: const Icon(
+            Icons.arrow_forward_rounded,
+            color: AppPalette.inkBlue,
+            size: 15,
+          ),
+          label: Text(prompt),
+          backgroundColor: Colors.white.withOpacity(0.72),
+          side: BorderSide(color: AppPalette.inkBlue.withOpacity(0.06)),
+          labelStyle: const TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+          onPressed: () => onPrompt(prompt),
+        );
+      }).toList(),
+    );
   }
 }
 
@@ -504,10 +971,10 @@ class _AssistantThinkingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppPanel(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+    return const AppPanel(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
-        children: const [
+        children: [
           SizedBox(
             width: 46,
             height: 46,
@@ -531,59 +998,132 @@ class _AssistantThinkingCard extends StatelessWidget {
 }
 
 class _AnswerSection extends StatelessWidget {
-  const _AnswerSection({required this.section});
+  const _AnswerSection({
+    required this.section,
+    required this.color,
+  });
 
-  final _AnswerSectionData section;
+  final AssistantReplySection section;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: section.color.withOpacity(0.42),
+        color: color.withOpacity(0.42),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.56),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(section.icon, color: AppPalette.inkBlue, size: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.56),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  _iconForTitle(section.title),
+                  color: AppPalette.inkBlue,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      section.title,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (section.body.trim().isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        section.body,
+                        style: const TextStyle(
+                          color: AppPalette.textPrimary,
+                          fontSize: 13,
+                          height: 1.48,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+          if (section.bullets.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  section.title,
-                  style: const TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  section.body,
-                  style: const TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 13,
-                    height: 1.48,
-                    fontWeight: FontWeight.w500,
+                ...section.bullets.map(
+                  (bullet) => Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          margin: const EdgeInsets.only(top: 8),
+                          decoration: BoxDecoration(
+                            color: AppPalette.inkBlue.withOpacity(0.64),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            bullet,
+                            style: const TextStyle(
+                              color: AppPalette.textPrimary,
+                              fontSize: 13,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
+          ],
         ],
       ),
     );
+  }
+
+  IconData _iconForTitle(String title) {
+    if (title.contains('关联') || title.contains('知识')) {
+      return Icons.hub_rounded;
+    }
+    if (title.contains('考前') || title.contains('分钟') || title.contains('复习')) {
+      return Icons.timer_rounded;
+    }
+    if (title.contains('错题') || title.contains('档案') || title.contains('记忆')) {
+      return Icons.folder_special_rounded;
+    }
+    if (title.contains('行动') || title.contains('下一步')) {
+      return Icons.route_rounded;
+    }
+    if (title.contains('状态')) {
+      return Icons.info_outline_rounded;
+    }
+    return Icons.auto_awesome_rounded;
   }
 }
 
@@ -794,26 +1334,77 @@ class _OrbGroundShadowPainter extends CustomPainter {
   }
 }
 
-class _AnswerSectionData {
-  const _AnswerSectionData({
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final Color color;
-}
-
 class _ChatMessage {
-  const _ChatMessage({
-    required this.text,
-    required this.isUser,
-  });
+  const _ChatMessage.user(this.text)
+      : isUser = true,
+        reply = null;
+
+  const _ChatMessage.assistant(this.reply)
+      : text = '',
+        isUser = false;
 
   final String text;
   final bool isUser;
+  final AssistantChatReply? reply;
+}
+
+enum _AssistantMode { quickAnswer, errorMemory, knowledgeLink, examSprint }
+
+extension _AssistantModeInfo on _AssistantMode {
+  String get apiName {
+    switch (this) {
+      case _AssistantMode.quickAnswer:
+        return 'quick_answer';
+      case _AssistantMode.errorMemory:
+        return 'error_memory';
+      case _AssistantMode.knowledgeLink:
+        return 'knowledge_link';
+      case _AssistantMode.examSprint:
+        return 'exam_sprint';
+    }
+  }
+
+  String get title {
+    switch (this) {
+      case _AssistantMode.quickAnswer:
+        return '快问快答';
+      case _AssistantMode.errorMemory:
+        return '错题记忆';
+      case _AssistantMode.knowledgeLink:
+        return '关联知识点';
+      case _AssistantMode.examSprint:
+        return '考前短复习';
+    }
+  }
+
+  String get sectionTitle {
+    switch (this) {
+      case _AssistantMode.quickAnswer:
+        return '快答路径';
+      case _AssistantMode.errorMemory:
+        return '错题档案记忆';
+      case _AssistantMode.knowledgeLink:
+        return '主动关联知识点';
+      case _AssistantMode.examSprint:
+        return '考前短时复习';
+    }
+  }
+}
+
+class _AssistantQuickAction {
+  const _AssistantQuickAction({
+    required this.mode,
+    required this.title,
+    required this.note,
+    required this.prompt,
+    required this.icon,
+    required this.color,
+  });
+
+  final _AssistantMode mode;
+  final String title;
+  final String note;
+  final String prompt;
+  final IconData icon;
+  final Color color;
 }

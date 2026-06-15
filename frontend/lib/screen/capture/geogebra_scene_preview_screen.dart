@@ -24,6 +24,13 @@ class GeoGebraScenePreviewScreen extends StatefulWidget {
 
 class _GeoGebraScenePreviewScreenState
     extends State<GeoGebraScenePreviewScreen> {
+  static const Color _readablePanel = Color(0xFFFFFCF5);
+  static const Color _readablePanelAlt = Color(0xFFF7F0E2);
+  static const Color _readableAccent = Color(0xFF38558F);
+  static const Color _readableAccentSoft = Color(0xFFE7ECF6);
+  static const Color _readableSuccess = Color(0xFF4B7B5F);
+  static const Color _readableWarning = Color(0xFF8A5615);
+
   late final WebViewController _controller;
   _PreviewStatus _status = _PreviewStatus.loading;
   int _variantIndex = 0;
@@ -103,8 +110,7 @@ class _GeoGebraScenePreviewScreenState
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(
-                              color:
-                                  AppPalette.pastelGrey.withOpacity(0.10),
+                              color: AppPalette.inkBlue.withOpacity(0.12),
                             ),
                           ),
                           child: WebViewWidget(controller: _controller),
@@ -131,10 +137,10 @@ class _GeoGebraScenePreviewScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppPalette.pastelGrey.withOpacity(0.10),
+          color: AppPalette.inkBlue.withOpacity(0.10),
         ),
       ),
       child: Column(
@@ -143,7 +149,7 @@ class _GeoGebraScenePreviewScreenState
           Text(
             isValid ? 'GeoGebra 交互图' : '图形不可用',
             style: const TextStyle(
-              color: AppPalette.almondCream,
+              color: _readableAccent,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -152,8 +158,8 @@ class _GeoGebraScenePreviewScreenState
           Text(
             caption,
             style: const TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 12.5,
+              color: AppPalette.textPrimary,
+              fontSize: 13,
               height: 1.5,
             ),
           ),
@@ -184,16 +190,16 @@ class _GeoGebraScenePreviewScreenState
         return ChoiceChip(
           selected: selected,
           label: Text(title),
-          selectedColor: AppPalette.almondCream.withOpacity(0.22),
-          backgroundColor: Colors.white.withOpacity(0.06),
+          selectedColor: _readableAccentSoft,
+          backgroundColor: _readablePanelAlt,
           labelStyle: TextStyle(
-            color: selected ? AppPalette.almondCream : AppPalette.textPrimary,
+            color: selected ? _readableAccent : AppPalette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
           side: BorderSide(
             color: selected
-                ? AppPalette.almondCream.withOpacity(0.45)
-                : AppPalette.pastelGrey.withOpacity(0.12),
+                ? _readableAccent.withOpacity(0.35)
+                : AppPalette.inkBlue.withOpacity(0.10),
           ),
           onSelected: (_) {
             setState(() {
@@ -216,10 +222,10 @@ class _GeoGebraScenePreviewScreenState
             _PreviewStatus.failed => '交互图暂时无法显示，请稍后重试。',
           };
     final color = switch (_status) {
-      _PreviewStatus.ready => AppPalette.matchaMist,
-      _PreviewStatus.fallback => AppPalette.almondCream,
-      _PreviewStatus.failed => const Color(0xFFFFC3B8),
-      _PreviewStatus.loading => AppPalette.textSecondary,
+      _PreviewStatus.ready => _readableSuccess,
+      _PreviewStatus.fallback => _readableWarning,
+      _PreviewStatus.failed => AppPalette.coral,
+      _PreviewStatus.loading => AppPalette.textPrimary,
     };
     return Row(
       children: [
@@ -263,10 +269,10 @@ class _GeoGebraScenePreviewScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: AppPalette.pastelGrey.withOpacity(0.10),
+          color: AppPalette.inkBlue.withOpacity(0.10),
         ),
       ),
       child: Column(
@@ -274,7 +280,7 @@ class _GeoGebraScenePreviewScreenState
         children: [
           const Icon(
             Icons.error_outline_rounded,
-            color: AppPalette.almondCream,
+            color: AppPalette.coral,
             size: 34,
           ),
           const SizedBox(height: 12),
@@ -282,7 +288,7 @@ class _GeoGebraScenePreviewScreenState
             fallback,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: AppPalette.textSecondary,
+              color: AppPalette.textPrimary,
               fontSize: 14,
               height: 1.5,
             ),
@@ -293,7 +299,7 @@ class _GeoGebraScenePreviewScreenState
               errors.join('\n'),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFFFC3B8),
+                color: AppPalette.coral,
                 fontSize: 12.5,
                 height: 1.45,
               ),
@@ -308,10 +314,9 @@ class _GeoGebraScenePreviewScreenState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: AppPalette.pastelGrey.withOpacity(0.10)),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.10)),
       ),
       child: Column(
         children: [
@@ -333,7 +338,7 @@ class _GeoGebraScenePreviewScreenState
                 children: [
                   const Icon(
                     Icons.bug_report_outlined,
-                    color: AppPalette.textSecondary,
+                    color: AppPalette.textPrimary,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -341,7 +346,7 @@ class _GeoGebraScenePreviewScreenState
                     child: Text(
                       '诊断信息',
                       style: TextStyle(
-                        color: AppPalette.textSecondary,
+                        color: AppPalette.textPrimary,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -391,13 +396,14 @@ class _GeoGebraScenePreviewScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: _readableAccentSoft,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _readableAccent.withOpacity(0.16)),
       ),
       child: Text(
         text,
         style: const TextStyle(
-          color: AppPalette.textSecondary,
+          color: AppPalette.textPrimary,
           fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),

@@ -46,6 +46,8 @@ class AppConstants {
       '$apiBaseUrl/api/v1/render/manim/${Uri.encodeComponent(jobId)}';
   static String get practicePaperEndpoint =>
       '$apiBaseUrl/api/v1/analysis/practice-paper';
+  static String get assistantChatEndpoint =>
+      '$apiBaseUrl/api/v1/assistant/chat';
   static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';
   static String appStateEndpoint(String syncUserId) =>
       '$apiBaseUrl/api/v1/app-state/${Uri.encodeComponent(syncUserId)}';

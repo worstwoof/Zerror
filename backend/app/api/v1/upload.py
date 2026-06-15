@@ -5,6 +5,7 @@ import time
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
+from ai_engine.llm_logic.assistant_chain import AssistantService
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
 from ai_engine.llm_logic.practice_paper_chain import PracticePaperService
@@ -13,6 +14,8 @@ from backend.app.core.config import settings
 from backend.app.schemas.card_schema import (
     AnalysisRequest,
     AnalysisResponse,
+    AssistantChatRequest,
+    AssistantChatResponse,
     ImageAnalysisJobResponse,
     ImageAnalysisResponse,
     OCRResponse,
@@ -33,6 +36,7 @@ router = APIRouter(prefix="/api/v1", tags=["ai"])
 vivo_client = VivoLMClient(settings)
 diagnostic_service = DiagnosticService(vivo_client)
 practice_paper_service = PracticePaperService(vivo_client)
+assistant_service = AssistantService(vivo_client)
 logger = logging.getLogger(__name__)
 
 
@@ -314,6 +318,37 @@ def generate_practice_paper(request: PracticePaperRequest) -> PracticePaperRespo
         return response
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/assistant/chat", response_model=AssistantChatResponse)
+def assistant_chat(request: AssistantChatRequest) -> AssistantChatResponse:
+    if not settings.has_vivo_credentials:
+        return assistant_service.fallback_reply(
+            request,
+            service_note="AI 服务暂未配置，我先按本地错题档案帮你整理。",
+        )
+    started_at = time.perf_counter()
+    try:
+        response = assistant_service.generate_reply(request)
+        logger.info(
+            "api assistant chat mode=%s errors=%s elapsed=%.2fs",
+            request.mode,
+            len(request.errors),
+            time.perf_counter() - started_at,
+        )
+        return response
+    except VivoAPIError as exc:
+        logger.warning("api assistant chat falling back after vivo error: %s", exc)
+        return assistant_service.fallback_reply(
+            request,
+            service_note="AI 服务暂时繁忙，我先按错题档案给你一版可执行建议。",
+        )
+    except Exception as exc:  # pragma: no cover - endpoint safety net
+        logger.exception("api assistant chat failed unexpectedly")
+        return assistant_service.fallback_reply(
+            request,
+            service_note=f"助教接口暂时不稳定，我先给你本地整理结果：{exc}",
+        )
 
 
 def _should_fallback_to_text_analysis(exc: VivoAPIError) -> bool:

@@ -267,6 +267,71 @@ class BackgroundAnalysisTask {
   }
 }
 
+class BackgroundPracticePaperTask {
+  const BackgroundPracticePaperTask({
+    required this.id,
+    required this.createdAt,
+    required this.status,
+    required this.sourceErrors,
+    required this.questionCount,
+    required this.selectedSubjects,
+    required this.strategyLabel,
+    this.progress = 0,
+    this.statusMessage,
+    this.paper,
+    this.errorMessage,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final AnalysisTaskStatus status;
+  final List<ErrorRecord> sourceErrors;
+  final int questionCount;
+  final List<String> selectedSubjects;
+  final String strategyLabel;
+  final int progress;
+  final String? statusMessage;
+  final PracticePaperResult? paper;
+  final String? errorMessage;
+
+  bool get isActive =>
+      status == AnalysisTaskStatus.queued ||
+      status == AnalysisTaskStatus.analyzing;
+  bool get isCompleted => status == AnalysisTaskStatus.completed;
+  bool get isFailed => status == AnalysisTaskStatus.failed;
+
+  BackgroundPracticePaperTask copyWith({
+    AnalysisTaskStatus? status,
+    List<ErrorRecord>? sourceErrors,
+    int? questionCount,
+    List<String>? selectedSubjects,
+    String? strategyLabel,
+    int? progress,
+    String? statusMessage,
+    PracticePaperResult? paper,
+    String? errorMessage,
+    bool clearStatusMessage = false,
+    bool clearPaper = false,
+    bool clearErrorMessage = false,
+  }) {
+    return BackgroundPracticePaperTask(
+      id: id,
+      createdAt: createdAt,
+      status: status ?? this.status,
+      sourceErrors: sourceErrors ?? this.sourceErrors,
+      questionCount: questionCount ?? this.questionCount,
+      selectedSubjects: selectedSubjects ?? this.selectedSubjects,
+      strategyLabel: strategyLabel ?? this.strategyLabel,
+      progress: progress ?? this.progress,
+      statusMessage:
+          clearStatusMessage ? null : statusMessage ?? this.statusMessage,
+      paper: clearPaper ? null : paper ?? this.paper,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
 class AppStore extends ChangeNotifier {
   static const Duration _analysisPollInterval = Duration(seconds: 3);
 
@@ -316,8 +381,11 @@ class AppStore extends ChangeNotifier {
   final List<ErrorRecord> _errors;
   final List<BackgroundAnalysisTask> _analysisTasks =
       <BackgroundAnalysisTask>[];
+  final List<BackgroundPracticePaperTask> _practicePaperTasks =
+      <BackgroundPracticePaperTask>[];
   final Set<String> _backgroundedAnalysisTaskIds = <String>{};
   final Set<String> _notifiedCompletedAnalysisTaskIds = <String>{};
+  final Set<String> _runningPracticePaperTaskIds = <String>{};
   AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
@@ -467,6 +535,8 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_devices);
   UnmodifiableListView<BackgroundAnalysisTask> get analysisTasks =>
       UnmodifiableListView(_analysisTasks);
+  UnmodifiableListView<BackgroundPracticePaperTask> get practicePaperTasks =>
+      UnmodifiableListView(_practicePaperTasks);
 
   DeviceSession get currentDevice => _devices.firstWhere(
         (item) => item.isCurrent,
@@ -509,9 +579,35 @@ class AppStore extends ChangeNotifier {
   int get failedAnalysisTaskCount =>
       _analysisTasks.where((item) => item.isFailed).length;
   bool get hasAnalysisTasks => _analysisTasks.isNotEmpty;
+  int get activePracticePaperTaskCount =>
+      _practicePaperTasks.where((item) => item.isActive).length;
+  int get completedPracticePaperTaskCount =>
+      _practicePaperTasks.where((item) => item.isCompleted).length;
+  int get failedPracticePaperTaskCount =>
+      _practicePaperTasks.where((item) => item.isFailed).length;
+  bool get hasPracticePaperTasks => _practicePaperTasks.isNotEmpty;
+  int get activeBackgroundTaskCount =>
+      activeAnalysisTaskCount + activePracticePaperTaskCount;
+  int get completedBackgroundTaskCount =>
+      completedAnalysisTaskCount + completedPracticePaperTaskCount;
+  int get failedBackgroundTaskCount =>
+      failedAnalysisTaskCount + failedPracticePaperTaskCount;
+  int get totalBackgroundTaskCount =>
+      _analysisTasks.length + _practicePaperTasks.length;
+  bool get hasBackgroundTasks => totalBackgroundTaskCount > 0;
 
   int analysisTaskQueuePosition(String id) {
     final activeOldestFirst = _analysisTasks
+        .where((item) => item.isActive)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+    final index = activeOldestFirst.indexWhere((item) => item.id == id);
+    return index == -1 ? 0 : index + 1;
+  }
+
+  int practicePaperTaskQueuePosition(String id) {
+    final activeOldestFirst = _practicePaperTasks
         .where((item) => item.isActive)
         .toList(growable: false)
         .reversed
@@ -765,6 +861,50 @@ class AppStore extends ChangeNotifier {
     );
   }
 
+  BackgroundPracticePaperTask enqueuePracticePaperTask({
+    required List<ErrorRecord> sourceErrors,
+    required int questionCount,
+    required List<String> selectedSubjects,
+    required String strategyLabel,
+  }) {
+    final task = BackgroundPracticePaperTask(
+      id: 'paper-${DateTime.now().microsecondsSinceEpoch}-${_practicePaperTasks.length}',
+      createdAt: DateTime.now(),
+      status: AnalysisTaskStatus.queued,
+      sourceErrors: sourceErrors.toList(growable: false),
+      questionCount: questionCount,
+      selectedSubjects: selectedSubjects.toList(growable: false),
+      strategyLabel: strategyLabel,
+      statusMessage: '已加入后台组卷队列',
+    );
+    _practicePaperTasks.insert(0, task);
+    notifyListeners();
+    unawaited(_runPracticePaperTask(task.id));
+    return task;
+  }
+
+  void retryPracticePaperTask(String id) {
+    final index = _practicePaperTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _practicePaperTasks[index] = _practicePaperTasks[index].copyWith(
+      status: AnalysisTaskStatus.queued,
+      progress: 0,
+      statusMessage: '正在重新提交智能组卷任务',
+      clearPaper: true,
+      clearErrorMessage: true,
+    );
+    notifyListeners();
+    unawaited(_runPracticePaperTask(id));
+  }
+
+  void dismissPracticePaperTask(String id) {
+    final index = _practicePaperTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _runningPracticePaperTaskIds.remove(id);
+    _practicePaperTasks.removeAt(index);
+    notifyListeners();
+  }
+
   List<ErrorRecord> addErrorRecords(Iterable<NewErrorDraft> drafts) {
     final created = drafts.map(addErrorRecord).toList(growable: false);
     return created;
@@ -908,8 +1048,10 @@ class AppStore extends ChangeNotifier {
     _session = null;
     _applySnapshotState(null);
     _analysisTasks.clear();
+    _practicePaperTasks.clear();
     _backgroundedAnalysisTaskIds.clear();
     _notifiedCompletedAnalysisTaskIds.clear();
+    _runningPracticePaperTaskIds.clear();
     notifyListeners();
     unawaited(_persist());
   }
@@ -959,12 +1101,105 @@ class AppStore extends ChangeNotifier {
     }
     if (isForeground) {
       resumeAnalysisQueue();
+      resumePracticePaperTasks();
     }
   }
 
   void resumeAnalysisQueue() {
     if (_analysisTasks.any((item) => item.isActive)) {
       unawaited(_pumpAnalysisQueue());
+    }
+  }
+
+  void resumePracticePaperTasks() {
+    for (final task in _practicePaperTasks.where((item) => item.isActive)) {
+      unawaited(_runPracticePaperTask(task.id));
+    }
+  }
+
+  Future<void> _runPracticePaperTask(String id) async {
+    if (_runningPracticePaperTaskIds.contains(id)) return;
+    final index = _practicePaperTasks.indexWhere((item) => item.id == id);
+    if (index == -1 || !_practicePaperTasks[index].isActive) return;
+
+    _runningPracticePaperTaskIds.add(id);
+    try {
+      _replacePracticePaperTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.analyzing,
+          progress: task.progress == 0 ? 10 : task.progress,
+          statusMessage: '正在整理错题档案，准备生成试卷',
+          clearErrorMessage: true,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+
+      final currentIndex =
+          _practicePaperTasks.indexWhere((item) => item.id == id);
+      if (currentIndex == -1) return;
+      final task = _practicePaperTasks[currentIndex];
+      if (!task.isActive) return;
+      if (task.sourceErrors.isEmpty) {
+        _replacePracticePaperTask(
+          id,
+          (current) => current.copyWith(
+            status: AnalysisTaskStatus.failed,
+            progress: 0,
+            statusMessage: '没有可用于组卷的错题',
+            errorMessage: '请先录入错题，AI 才能生成针对性练习讲义',
+          ),
+        );
+        return;
+      }
+
+      _replacePracticePaperTask(
+        id,
+        (current) => current.copyWith(
+          progress: 45,
+          statusMessage: 'AI 正在编排练习题和答案讲义',
+        ),
+      );
+      final paper = await _aiApiClient.generatePracticePaper(
+        errors: task.sourceErrors
+            .map((item) => item.toJson())
+            .toList(growable: false),
+        questionCount: task.questionCount,
+        selectedSubjects: task.selectedSubjects,
+        strategyLabel: task.strategyLabel,
+      );
+      _replacePracticePaperTask(
+        id,
+        (current) => current.copyWith(
+          status: AnalysisTaskStatus.completed,
+          progress: 100,
+          statusMessage: '智能试卷已生成，等待打开',
+          paper: paper,
+          clearErrorMessage: true,
+        ),
+      );
+    } on AiApiException catch (error) {
+      _replacePracticePaperTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '智能组卷失败',
+          errorMessage: error.message,
+        ),
+      );
+    } catch (error) {
+      _replacePracticePaperTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '智能组卷失败',
+          errorMessage: '生成失败：$error',
+        ),
+      );
+    } finally {
+      _runningPracticePaperTaskIds.remove(id);
     }
   }
 
@@ -1369,6 +1604,17 @@ class AppStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _replacePracticePaperTask(
+    String id,
+    BackgroundPracticePaperTask Function(BackgroundPracticePaperTask task)
+        update,
+  ) {
+    final index = _practicePaperTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _practicePaperTasks[index] = update(_practicePaperTasks[index]);
+    notifyListeners();
+  }
+
   Future<void> _reloadForCurrentSession() async {
     AppPersistenceSnapshot? loadedSnapshot;
     final repository = _repository;
@@ -1395,6 +1641,8 @@ class AppStore extends ChangeNotifier {
       ..clear()
       ..addAll(_restoreErrors(snapshot));
     _analysisTasks.clear();
+    _practicePaperTasks.clear();
+    _runningPracticePaperTaskIds.clear();
     _profile =
         snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;

@@ -18,6 +18,7 @@ import 'login_screen.dart';
 import 'manual_entry_screen.dart';
 import 'privacy_security_screen.dart';
 import 'profile_screen.dart';
+import 'practice_paper_entry_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'settings_screen.dart';
 import 'smart_quiz_screen.dart';
@@ -38,6 +39,11 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color _flatMint = AppPalette.mint;
   static const Color _flatPeach = AppPalette.peach;
   static const Color _flatPink = AppPalette.blush;
+  static const Color _queueSheetSurface = Color(0xFFFFFCF6);
+  static const Color _queueTaskSurface = Color(0xFFFFFEFB);
+  static const Color _queueSuccess = Color(0xFF53784F);
+  static const Color _queueWarning = Color(0xFF9A681F);
+  static const Color _queueDanger = Color(0xFFB9574F);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final PageController _pageController;
@@ -578,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        if (store.hasAnalysisTasks) ...[
+        if (store.hasBackgroundTasks) ...[
           const SizedBox(width: 14),
           _buildAnalysisQueueLauncher(context, store),
         ],
@@ -968,20 +974,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAnalysisQueueLauncher(BuildContext context, AppStore store) {
-    final completedCount = store.completedAnalysisTaskCount;
-    final failedCount = store.failedAnalysisTaskCount;
-    final activeCount = store.activeAnalysisTaskCount;
-    final totalCount = store.analysisTasks.length;
+    final completedCount = store.completedBackgroundTaskCount;
+    final failedCount = store.failedBackgroundTaskCount;
+    final activeCount = store.activeBackgroundTaskCount;
+    final totalCount = store.totalBackgroundTaskCount;
     final hasFailure = failedCount > 0;
     final hasCompleted = completedCount > 0;
     final hasActive = activeCount > 0;
     final tint = hasFailure
-        ? Colors.redAccent
+        ? _queueDanger
         : hasActive
-            ? AppPalette.almondCream
+            ? AppPalette.moodBlue
             : hasCompleted
-                ? AppPalette.matchaMist
-                : AppPalette.almondCream;
+                ? _queueSuccess
+                : AppPalette.textSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -991,12 +997,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: AppPalette.night.withOpacity(0.88),
+            color: AppPalette.paper.withOpacity(0.96),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: tint.withOpacity(0.32)),
+            border: Border.all(color: tint.withOpacity(0.18)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.24),
+                color: AppPalette.inkBlue.withOpacity(0.10),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -1010,7 +1016,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   : Icon(
                       hasFailure
                           ? Icons.error_outline_rounded
-                          : Icons.file_download_rounded,
+                          : Icons.pending_actions_rounded,
                       color: tint,
                       size: 21,
                     ),
@@ -1044,14 +1050,30 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         final store = AppStateScope.of(context);
         final tasks = store.analysisTasks;
+        final paperTasks = store.practicePaperTasks;
+        final taskCards = <Widget>[
+          ...tasks.map(
+            (task) => _buildAnalysisTaskTile(sheetContext, store, task),
+          ),
+          ...paperTasks.map(
+            (task) => _buildPracticePaperTaskTile(sheetContext, store, task),
+          ),
+        ];
         return Container(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.76,
           ),
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           decoration: const BoxDecoration(
-            color: AppPalette.night,
+            color: _queueSheetSurface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x24111A3A),
+                blurRadius: 28,
+                offset: Offset(0, -10),
+              ),
+            ],
           ),
           child: SafeArea(
             top: false,
@@ -1064,7 +1086,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppPalette.textSecondary.withOpacity(0.22),
+                      color: AppPalette.inkBlue.withOpacity(0.14),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -1076,12 +1098,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppPalette.almondCream.withOpacity(0.12),
+                        color: AppPalette.moodBlue.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
-                        Icons.file_download_rounded,
-                        color: AppPalette.almondCream,
+                        Icons.pending_actions_rounded,
+                        color: AppPalette.moodBlue,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1090,7 +1112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            '\u540e\u53f0\u9519\u9898\u6574\u7406',
+                            '后台学习任务',
                             style: TextStyle(
                               color: AppPalette.textPrimary,
                               fontSize: 19,
@@ -1112,25 +1134,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 Flexible(
-                  child: tasks.isEmpty
+                  child: taskCards.isEmpty
                       ? const Center(
                           child: Text(
-                            '\u6682\u65e0\u540e\u53f0\u6574\u7406\u4efb\u52a1',
+                            '暂无后台学习任务',
                             style: TextStyle(color: AppPalette.textSecondary),
                           ),
                         )
                       : ListView.separated(
                           shrinkWrap: true,
-                          itemCount: tasks.length,
+                          itemCount: taskCards.length,
                           separatorBuilder: (context, index) =>
                               const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            return _buildAnalysisTaskTile(
-                              sheetContext,
-                              store,
-                              tasks[index],
-                            );
-                          },
+                          itemBuilder: (context, index) => taskCards[index],
                         ),
                 ),
               ],
@@ -1142,19 +1158,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _queueSummary(AppStore store) {
-    final active = store.activeAnalysisTaskCount;
-    final completed = store.completedAnalysisTaskCount;
-    final failed = store.failedAnalysisTaskCount;
+    final active = store.activeBackgroundTaskCount;
+    final completed = store.completedBackgroundTaskCount;
+    final failed = store.failedBackgroundTaskCount;
     if (active > 0) {
-      return '\u6b63\u5728\u6574\u7406 $active \u9053\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+      return '正在后台处理 $active 个任务，$completed 个已完成';
     }
     if (failed > 0) {
-      return '$failed \u9053\u9700\u8981\u91cd\u8bd5\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+      return '$failed 个任务需要重试，$completed 个已完成';
     }
     if (completed > 0) {
-      return '$completed \u9053\u5df2\u6574\u7406\u597d\uff0c\u7b49\u4f60\u786e\u8ba4\u5165\u6863';
+      return '$completed 个任务已完成，等你打开确认';
     }
-    return '\u62cd\u5b8c\u9898\u540e\u4f1a\u81ea\u52a8\u5728\u8fd9\u91cc\u6392\u961f';
+    return '拍题解析和智能组卷都会在这里排队';
   }
 
   Widget _buildAnalysisTaskTile(
@@ -1171,7 +1187,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         child: AppPanel(
           padding: const EdgeInsets.all(12),
-          color: AppPalette.pastelGrey.withOpacity(0.06),
+          color: _queueTaskSurface,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1185,11 +1201,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: AppPalette.pineGreen,
+                        color: AppPalette.pastelGrey.withOpacity(0.45),
                         alignment: Alignment.center,
                         child: const Icon(
                           Icons.image_rounded,
-                          color: AppPalette.textPrimary,
+                          color: AppPalette.textSecondary,
                         ),
                       );
                     },
@@ -1248,6 +1264,101 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPracticePaperTaskTile(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundPracticePaperTask task,
+  ) {
+    final status = _practicePaperTaskStatus(task);
+    final queuePosition = store.practicePaperTaskQueuePosition(task.id);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _practicePaperTaskTap(sheetContext, task),
+        borderRadius: BorderRadius.circular(24),
+        child: AppPanel(
+          padding: const EdgeInsets.all(12),
+          color: _queueTaskSurface,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: AppPalette.moodBlue.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppPalette.moodBlue.withOpacity(0.14),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_stories_rounded,
+                  color: AppPalette.moodBlue,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(status.icon, color: status.color, size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            color: status.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _formatTaskTime(task.createdAt),
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _practicePaperTaskPreviewText(task, status.note),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildPracticePaperTaskActions(sheetContext, store, task),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   VoidCallback? _analysisTaskTap(
     BuildContext sheetContext,
     BackgroundAnalysisTask task,
@@ -1268,6 +1379,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return () {
         Navigator.pop(sheetContext);
         _openWaitingAnalysisTask(task);
+      };
+    }
+    return null;
+  }
+
+  VoidCallback? _practicePaperTaskTap(
+    BuildContext sheetContext,
+    BackgroundPracticePaperTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.paper != null) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openCompletedPracticePaperTask(task);
       };
     }
     return null;
@@ -1309,6 +1433,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _practicePaperTaskPreviewText(
+    BackgroundPracticePaperTask task,
+    String fallback,
+  ) {
+    final paper = task.paper;
+    if (task.isCompleted && paper != null) {
+      final title = paper.title.trim().isEmpty ? '专题针对性练习' : paper.title;
+      return '$title · ${paper.questions.length} 题';
+    }
+    return task.errorMessage ?? task.statusMessage ?? fallback;
+  }
+
   Widget _buildAnalysisTaskActions(
     BuildContext sheetContext,
     AppStore store,
@@ -1328,7 +1464,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.fact_check_rounded, size: 17),
             label: const Text('\u786e\u8ba4\u5165\u6863'),
             style: TextButton.styleFrom(
-              foregroundColor: AppPalette.almondCream,
+              foregroundColor: AppPalette.moodBlue,
               padding: EdgeInsets.zero,
             ),
           ),
@@ -1362,7 +1498,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.refresh_rounded, size: 17),
             label: const Text('\u91cd\u8bd5'),
             style: TextButton.styleFrom(
-              foregroundColor: AppPalette.almondCream,
+              foregroundColor: _queueDanger,
               padding: EdgeInsets.zero,
             ),
           ),
@@ -1397,18 +1533,98 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 18,
           height: 18,
           decoration: BoxDecoration(
-            color: AppPalette.almondCream.withOpacity(0.14),
+            color: AppPalette.moodBlue.withOpacity(0.10),
             shape: BoxShape.circle,
           ),
           child: const Icon(
             Icons.file_download_rounded,
-            color: AppPalette.almondCream,
+            color: AppPalette.moodBlue,
             size: 13,
           ),
         ),
         const SizedBox(width: 8),
         const Text(
           '\u4f60\u53ef\u4ee5\u7ee7\u7eed\u62cd\u4e0b\u4e00\u9898',
+          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPracticePaperTaskActions(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundPracticePaperTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.paper != null) {
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openCompletedPracticePaperTask(task);
+            },
+            icon: const Icon(Icons.open_in_new_rounded, size: 17),
+            label: const Text('打开试卷'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.moodBlue,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          TextButton(
+            onPressed: () => store.dismissPracticePaperTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    if (task.status == AnalysisTaskStatus.failed) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => store.retryPracticePaperTask(task.id),
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('重试'),
+            style: TextButton.styleFrom(
+              foregroundColor: _queueDanger,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissPracticePaperTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: task.progress > 0 ? task.progress / 100 : null,
+            strokeWidth: 2,
+            color: AppPalette.moodBlue,
+            backgroundColor: AppPalette.moodBlue.withOpacity(0.12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          '可以先回主页继续学习',
           style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
         ),
       ],
@@ -1429,7 +1645,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case AnalysisTaskStatus.analyzing:
         return (
           icon: Icons.file_download_rounded,
-          color: AppPalette.almondCream,
+          color: AppPalette.moodBlue,
           label: '\u6b63\u5728\u6574\u7406',
           note:
               '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
@@ -1438,24 +1654,60 @@ class _HomeScreenState extends State<HomeScreen> {
         if ((task.errorMessage ?? '').trim().isNotEmpty) {
           return (
             icon: Icons.fact_check_rounded,
-            color: AppPalette.almondCream,
+            color: _queueWarning,
             label: '基础结果',
             note: '已保留识别结果，可先入档或重试详解',
           );
         }
         return (
           icon: Icons.check_circle_rounded,
-          color: AppPalette.matchaMist,
+          color: _queueSuccess,
           label: '\u5df2\u5b8c\u6210',
           note: '\u70b9\u51fb\u786e\u8ba4\u540e\u5c31\u80fd\u5165\u6863',
         );
       case AnalysisTaskStatus.failed:
         return (
           icon: Icons.error_outline_rounded,
-          color: Colors.redAccent,
+          color: _queueDanger,
           label: '\u9700\u8981\u91cd\u8bd5',
           note:
               '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
+        );
+    }
+  }
+
+  ({IconData icon, Color color, String label, String note})
+      _practicePaperTaskStatus(
+    BackgroundPracticePaperTask task,
+  ) {
+    switch (task.status) {
+      case AnalysisTaskStatus.queued:
+        return (
+          icon: Icons.schedule_rounded,
+          color: AppPalette.textSecondary,
+          label: '等待组卷',
+          note: '已收到智能组卷任务',
+        );
+      case AnalysisTaskStatus.analyzing:
+        return (
+          icon: Icons.auto_awesome_rounded,
+          color: AppPalette.moodBlue,
+          label: '正在组卷',
+          note: 'AI 正在编排练习题、答案和打印讲义',
+        );
+      case AnalysisTaskStatus.completed:
+        return (
+          icon: Icons.check_circle_rounded,
+          color: _queueSuccess,
+          label: '试卷已生成',
+          note: '点击打开试卷即可开始练习',
+        );
+      case AnalysisTaskStatus.failed:
+        return (
+          icon: Icons.error_outline_rounded,
+          color: _queueDanger,
+          label: '组卷失败',
+          note: '可以重试生成智能试卷',
         );
     }
   }
@@ -1482,6 +1734,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           onAnalysisUpdated: (analysis) =>
               store.updateAnalysisTaskAnalysis(task.id, analysis),
+        ),
+      ),
+    );
+  }
+
+  void _openCompletedPracticePaperTask(BackgroundPracticePaperTask task) {
+    final paper = task.paper;
+    if (paper == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PracticePaperEntryScreen(
+          paper: paper,
+          selectedSubjects: task.selectedSubjects,
+          strategyLabel: paper.strategyLabel.isEmpty
+              ? task.strategyLabel
+              : paper.strategyLabel,
         ),
       ),
     );
@@ -1934,7 +2202,7 @@ class _ActiveDownloadIndicatorState extends State<_ActiveDownloadIndicator>
             turns: _controller,
             child: const CustomPaint(
               size: Size.square(27),
-              painter: _DownloadRingPainter(color: AppPalette.almondCream),
+              painter: _DownloadRingPainter(color: AppPalette.moodBlue),
             ),
           ),
           AnimatedBuilder(
@@ -1947,7 +2215,7 @@ class _ActiveDownloadIndicatorState extends State<_ActiveDownloadIndicator>
             },
             child: const Icon(
               Icons.file_download_rounded,
-              color: AppPalette.almondCream,
+              color: AppPalette.moodBlue,
               size: 17,
             ),
           ),

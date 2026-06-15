@@ -169,3 +169,47 @@ class PracticePaperResponse(BaseModel):
     answer_key: List[str] = Field(default_factory=list)
     printable_html: str = ""
     raw_model_output: str = ""
+
+
+AssistantMode = Literal[
+    "quick_answer",
+    "error_memory",
+    "knowledge_link",
+    "exam_sprint",
+]
+
+
+class AssistantMemoryContext(BaseModel):
+    total_errors: int = 0
+    pending_review_count: int = 0
+    mastered_count: int = 0
+    weakest_subject: str = ""
+    weakest_topic: str = ""
+    weakest_subject_pending_count: int = 0
+    weakest_topic_pending_count: int = 0
+    subject_distribution: Dict[str, int] = Field(default_factory=dict)
+
+
+class AssistantChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    mode: AssistantMode = "quick_answer"
+    context: AssistantMemoryContext = Field(default_factory=AssistantMemoryContext)
+    errors: List[PracticePaperSourceError] = Field(default_factory=list)
+
+
+class AssistantChatSection(BaseModel):
+    title: str
+    body: str = ""
+    bullets: List[str] = Field(default_factory=list)
+
+
+class AssistantChatResponse(BaseModel):
+    mode: AssistantMode
+    title: str
+    summary: str
+    sections: List[AssistantChatSection] = Field(default_factory=list)
+    linked_knowledge: List[str] = Field(default_factory=list)
+    follow_up_prompts: List[str] = Field(default_factory=list)
+    sprint_minutes: int = Field(default=0, ge=0, le=180)
+    fallback: bool = False
+    raw_model_output: str = ""

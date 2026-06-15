@@ -161,11 +161,15 @@ class AppSectionTitle extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.icon,
+    this.iconBackgroundColor = AppPalette.peach,
+    this.iconColor = AppPalette.inkBlue,
   });
 
   final String title;
   final String? subtitle;
   final IconData? icon;
+  final Color iconBackgroundColor;
+  final Color iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -176,12 +180,12 @@ class AppSectionTitle extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: AppPalette.peach,
+            color: iconBackgroundColor,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(
             icon ?? Icons.tune_rounded,
-            color: AppPalette.inkBlue,
+            color: iconColor,
             size: 20,
           ),
         ),
@@ -497,7 +501,8 @@ class AppChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final bubbleColor = isUser ? AppPalette.moodBlue : AppPalette.paper;
     final textColor = isUser ? Colors.white : AppPalette.textPrimary;
-    final alignment = isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final alignment =
+        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;
 
     return Column(
       crossAxisAlignment: alignment,
@@ -572,28 +577,33 @@ class AppChatInputBar extends StatelessWidget {
           top: BorderSide(color: AppPalette.inkBlue.withOpacity(0.06)),
         ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              minLines: 1,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: hintText,
-                prefixIcon: const Icon(Icons.auto_awesome_rounded),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    prefixIcon: const Icon(Icons.auto_awesome_rounded),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              AppFlatIconButton(
+                icon: Icons.arrow_upward_rounded,
+                onTap: onSend,
+                color: AppPalette.inkBlue,
+                iconColor: Colors.white,
+                size: 52,
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          AppFlatIconButton(
-            icon: Icons.arrow_upward_rounded,
-            onTap: onSend,
-            color: AppPalette.inkBlue,
-            iconColor: Colors.white,
-            size: 52,
-          ),
-        ],
+        ),
       ),
     );
   }

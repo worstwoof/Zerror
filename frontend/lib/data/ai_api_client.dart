@@ -25,6 +25,16 @@ Map<String, dynamic> _asStringMap(dynamic value) {
   return const <String, dynamic>{};
 }
 
+List<String> _asStringList(dynamic value) {
+  if (value is! List) {
+    return const [];
+  }
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
 class SimilarQuestionItem {
   final String prompt;
   final String answerOutline;
@@ -203,7 +213,6 @@ class ImageAnalysisJob {
     }
     return '后台整理中';
   }
-
 
   factory ImageAnalysisJob.fromJson(Map<String, dynamic> json) {
     final rawResult = _asStringMap(json['result']);
@@ -391,7 +400,8 @@ class GeneratedPracticeQuestion {
           .toList(),
       reasonHint: (json['reason_hint'] ?? '').toString(),
       difficulty: (json['difficulty'] ?? '中等').toString(),
-      estimatedMinutes: int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 4,
+      estimatedMinutes:
+          int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 4,
       sourceErrorIds: (json['source_error_ids'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
           .where((item) => item.trim().isNotEmpty)
@@ -441,7 +451,8 @@ class GeneratedPracticeQuestion {
 
   static String _normalizeOption(String option) {
     final cleaned = option.trim().replaceFirst(
-          RegExp(r'^(?:[\(\[（【]?\s*[A-Fa-f]\s*[\)\]）】]?[\.\、．:：]?\s+|[A-Fa-f][\.\、．:：]\s*)'),
+          RegExp(
+              r'^(?:[\(\[（【]?\s*[A-Fa-f]\s*[\)\]）】]?[\.\、．:：]?\s+|[A-Fa-f][\.\、．:：]\s*)'),
           '',
         );
     return cleaned.trim().isEmpty ? option.trim() : cleaned.trim();
@@ -484,7 +495,8 @@ class PracticePaperResult {
       subjectFocus: _stringList(json['subject_focus']),
       topicFocus: _stringList(json['topic_focus']),
       strategyLabel: (json['strategy_label'] ?? '').toString(),
-      estimatedMinutes: int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 20,
+      estimatedMinutes:
+          int.tryParse((json['estimated_minutes'] ?? '').toString()) ?? 20,
       handoutOverview: (json['handout_overview'] ?? '').toString(),
       learningTargets: _stringList(json['learning_targets']),
       warmupNotes: _stringList(json['warmup_notes']),
@@ -506,6 +518,77 @@ class PracticePaperResult {
         .map((item) => item.toString())
         .where((item) => item.trim().isNotEmpty)
         .toList();
+  }
+}
+
+class AssistantReplySection {
+  final String title;
+  final String body;
+  final List<String> bullets;
+
+  const AssistantReplySection({
+    required this.title,
+    required this.body,
+    required this.bullets,
+  });
+
+  factory AssistantReplySection.fromJson(Map<String, dynamic> json) {
+    return AssistantReplySection(
+      title: (json['title'] ?? '助教建议').toString(),
+      body: (json['body'] ?? '').toString(),
+      bullets: _asStringList(json['bullets']),
+    );
+  }
+}
+
+class AssistantChatReply {
+  final String mode;
+  final String title;
+  final String summary;
+  final List<AssistantReplySection> sections;
+  final List<String> linkedKnowledge;
+  final List<String> followUpPrompts;
+  final int sprintMinutes;
+  final bool fallback;
+  final String rawModelOutput;
+
+  const AssistantChatReply({
+    required this.mode,
+    required this.title,
+    required this.summary,
+    required this.sections,
+    required this.linkedKnowledge,
+    required this.followUpPrompts,
+    required this.sprintMinutes,
+    required this.fallback,
+    required this.rawModelOutput,
+  });
+
+  factory AssistantChatReply.fromJson(Map<String, dynamic> json) {
+    final rawSections = json['sections'];
+    final sections = rawSections is List
+        ? rawSections
+            .whereType<Map>()
+            .map(
+              (item) => AssistantReplySection.fromJson(
+                item.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList(growable: false)
+        : const <AssistantReplySection>[];
+
+    return AssistantChatReply(
+      mode: (json['mode'] ?? 'quick_answer').toString(),
+      title: (json['title'] ?? 'AI 助教').toString(),
+      summary: (json['summary'] ?? '').toString(),
+      sections: sections,
+      linkedKnowledge: _asStringList(json['linked_knowledge']),
+      followUpPrompts: _asStringList(json['follow_up_prompts']),
+      sprintMinutes:
+          int.tryParse((json['sprint_minutes'] ?? '0').toString()) ?? 0,
+      fallback: json['fallback'] == true,
+      rawModelOutput: (json['raw_model_output'] ?? '').toString(),
+    );
   }
 }
 
@@ -761,6 +844,51 @@ class AiApiClient {
     }
 
     return PracticePaperResult.fromJson(decoded);
+  }
+
+  Future<AssistantChatReply> askAssistant({
+    required String message,
+    required String mode,
+    required Map<String, dynamic> context,
+    required List<Map<String, dynamic>> errors,
+  }) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse(AppConstants.assistantChatEndpoint),
+            headers: const {
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'message': message,
+              'mode': mode,
+              'context': context,
+              'errors': errors,
+            }),
+          )
+          .timeout(const Duration(seconds: 75));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('AI 助教响应暂时较慢，我先帮你保留这个问题。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，AI 助教暂时连不上服务器。');
+    }
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 404) {
+        throw AiApiException(
+          'AI 助教接口未找到，请确认 App 连接的是已更新后端：${AppConstants.assistantChatEndpoint}',
+          statusCode: response.statusCode,
+        );
+      }
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+
+    return AssistantChatReply.fromJson(decoded);
   }
 
   Future<void> retainManimArtifacts(

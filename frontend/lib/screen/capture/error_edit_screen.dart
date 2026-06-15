@@ -48,6 +48,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     '思路中断',
     '计算错误',
   ];
+  static const Color _readablePanel = Color(0xFFFFFFFF);
+  static const Color _readablePanelAlt = Color(0xFFF6F9FF);
+  static const Color _readableFormulaSurface = Color(0xFFF7FBFF);
+  static const Color _readableGeoGebraSurface = Color(0xFFF1F7FF);
+  static const Color _readableBottomBar = Color(0xFFF8FBFF);
+  static const Color _readableActionButton = Color(0xFFEAF1FF);
+  static const Color _readableAccent = Color(0xFF38558F);
+  static const Color _readableAccentSoft = Color(0xFFE7ECF6);
+  static const Color _readableOnDark = Colors.white;
+  static const Color _readableOnDarkMuted = Color(0xFFE9EDF6);
 
   late final TextEditingController _questionController;
   late final TextEditingController _reflectionController;
@@ -755,19 +765,53 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           : Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               decoration: BoxDecoration(
-                color: AppPalette.night.withOpacity(0.94),
+                color: _readableBottomBar,
                 border: Border(
                   top: BorderSide(
-                    color: AppPalette.pastelGrey.withOpacity(0.08),
+                    color: AppPalette.inkBlue.withOpacity(0.08),
                   ),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppPalette.inkBlue.withOpacity(0.10),
+                    blurRadius: 18,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
               ),
               child: SizedBox(
                 width: double.infinity,
-                child: AppPrimaryButton(
-                  label: '生成我的错题档案',
-                  icon: Icons.library_add_check_rounded,
+                child: ElevatedButton.icon(
                   onPressed: _isSaving ? null : _saveToArchiveWithUpload,
+                  icon: const Icon(
+                    Icons.library_add_check_rounded,
+                    color: _readableAccent,
+                  ),
+                  label: const Text(
+                    '生成我的错题档案',
+                    style: TextStyle(
+                      color: _readableAccent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _readableActionButton,
+                    disabledBackgroundColor:
+                        AppPalette.pastelGrey.withOpacity(0.55),
+                    foregroundColor: _readableAccent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    side: BorderSide(
+                      color: _readableAccent.withOpacity(0.16),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
               ),
             ),
@@ -827,6 +871,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
 
   Widget _buildOriginalQuestionCard() {
     return AppPanel(
+      color: _readablePanel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -834,6 +879,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             title: '原题与识别结果',
             subtitle: '点击渲染结果即可修正题干',
             icon: Icons.document_scanner_rounded,
+            iconBackgroundColor: _readableAccentSoft,
+            iconColor: _readableAccent,
           ),
           const SizedBox(height: 16),
           if (widget.imagePath.isNotEmpty) ...[
@@ -856,22 +903,22 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
+                      color: _readablePanel,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppPalette.pastelGrey.withOpacity(0.08),
+                        color: AppPalette.inkBlue.withOpacity(0.10),
                       ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 '题干渲染预览',
                                 style: TextStyle(
-                                  color: AppPalette.almondCream,
+                                  color: _readableAccent,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -879,8 +926,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                             ),
                             Icon(
                               Icons.edit_rounded,
-                              color: AppPalette.textSecondary
-                                  .withOpacity(0.82),
+                              color: AppPalette.textSecondary,
                               size: 16,
                             ),
                           ],
@@ -932,16 +978,23 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
   Widget _buildOriginalImagePreview() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppPalette.night.withOpacity(0.36),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppPalette.pastelGrey.withOpacity(0.08),
+          color: _readableAccent.withOpacity(0.10),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppPalette.inkBlue.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(15),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 280),
           child: Image.file(
@@ -957,7 +1010,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
 
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
-      color: AppPalette.matchaMist.withOpacity(0.08),
+      color: _readablePanel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -984,6 +1037,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             title: 'AI 深度解析',
             subtitle: '现在已经接入真实后端结果',
             icon: Icons.auto_awesome,
+            iconBackgroundColor: _readableAccentSoft,
+            iconColor: _readableAccent,
           ),
           const SizedBox(height: 16),
           _buildSectionLabel('💡 破题技巧'),
@@ -1001,12 +1056,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              iconColor: AppPalette.almondCream,
-              collapsedIconColor: AppPalette.almondCream,
+              iconColor: _readableAccent,
+              collapsedIconColor: _readableAccent,
               title: const Text(
                 '查看详细推导步骤',
                 style: TextStyle(
-                  color: AppPalette.almondCream,
+                  color: _readableAccent,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1042,7 +1097,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           Text(
             '归档方向：$subject · $topic',
             style: const TextStyle(
-              color: AppPalette.almondCream,
+              color: _readableAccent,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1068,11 +1123,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               margin: const EdgeInsets.symmetric(vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                color: AppPalette.night.withOpacity(0.24),
+                color: _readableFormulaSurface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppPalette.pastelGrey.withOpacity(0.08),
+                  color: _readableAccent.withOpacity(0.14),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppPalette.inkBlue.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: AppLatexText(
                 r'$$' + text + r'$$',
@@ -1129,14 +1191,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
         width: double.infinity,
         child: OutlinedButton.icon(
           onPressed: _isAiThinking ? null : _generateAiAnalysis,
-          icon: const Icon(Icons.hub_rounded, color: AppPalette.almondCream),
+          icon: const Icon(Icons.hub_rounded, color: _readableAccent),
           label: const Text(
             '重新生成举一反三练习',
-            style: TextStyle(color: AppPalette.almondCream),
+            style: TextStyle(color: _readableAccent),
           ),
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: AppPalette.almondCream.withOpacity(0.5),
+              color: _readableAccent.withOpacity(0.45),
             ),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -1148,6 +1210,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     }
 
     return AppPanel(
+      color: _readablePanel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1155,6 +1218,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             title: '举一反三',
             subtitle: '后续可以把这里接到智能组卷或薄弱点训练',
             icon: Icons.explore_rounded,
+            iconBackgroundColor: _readableAccentSoft,
+            iconColor: _readableAccent,
           ),
           const SizedBox(height: 14),
           Text(
@@ -1206,6 +1271,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
 
   Widget _buildUserReflectionCard() {
     return AppPanel(
+      color: _readablePanel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1213,6 +1279,8 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             title: '自我复盘',
             subtitle: '记录为什么错，以及下次怎么避坑',
             icon: Icons.rate_review_rounded,
+            iconBackgroundColor: _readableAccentSoft,
+            iconColor: _readableAccent,
           ),
           const SizedBox(height: 16),
           const Text(
@@ -1228,13 +1296,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               return ChoiceChip(
                 label: Text(reason),
                 selected: isSelected,
-                selectedColor: AppPalette.matchaMist,
-                backgroundColor: Colors.white.withOpacity(0.05),
+                selectedColor: _readableActionButton,
+                backgroundColor: _readablePanelAlt,
                 labelStyle: TextStyle(
-                  color: isSelected ? AppPalette.night : AppPalette.textPrimary,
+                  color: isSelected ? _readableAccent : AppPalette.textPrimary,
                   fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 ),
-                side: BorderSide.none,
+                side: BorderSide(
+                  color: isSelected
+                      ? _readableAccent.withOpacity(0.24)
+                      : AppPalette.inkBlue.withOpacity(0.08),
+                ),
                 onSelected: (selected) {
                   if (!selected) return;
                   setState(() => _selectedErrorReason = reason);
@@ -1252,10 +1325,24 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               hintText: '写下你自己的避坑笔记...',
               hintStyle: const TextStyle(color: AppPalette.textSecondary),
               filled: true,
-              fillColor: Colors.white.withOpacity(0.03),
+              fillColor: _readablePanelAlt,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
+                borderSide: BorderSide(
+                  color: AppPalette.inkBlue.withOpacity(0.08),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: AppPalette.inkBlue.withOpacity(0.08),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: _readableAccent.withOpacity(0.40),
+                ),
               ),
             ),
           ),
@@ -1266,12 +1353,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               onPressed: _isAiThinking ? null : _generateAiAnalysis,
               icon: const Icon(
                 Icons.auto_awesome,
-                color: AppPalette.matchaMist,
+                color: _readableAccent,
                 size: 18,
               ),
               label: const Text(
                 '结合当前题目重新分析',
-                style: TextStyle(color: AppPalette.matchaMist),
+                style: TextStyle(color: _readableAccent),
               ),
             ),
           ),
@@ -1288,10 +1375,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppPalette.night.withOpacity(0.76),
+        color: AppPalette.inkBlue,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppPalette.matchaMist.withOpacity(0.24),
+          color: _readableAccentSoft.withOpacity(0.32),
         ),
       ),
       child: Column(
@@ -1308,7 +1395,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                       const Text(
                         'Manim 数学讲解',
                         style: TextStyle(
-                          color: AppPalette.textPrimary,
+                          color: _readableOnDark,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1317,7 +1404,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                       const Text(
                         'Manim 物理动画',
                         style: TextStyle(
-                          color: AppPalette.textPrimary,
+                          color: _readableOnDark,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1330,7 +1417,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                               ? '数学题将生成黑底 Manim 讲解视频：题干逐步呈现、红框高亮条件、左侧作图、右侧公式推导。'
                               : '物理题将直接使用 Manim 生成动画视频，展示受力、运动和关键状态变化。',
                       style: const TextStyle(
-                        color: AppPalette.textSecondary,
+                        color: _readableOnDarkMuted,
                         fontSize: 13,
                         height: 1.5,
                       ),
@@ -1353,7 +1440,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                         )
                       : const Icon(
                           Icons.animation_rounded,
-                          color: AppPalette.almondCream,
+                          color: _readableOnDark,
                           size: 18,
                         ),
                   label: Text(
@@ -1362,11 +1449,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                         : hasArtifact
                             ? '重新生成'
                             : '生成 Manim',
-                    style: const TextStyle(color: AppPalette.almondCream),
+                    style: const TextStyle(color: _readableOnDark),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: AppPalette.almondCream.withOpacity(0.45),
+                      color: Colors.white.withOpacity(0.58),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1504,17 +1591,30 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       description,
     );
     final previewText = _artifactPreviewText(type, mimeType, content);
+    final isGeoGebraCard =
+        type == 'geogebra_scene' || type == 'physics_scene_spec';
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: isGeoGebraCard ? _readableGeoGebraSurface : _readablePanelAlt,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppPalette.pastelGrey.withOpacity(0.10),
+          color: isGeoGebraCard
+              ? _readableAccent.withOpacity(0.16)
+              : AppPalette.inkBlue.withOpacity(0.10),
         ),
+        boxShadow: isGeoGebraCard
+            ? [
+                BoxShadow(
+                  color: AppPalette.inkBlue.withOpacity(0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1523,7 +1623,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             children: [
               Icon(
                 _artifactIcon(type),
-                color: AppPalette.almondCream,
+                color: _readableAccent,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -2051,9 +2151,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
         children: [
           AspectRatio(
             aspectRatio: 1.45,
-            child: CustomPaint(
-              painter: _MathCoordinateGraphPainter(graph),
-              child: const SizedBox.expand(),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(color: AppPalette.inkBlue),
+                child: CustomPaint(
+                  painter: _MathCoordinateGraphPainter(graph),
+                  child: const SizedBox.expand(),
+                ),
+              ),
             ),
           ),
           if (notes.isNotEmpty) ...[
@@ -2130,8 +2236,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03),
+            color: _readablePanel,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppPalette.inkBlue.withOpacity(0.08)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2139,7 +2246,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               Text(
                 front.isEmpty ? '复习卡片' : front,
                 style: const TextStyle(
-                  color: AppPalette.almondCream,
+                  color: _readableAccent,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2196,10 +2303,10 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppPalette.night.withOpacity(0.55),
+              color: AppPalette.inkBlue,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppPalette.pastelGrey.withOpacity(0.08),
+                color: _readableOnDarkMuted.withOpacity(0.18),
               ),
             ),
             child: SingleChildScrollView(
@@ -2207,7 +2314,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               child: SelectableText(
                 template,
                 style: const TextStyle(
-                  color: AppPalette.textPrimary,
+                  color: _readableOnDark,
                   fontSize: 12.5,
                   height: 1.5,
                   fontFamily: 'monospace',
@@ -2325,8 +2432,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: _readableGeoGebraSurface,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _readableAccent.withOpacity(0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2388,15 +2496,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               },
               icon: const Icon(
                 Icons.open_in_browser_rounded,
-                color: AppPalette.almondCream,
+                color: _readableAccent,
               ),
               label: const Text(
                 '打开 GeoGebra 交互图',
-                style: TextStyle(color: AppPalette.almondCream),
+                style: TextStyle(color: _readableAccent),
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(
-                  color: AppPalette.almondCream.withOpacity(0.45),
+                  color: _readableAccent.withOpacity(0.55),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -2416,9 +2524,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     final jobId = (data['job_id'] ?? '').toString();
     final error = (data['error'] ?? '').toString();
     final message = (data['message'] ?? '讲解视频正在等待后台生成。').toString();
+    final isFailed = status == 'failed' || error.isNotEmpty;
     final isFinished = status == 'succeeded' || status == 'failed';
     final displayProgress = progress.clamp(0, 100);
     final displayMessage = error.isNotEmpty ? error : message;
+    final statusLabel = isFailed ? '服务暂不可用' : '$displayProgress%';
     const stages = [
       ('题干', Icons.subject_rounded),
       ('高亮', Icons.highlight_alt_rounded),
@@ -2440,10 +2550,12 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF050505),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppPalette.almondCream.withOpacity(0.18),
+          color: isFailed
+              ? AppPalette.coral.withOpacity(0.34)
+              : _readableAccent.withOpacity(0.14),
         ),
       ),
       child: Column(
@@ -2456,20 +2568,27 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                 height: 28,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
+                  color:
+                      isFailed ? const Color(0xFFFFF0EC) : _readableAccentSoft,
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppPalette.matchaMist.withOpacity(0.64),
+                    color: isFailed
+                        ? AppPalette.coral.withOpacity(0.32)
+                        : _readableAccent.withOpacity(0.18),
                   ),
                 ),
-                child: const Icon(
-                  Icons.auto_graph_rounded,
-                  color: AppPalette.matchaMist,
+                child: Icon(
+                  isFailed
+                      ? Icons.error_outline_rounded
+                      : Icons.auto_graph_rounded,
+                  color: isFailed ? AppPalette.coral : _readableAccent,
                   size: 16,
                 ),
               ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'Zerror Math Studio',
+                  'Manim 视频生成状态',
                   style: TextStyle(
                     color: AppPalette.textPrimary,
                     fontSize: 13.5,
@@ -2479,9 +2598,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                 ),
               ),
               Text(
-                '$displayProgress%',
-                style: const TextStyle(
-                  color: AppPalette.almondCream,
+                statusLabel,
+                style: TextStyle(
+                  color: isFailed ? AppPalette.coral : _readableAccent,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2492,34 +2611,34 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           Text(
             displayMessage,
             style: TextStyle(
-              color: error.isNotEmpty
-                  ? const Color(0xFFFFC3B8)
-                  : AppPalette.textPrimary,
+              color: isFailed ? AppPalette.coral : AppPalette.textSecondary,
               fontSize: 12.5,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 12),
-          _buildAnimatedManimProgress(
-            displayProgress / 100,
-            isRunning: !isFinished && error.isEmpty,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: stages.asMap().entries.map((entry) {
-              final index = entry.key;
-              final stage = entry.value;
-              final isActive = index <= activeStage && error.isEmpty;
-              return _buildManimStageChip(
-                label: stage.$1,
-                icon: stage.$2,
-                isActive: isActive,
-                isCurrent: index == activeStage && !isFinished && error.isEmpty,
-              );
-            }).toList(),
-          ),
+          if (!isFailed) ...[
+            const SizedBox(height: 12),
+            _buildAnimatedManimProgress(
+              displayProgress / 100,
+              isRunning: !isFinished,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: stages.asMap().entries.map((entry) {
+                final index = entry.key;
+                final stage = entry.value;
+                final isActive = index <= activeStage;
+                return _buildManimStageChip(
+                  label: stage.$1,
+                  icon: stage.$2,
+                  isActive: isActive,
+                  isCurrent: index == activeStage && !isFinished,
+                );
+              }).toList(),
+            ),
+          ],
           if (jobId.isNotEmpty && !isFinished) ...[
             const SizedBox(height: 12),
             Align(
@@ -2530,16 +2649,16 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     : () => _pollManimJob(jobId, showErrors: true),
                 icon: const Icon(
                   Icons.refresh_rounded,
-                  color: AppPalette.almondCream,
+                  color: _readableAccent,
                   size: 18,
                 ),
                 label: const Text(
                   '刷新进度',
-                  style: TextStyle(color: AppPalette.almondCream),
+                  style: TextStyle(color: _readableAccent),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(
-                    color: AppPalette.almondCream.withOpacity(0.45),
+                    color: _readableAccent.withOpacity(0.45),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2579,7 +2698,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     Positioned.fill(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: AppPalette.inkBlue.withOpacity(0.08),
                         ),
                       ),
                     ),
@@ -2590,13 +2709,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                         child: Stack(
                           clipBehavior: Clip.hardEdge,
                           children: [
-                            Positioned.fill(
+                            const Positioned.fill(
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
+                                      _readableAccent,
                                       AppPalette.matchaMist,
-                                      AppPalette.almondCream.withOpacity(0.86),
                                     ],
                                   ),
                                 ),
@@ -2623,8 +2742,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                                         gradient: LinearGradient(
                                           colors: [
                                             Colors.white.withOpacity(0),
-                                            Colors.white
-                                                .withOpacity(0.34),
+                                            Colors.white.withOpacity(0.34),
                                             Colors.white.withOpacity(0),
                                           ],
                                         ),
@@ -2655,7 +2773,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
   }) {
     Widget buildChip(double pulse) {
       final pulseAmount = (pulse + 1) / 2;
-      final activeFillAlpha = isCurrent ? 0.16 + pulseAmount * 0.08 : 0.16;
       final activeBorderAlpha = isCurrent ? 0.42 + pulseAmount * 0.16 : 0.42;
       return Transform.scale(
         scale: isCurrent ? 1.0 + pulseAmount * 0.025 : 1.0,
@@ -2663,18 +2780,20 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: isActive
-                ? AppPalette.matchaMist.withOpacity(activeFillAlpha)
-                : Colors.white.withOpacity(0.04),
+                ? _readableAccentSoft.withOpacity(
+                    0.72 + pulseAmount * 0.12,
+                  )
+                : _readablePanelAlt,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: isActive
-                  ? AppPalette.matchaMist.withOpacity(activeBorderAlpha)
-                  : Colors.white.withOpacity(0.08),
+                  ? _readableAccent.withOpacity(activeBorderAlpha)
+                  : AppPalette.inkBlue.withOpacity(0.08),
             ),
             boxShadow: isCurrent
                 ? [
                     BoxShadow(
-                      color: AppPalette.matchaMist.withOpacity(
+                      color: _readableAccent.withOpacity(
                         0.08 + pulseAmount * 0.10,
                       ),
                       blurRadius: 10,
@@ -2688,17 +2807,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             children: [
               Icon(
                 icon,
-                color:
-                    isActive ? AppPalette.matchaMist : AppPalette.textSecondary,
+                color: isActive ? _readableAccent : AppPalette.textSecondary,
                 size: 14,
               ),
               const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
-                  color: isActive
-                      ? AppPalette.textPrimary
-                      : AppPalette.textSecondary,
+                  color: isActive ? _readableAccent : AppPalette.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2774,13 +2890,14 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.08)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppPalette.almondCream, size: 20),
+          Icon(icon, color: _readableAccent, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -2809,15 +2926,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
                     onPressed: onAction,
                     icon: const Icon(
                       Icons.refresh_rounded,
-                      color: AppPalette.almondCream,
+                      color: _readableAccent,
                     ),
                     label: Text(
                       actionLabel,
-                      style: const TextStyle(color: AppPalette.almondCream),
+                      style: const TextStyle(color: _readableAccent),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
-                        color: AppPalette.almondCream.withOpacity(0.45),
+                        color: _readableAccent.withOpacity(0.45),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2843,8 +2960,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2891,15 +3009,15 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               },
               icon: const Icon(
                 Icons.open_in_browser_rounded,
-                color: AppPalette.almondCream,
+                color: _readableAccent,
               ),
               label: const Text(
                 '打开交互预览',
-                style: TextStyle(color: AppPalette.almondCream),
+                style: TextStyle(color: _readableAccent),
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(
-                  color: AppPalette.almondCream.withOpacity(0.45),
+                  color: _readableAccent.withOpacity(0.45),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -2917,7 +3035,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return Text(
       text,
       style: const TextStyle(
-        color: AppPalette.almondCream,
+        color: _readableAccent,
         fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
@@ -2932,8 +3050,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: _readablePanel,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2941,7 +3060,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           Text(
             label,
             style: const TextStyle(
-              color: AppPalette.textSecondary,
+              color: _readableAccent,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -2962,7 +3081,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
           height: 6,
           margin: const EdgeInsets.only(top: 7),
           decoration: const BoxDecoration(
-            color: AppPalette.almondCream,
+            color: _readableAccent,
             shape: BoxShape.circle,
           ),
         ),
@@ -2985,8 +3104,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppPalette.almondCream.withOpacity(0.10),
+        color: _readableAccentSoft,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _readableAccent.withOpacity(0.18)),
       ),
       child: Text(
         '$label：$value',
@@ -3003,8 +3123,9 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: AppPalette.inkBlue.withOpacity(0.06),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppPalette.inkBlue.withOpacity(0.08)),
       ),
       child: Text(
         text,
@@ -3096,7 +3217,7 @@ class _QuestionTextEditorScreenState extends State<QuestionTextEditorScreen> {
             child: const Text(
               '完成',
               style: TextStyle(
-                color: AppPalette.almondCream,
+                color: AppPalette.moodBlue,
                 fontWeight: FontWeight.w700,
               ),
             ),
