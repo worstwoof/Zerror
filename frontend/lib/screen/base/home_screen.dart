@@ -153,8 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildSecondaryActions(context, store),
           const SizedBox(height: 16),
           _buildAiAssistantCard(context),
-          const SizedBox(height: 16),
-          _buildArchiveSummary(context, store),
         ],
       ),
     );
@@ -235,15 +233,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: AppPalette.paper.withOpacity(0.82),
+                        color: const Color(0xF2FFFFFF),
                         borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0x22000000),
+                          width: 1.2,
+                        ),
                       ),
                       child: Text(
                         store.totalErrors == 0
                             ? '从第一题开始'
                             : '档案中已有 ${store.totalErrors} 题',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _flatInk,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -479,90 +481,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildArchiveSummary(BuildContext context, AppStore store) {
-    return AppPanel(
-      padding: const EdgeInsets.all(18),
-      borderRadius: 24,
-      color: Colors.white.withOpacity(0.72),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  '档案概览',
-                  style: TextStyle(
-                    color: _flatInk,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: _flatInk,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 34),
-                ),
-                child: const Text('查看'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: _summaryPill('错题', '${store.totalErrors}')),
-              const SizedBox(width: 10),
-              Expanded(child: _summaryPill('收藏', '${store.favoriteCount}')),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _summaryPill('考点', '${store.knowledgePointCount}')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryPill(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-      decoration: BoxDecoration(
-        color: _flatBlue.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _flatInk,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _flatMuted,
-              fontSize: 12,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1989,6 +1907,8 @@ class _FlatHomeIconPainter extends CustomPainter {
   static const _peach = AppPalette.peach;
   static const _blue = AppPalette.moodBlue;
   static const _coral = AppPalette.coral;
+  static const _captureAccent = Color(0xFFFFC25F);
+  static const _captureLens = Color(0xFFFF9F8A);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2031,7 +1951,7 @@ class _FlatHomeIconPainter extends CustomPainter {
     return switch (kind) {
       _FlatHomeIconKind.archive => _peach,
       _FlatHomeIconKind.quiz => _coral.withAlpha(92),
-      _FlatHomeIconKind.capture => _mint,
+      _FlatHomeIconKind.capture => _captureAccent,
       _FlatHomeIconKind.assistant => _peach,
     };
   }
@@ -2106,7 +2026,7 @@ class _FlatHomeIconPainter extends CustomPainter {
     );
     fill.color = _paper;
     canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.13, fill);
-    fill.color = _mint;
+    fill.color = _captureLens;
     canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.075, fill);
     fill.color = _paper;
     canvas.drawCircle(Offset(s * 0.67, s * 0.43), s * 0.032, fill);
