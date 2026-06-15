@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import '../capture/html_artifact_preview_screen.dart';
 import 'quiz_result_screen.dart';
@@ -420,7 +421,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Text(
+            AppLatexText(
               question['content'] as String,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
@@ -507,7 +508,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 ),
               ),
               Expanded(
-                child: Text(
+                child: AppLatexText(
                   optionText,
                   style: const TextStyle(
                     color: AppPalette.textPrimary,

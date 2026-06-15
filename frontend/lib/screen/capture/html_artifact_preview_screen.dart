@@ -157,8 +157,32 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     var active = false;
     var lastX = 0;
     var lastY = 0;
+    function rootElement() {
+      return document.scrollingElement || document.documentElement;
+    }
+    function horizontalPanEnabled() {
+      var root = rootElement();
+      var viewport = window.visualViewport;
+      var viewportWidth = viewport ? viewport.width : window.innerWidth;
+      var scale = viewport ? viewport.scale : 1;
+      return scale > 0.58 && root.scrollWidth > viewportWidth + 2;
+    }
+    function updateHorizontalPanBounds() {
+      var enabled = horizontalPanEnabled();
+      var root = rootElement();
+      document.documentElement.style.overflowX = enabled ? 'auto' : 'hidden';
+      document.body.style.overflowX = enabled ? 'auto' : 'hidden';
+      if (!enabled) {
+        root.scrollLeft = 0;
+        document.documentElement.scrollLeft = 0;
+        document.body.scrollLeft = 0;
+      }
+    }
     function scrollByDelta(dx, dy) {
-      var root = document.scrollingElement || document.documentElement;
+      var root = rootElement();
+      if (!horizontalPanEnabled()) {
+        dx = 0;
+      }
       root.scrollLeft += dx;
       root.scrollTop += dy;
       if (root !== document.body) {
@@ -193,6 +217,12 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     document.addEventListener('touchcancel', function () {
       active = false;
     }, { passive: false });
+    window.addEventListener('resize', updateHorizontalPanBounds);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateHorizontalPanBounds);
+      window.visualViewport.addEventListener('scroll', updateHorizontalPanBounds);
+    }
+    updateHorizontalPanBounds();
   }
 </script>
 <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" onerror="zerrorLoadMathJaxFallback()"></script>

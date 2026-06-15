@@ -102,7 +102,7 @@ class AppLatexText extends StatelessWidget {
 
   String _wrapBareLatexInPlainText(String value) {
     final pattern = RegExp(
-      r'\\(?:dfrac|tfrac|frac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|overline|vec|bar|hat)\{[^{}]+\}|\\(?:sin|cos|tan|ln|log|leq|geq|alpha|beta|gamma|lambda|mu|theta|pi|Delta|Omega)\b',
+      r'(?:[A-Za-z]\s*=\s*)?(?:[-+]?\d+(?:\.\d+)?\s*)?(?:\\(?:dfrac|tfrac|frac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|overline|vec|bar|hat)\{[^{}]+\}|\\(?:sin|cos|tan|ln|log|leq|geq|neq|alpha|beta|gamma|lambda|mu|theta|pi|Delta|Omega)\b)(?:\s*[+\-*/=]\s*(?:[A-Za-z]|\d+(?:\.\d+)?|\\(?:dfrac|tfrac|frac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|overline|vec|bar|hat)\{[^{}]+\}|\\(?:sin|cos|tan|ln|log|leq|geq|neq|alpha|beta|gamma|lambda|mu|theta|pi|Delta|Omega)\b))*',
     );
     return value.replaceAllMapped(pattern, (match) {
       final body = _normalizeMathBody(match.group(0) ?? '');

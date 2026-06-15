@@ -13,7 +13,7 @@ from backend.app.schemas.card_schema import (
     PracticeQuestion,
 )
 
-from .vivo_client import VivoLMClient
+from .vivo_client import VivoAPIError, VivoLMClient
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,39 @@ class PracticePaperService:
 
     def generate_practice_paper(self, request: PracticePaperRequest) -> PracticePaperResponse:
         prompt = self._build_prompt(request)
-        raw_output = self.client.chat_completion(prompt)
+        try:
+            raw_output = self.client.chat_completion(
+                prompt,
+                max_tokens=self._practice_max_tokens(),
+                timeout_seconds=self._practice_timeout_seconds(),
+            )
+        except VivoAPIError as exc:
+            if not self._is_timeout_error(exc):
+                raise
+            logger.warning("practice paper primary generation timed out, retrying compact prompt: %s", exc)
+            try:
+                raw_output = self.client.chat_completion(
+                    self._build_compact_prompt(request),
+                    reasoning_effort="low",
+                    max_tokens=self._practice_retry_max_tokens(),
+                    timeout_seconds=self._practice_retry_timeout_seconds(),
+                )
+            except VivoAPIError as retry_exc:
+                if not self._is_timeout_error(retry_exc):
+                    raise
+                logger.warning("practice paper compact retry timed out, using local fallback: %s", retry_exc)
+                response = self._build_response(
+                    request=request,
+                    parsed={},
+                    raw_output=f"local fallback after timeout: {retry_exc}",
+                )
+                logger.info(
+                    "practice paper generated fallback questions=%s subjects=%s topics=%s",
+                    len(response.questions),
+                    len(response.subject_focus),
+                    len(response.topic_focus),
+                )
+                return response
         parsed = self._parse_json(raw_output)
         response = self._build_response(
             request=request,
@@ -54,6 +86,32 @@ class PracticePaperService:
             len(response.topic_focus),
         )
         return response
+
+    def _practice_timeout_seconds(self) -> int:
+        return min(max(30, self.client.settings.vivo_timeout_seconds), 165)
+
+    def _practice_retry_timeout_seconds(self) -> int:
+        return min(max(30, self.client.settings.vivo_timeout_seconds), 110)
+
+    def _practice_max_tokens(self) -> int:
+        return min(self.client.settings.vivo_max_tokens, 8192)
+
+    def _practice_retry_max_tokens(self) -> int:
+        return min(self.client.settings.vivo_max_tokens, 4096)
+
+    def _is_timeout_error(self, exc: VivoAPIError) -> bool:
+        message = str(exc).lower()
+        return any(
+            marker in message
+            for marker in (
+                "status=504",
+                "gateway timeout",
+                "gateway time-out",
+                "read timed out",
+                "timed out",
+                "timeout",
+            )
+        )
 
     def _build_prompt(self, request: PracticePaperRequest) -> str:
         source_errors = self._source_errors_for_prompt(request)
@@ -132,6 +190,73 @@ class PracticePaperService:
 }}
 """.strip()
 
+    def _build_compact_prompt(self, request: PracticePaperRequest) -> str:
+        source_errors = self._source_errors_for_prompt(request)[:6]
+        subjects = [
+            item
+            for item in request.selected_subjects
+            if item.strip() and item.strip() not in {"全部", "全部学科"}
+        ]
+        subject_hint = "、".join(subjects) if subjects else "从错题档案中自动判断"
+        source_json = json.dumps(source_errors, ensure_ascii=False, indent=2)
+        question_count = min(max(1, request.question_count), 10)
+
+        return f"""
+只返回 JSON，不要 Markdown，不要代码围栏。
+你是教辅命题老师。上一次完整讲义生成可能超时，请用轻量模式基于错题档案生成稳定可用的专题练习。
+
+要求：
+- 题量：{question_count} 题，选定学科：{subject_hint}，策略：{request.strategy_label}。
+- 优先覆盖错题暴露的知识点、错因和相近变式，不要复刻原题。
+- 每题题干清晰，选择题提供 4 个 options 和 0-based answer_index；非选择题 answer_index 为 null。
+- options 只写选项内容，不带 A.、B.、C.、D. 前缀。
+- 所有数学公式、变量、分式、根式、坐标、角度和数学数字都用 MathJax：行内 \\( ... \\)，展示 \\[ ... \\]；例如 \\(2\\sqrt{{6}}\\)、\\(x=\\frac{{13}}{{6}}\\)。
+- solution_steps 写 2 到 4 步，清楚说明关键公式、代入、计算和检验。
+- diagram_svg 只在几何、圆锥曲线、函数图像、物理受力/运动、电路、光路等必须看图时返回小 SVG；否则返回空字符串。
+- 精讲内容保持短小：concept_review、formula_cards、method_models、worked_examples、common_traps 每项 2 到 4 条。
+
+错题档案：
+{source_json}
+
+输出 JSON 字段：
+{{
+  "title": "专题讲义标题",
+  "subtitle": "一行副标题",
+  "subject_focus": ["学科"],
+  "topic_focus": ["知识点"],
+  "estimated_minutes": 20,
+  "handout_overview": "80字以内",
+  "learning_targets": ["目标1", "目标2"],
+  "warmup_notes": ["提醒1", "提醒2"],
+  "concept_review": ["概念1", "概念2"],
+  "formula_cards": ["公式1", "公式2"],
+  "method_models": ["模型1", "模型2"],
+  "worked_examples": ["例题讲解1"],
+  "common_traps": ["易错点1", "易错点2"],
+  "questions": [
+    {{
+      "id": "q1",
+      "type": "单选题/填空题/解答题",
+      "subject": "学科",
+      "topic": "知识点",
+      "stem": "题干",
+      "options": ["选项1", "选项2", "选项3", "选项4"],
+      "answer": "标准答案",
+      "answer_index": 0,
+      "solution_outline": "答案要点",
+      "solution_steps": ["步骤1", "步骤2"],
+      "diagram_svg": "",
+      "diagram_caption": "",
+      "reason_hint": "回收的错因",
+      "difficulty": "基础/中等/提高",
+      "estimated_minutes": 3,
+      "source_error_ids": ["错题 id"]
+    }}
+  ],
+  "answer_key": ["1. ..."]
+}}
+""".strip()
+
     def _source_errors_for_prompt(self, request: PracticePaperRequest) -> list[dict[str, Any]]:
         selected_subjects = {
             item.strip()
@@ -149,17 +274,17 @@ class PracticePaperService:
                 errors = filtered
 
         source = []
-        for item in errors[:12]:
+        for item in errors[:8]:
             source.append(
                 {
                     "id": item.id,
                     "subject": item.subject,
                     "topic": item.topic,
-                    "question": self._clip(item.question, 320),
+                    "question": self._clip(item.question, 260),
                     "reason": self._clip(item.reason, 120),
                     "tags": item.tags[:6],
                     "my_answer": self._clip(item.my_answer, 160),
-                    "ai_analysis": self._clip(item.ai_analysis, 240),
+                    "ai_analysis": self._clip(item.ai_analysis, 180),
                 }
             )
         return source

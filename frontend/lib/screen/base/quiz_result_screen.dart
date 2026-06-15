@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import 'learning_plan_screen.dart';
 
@@ -382,7 +383,7 @@ class QuizResultScreen extends StatelessWidget {
                   child: const Text(
                     '答错',
                     style: TextStyle(
-                    color: AppPalette.coral,
+                      color: AppPalette.coral,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -401,7 +402,7 @@ class QuizResultScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
+            AppLatexText(
               q['content'] as String,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
@@ -430,10 +431,10 @@ class QuizResultScreen extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(
+                        child: AppLatexText(
                           displayedUserAnswer,
                           style: const TextStyle(
-                    color: AppPalette.coral,
+                            color: AppPalette.coral,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -453,7 +454,7 @@ class QuizResultScreen extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(
+                        child: AppLatexText(
                           q['correctAnswer'] as String? ?? '回到档案复盘这道题',
                           style: const TextStyle(
                             color: AppPalette.matchaMist,
