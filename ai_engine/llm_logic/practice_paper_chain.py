@@ -37,6 +37,12 @@ _JSON_LATEX_COMMAND_BACKSLASH_PATTERN = re.compile(
 )
 _JSON_MATH_DELIMITER_BACKSLASH_PATTERN = re.compile(r"(?<!\\)\\(?=[()\[\]])")
 _JSON_INVALID_BACKSLASH_PATTERN = re.compile(r'(?<!\\)\\(?!["\\/bfnrtu])')
+_JSON_MISSING_COLON_FIELD_PATTERN = re.compile(
+    r'"(title|subtitle|subject_focus|topic_focus|estimated_minutes|handout_overview|learning_targets|warmup_notes|concept_review|formula_cards|method_models|worked_examples|common_traps|questions|id|type|subject|topic|stem|options|answer|answer_index|solution_outline|solution_steps|diagram_svg|diagram_caption|reason_hint|difficulty|source_error_ids|answer_key)"\s+(?=[\[{"]|null|-?\d)'
+)
+_JSON_FIELD_QUOTE_SWALLOWED_VALUE_PATTERN = re.compile(
+    r'"(title|subtitle|subject_focus|topic_focus|estimated_minutes|handout_overview|learning_targets|warmup_notes|concept_review|formula_cards|method_models|worked_examples|common_traps|questions|id|type|subject|topic|stem|options|answer|answer_index|solution_outline|solution_steps|diagram_svg|diagram_caption|reason_hint|difficulty|source_error_ids|answer_key)\s+([\[{]|null|-?\d)'
+)
 
 
 class PracticePaperService:
@@ -1048,7 +1054,7 @@ class PracticePaperService:
                 parsed = self._loads_json_object(attempt)
                 if parsed:
                     if repaired_used:
-                        logger.info("practice paper json parsed after latex escape repair")
+                        logger.info("practice paper json parsed after repair")
                     return parsed
                 error = self._json_decode_error(attempt)
                 if error:
@@ -1069,7 +1075,9 @@ class PracticePaperService:
         return parsed if isinstance(parsed, dict) else {}
 
     def _repair_json_latex_escapes(self, value: str) -> str:
-        repaired = _JSON_MATH_DELIMITER_BACKSLASH_PATTERN.sub(r"\\\\", value)
+        repaired = _JSON_FIELD_QUOTE_SWALLOWED_VALUE_PATTERN.sub(r'"\1": \2', value)
+        repaired = _JSON_MISSING_COLON_FIELD_PATTERN.sub(r'"\1": ', repaired)
+        repaired = _JSON_MATH_DELIMITER_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
         repaired = _JSON_LATEX_COMMAND_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
         return _JSON_INVALID_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
 
