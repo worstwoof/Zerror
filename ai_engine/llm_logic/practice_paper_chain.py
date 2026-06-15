@@ -32,6 +32,11 @@ _BARE_TEX_PATTERN = re.compile(
     r"(?:\s*[+\-*/=]\s*(?:[A-Za-z]|\d+(?:\.\d+)?|\\[A-Za-z]+(?:\s*\{[^{}]*\}){0,3}))*"
     r")"
 )
+_JSON_LATEX_COMMAND_BACKSLASH_PATTERN = re.compile(
+    r"(?<!\\)\\(?=(?:sqrt|frac|dfrac|tfrac|cdot|times|div|le|ge|leq|geq|neq|pm|mp|angle|triangle|parallel|perp|sin|cos|tan|log|ln|lim|sum|int|alpha|beta|gamma|lambda|mu|theta|pi|Delta|Omega|vec|bar|hat|overline)\b)"
+)
+_JSON_MATH_DELIMITER_BACKSLASH_PATTERN = re.compile(r"(?<!\\)\\(?=[()\[\]])")
+_JSON_INVALID_BACKSLASH_PATTERN = re.compile(r'(?<!\\)\\(?!["\\/bfnrtu])')
 
 
 class PracticePaperService:
@@ -1011,25 +1016,53 @@ class PracticePaperService:
 
     def _parse_json(self, raw_output: str) -> dict[str, Any]:
         cleaned = raw_output.strip()
-        if cleaned.startswith("```"):
-            match = re.search(r"```(?:json)?\s*(.*?)```", cleaned, re.DOTALL | re.IGNORECASE)
-            if match:
-                cleaned = match.group(1).strip()
+        candidates = []
 
-        try:
-            parsed = json.loads(cleaned)
-            return parsed if isinstance(parsed, dict) else {}
-        except json.JSONDecodeError:
-            pass
+        fence_match = re.search(
+            r"```(?:json)?\s*(.*?)```",
+            cleaned,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if fence_match:
+            candidates.append(fence_match.group(1).strip())
 
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if not match:
-            return {}
+        candidates.append(cleaned)
+
+        object_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if object_match:
+            candidates.append(object_match.group(0).strip())
+
+        seen = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+
+            repaired = self._repair_json_latex_escapes(candidate)
+            for attempt, repaired_used in (
+                (repaired, repaired != candidate),
+                (candidate, False),
+            ):
+                parsed = self._loads_json_object(attempt)
+                if parsed:
+                    if repaired_used:
+                        logger.info("practice paper json parsed after latex escape repair")
+                    return parsed
+
+        logger.warning("practice paper json parse failed content_len=%s", len(raw_output))
+        return {}
+
+    def _loads_json_object(self, value: str) -> dict[str, Any]:
         try:
-            parsed = json.loads(match.group(0))
-            return parsed if isinstance(parsed, dict) else {}
+            parsed = json.loads(value)
         except json.JSONDecodeError:
             return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _repair_json_latex_escapes(self, value: str) -> str:
+        repaired = _JSON_MATH_DELIMITER_BACKSLASH_PATTERN.sub(r"\\\\", value)
+        repaired = _JSON_LATEX_COMMAND_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
+        return _JSON_INVALID_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
 
     def _string_list(self, value: Any) -> list[str]:
         if not isinstance(value, list):
