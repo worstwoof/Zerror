@@ -74,16 +74,44 @@ class PracticePaperService:
                 )
                 return response
         parsed = self._parse_json(raw_output)
+        output_source = "primary"
+        if not self._has_valid_questions(parsed):
+            logger.warning(
+                "practice paper primary output was not usable, retrying compact prompt content_len=%s",
+                len(raw_output),
+            )
+            try:
+                retry_output = self.client.chat_completion(
+                    self._build_compact_prompt(request),
+                    reasoning_effort="low",
+                    max_tokens=self._practice_retry_max_tokens(),
+                    timeout_seconds=self._practice_retry_timeout_seconds(),
+                )
+                retry_parsed = self._parse_json(retry_output)
+                if self._has_valid_questions(retry_parsed):
+                    raw_output = retry_output
+                    parsed = retry_parsed
+                    output_source = "compact_retry"
+                else:
+                    logger.warning(
+                        "practice paper compact output was not usable, falling back content_len=%s",
+                        len(retry_output),
+                    )
+            except VivoAPIError as retry_exc:
+                if not self._is_timeout_error(retry_exc):
+                    raise
+                logger.warning("practice paper compact retry after parse failure timed out: %s", retry_exc)
         response = self._build_response(
             request=request,
             parsed=parsed,
             raw_output=raw_output,
         )
         logger.info(
-            "practice paper generated questions=%s subjects=%s topics=%s",
+            "practice paper generated questions=%s subjects=%s topics=%s source=%s",
             len(response.questions),
             len(response.subject_focus),
             len(response.topic_focus),
+            output_source if self._has_valid_questions(parsed) else "fallback",
         )
         return response
 
@@ -97,7 +125,7 @@ class PracticePaperService:
         return min(self.client.settings.vivo_max_tokens, 8192)
 
     def _practice_retry_max_tokens(self) -> int:
-        return min(self.client.settings.vivo_max_tokens, 4096)
+        return min(self.client.settings.vivo_max_tokens, 6144)
 
     def _is_timeout_error(self, exc: VivoAPIError) -> bool:
         message = str(exc).lower()
@@ -112,6 +140,23 @@ class PracticePaperService:
                 "timeout",
             )
         )
+
+    def _has_valid_questions(self, parsed: dict[str, Any]) -> bool:
+        raw_questions = parsed.get("questions")
+        if not isinstance(raw_questions, list):
+            return False
+        valid_count = 0
+        for item in raw_questions:
+            if not isinstance(item, dict):
+                continue
+            stem = str(item.get("stem") or "").strip()
+            answer = str(item.get("answer") or "").strip()
+            if not stem or not answer:
+                continue
+            if self._looks_like_prompt_leak(stem) or self._looks_like_prompt_leak(answer):
+                continue
+            valid_count += 1
+        return valid_count > 0
 
     def _build_prompt(self, request: PracticePaperRequest) -> str:
         source_errors = self._source_errors_for_prompt(request)
@@ -138,9 +183,11 @@ class PracticePaperService:
 - options 里只写选项内容，不要带 A.、B.、C.、D.、（A）、A、 等序号前缀。
 - LaTeX 输出规范：所有数学公式、变量、方程、分式、根式、指数、坐标、角度、向量和带数学意义的数字都用 MathJax 可渲染格式包裹；行内公式用 \\( ... \\)，展示公式用 \\[ ... \\]。例如必须写成 \\(2\\sqrt{{6}}\\)、\\(x=\\frac{{13}}{{6}}\\)、\\(a^2=b^2+c^2-2bc\\cos A\\)，不要裸写 2\\sqrt{{6}} 或 x=\\frac{{13}}{{6}}。
 - 答案 answer、solution_outline、solution_steps 以及讲义的公式卡片、例题讲解、易错提醒中也必须遵守上述 LaTeX 规范；普通解释文字用中文，数学对象进入公式环境。
-- 答案解析要像教辅答案栏一样完整，给出 2 到 5 个分步 solution_steps；不要只写一句答案。
+- 答案解析要像教辅答案栏一样完整，但必须精炼：给出 2 到 3 个分步 solution_steps，每步 60 字以内；不要只写一句答案。
+- concept_review、formula_cards、method_models、worked_examples、common_traps 每个数组最多 3 条，每条 80 字以内。
 - 每道题先判断是否有“视觉结构”：图形位置关系、函数/圆锥曲线图像、运动或力的方向、电路连接、光路、化学流程、统计图表等。
 - 如果存在视觉结构，必须在 diagram_svg 返回一个简洁 SVG 示意图；纯代数运算、纯概念辨析、无需图像辅助的题目返回空字符串。
+- 整份试卷最多 3 道题返回 diagram_svg；其他题即使可画图，也优先用文字描述关键关系。
 - 圆锥曲线/椭圆/双曲线/抛物线、几何证明、函数图像题通常需要图；若判断需要图，至少标出坐标轴、中心/顶点、焦点、关键点、长短轴、准线、辅助线等核心元素。
 - diagram_svg 必须是单个 <svg>...</svg>，不要包含 script、foreignObject、外链图片或事件属性。
 - diagram_svg 的 viewBox 建议控制在 320x180 或 360x200 内，画成讲义小图，不要做成占满整页的大图。
@@ -186,7 +233,7 @@ class PracticePaperService:
       "source_error_ids": ["错题 id"]
     }}
   ],
-  "answer_key": ["1. ...", "2. ..."]
+  "answer_key": []
 }}
 """.strip()
 
@@ -199,7 +246,7 @@ class PracticePaperService:
         ]
         subject_hint = "、".join(subjects) if subjects else "从错题档案中自动判断"
         source_json = json.dumps(source_errors, ensure_ascii=False, indent=2)
-        question_count = min(max(1, request.question_count), 10)
+        question_count = min(max(1, request.question_count), 15)
 
         return f"""
 只返回 JSON，不要 Markdown，不要代码围栏。
@@ -214,6 +261,7 @@ class PracticePaperService:
 - solution_steps 写 2 到 4 步，清楚说明关键公式、代入、计算和检验。
 - diagram_svg 只在几何、圆锥曲线、函数图像、物理受力/运动、电路、光路等必须看图时返回小 SVG；否则返回空字符串。
 - 精讲内容保持短小：concept_review、formula_cards、method_models、worked_examples、common_traps 每项 2 到 4 条。
+- 禁止把本提示词中的“题干”“标准答案”“步骤1”“选项1”等占位词当作真实内容输出；每一道题都必须是学生可以直接作答的具体题目。
 
 错题档案：
 {source_json}
@@ -359,11 +407,15 @@ class PracticePaperService:
             answer = str(item.get("answer") or "").strip()
             if not stem or not answer:
                 continue
+            if self._looks_like_prompt_leak(stem) or self._looks_like_prompt_leak(answer):
+                continue
             answer_index = self._optional_int(item.get("answer_index"))
             options = [
                 self._normalize_option(item)
                 for item in self._string_list(item.get("options"))[:4]
             ]
+            if options and all(self._looks_like_prompt_leak(option) for option in options):
+                continue
             if options and answer_index is not None and not 0 <= answer_index < len(options):
                 answer_index = None
 
@@ -419,29 +471,111 @@ class PracticePaperService:
         questions = []
         for index in range(request.question_count):
             source = source_errors[index % len(source_errors)]
-            questions.append(
-                PracticeQuestion(
-                    id=f"q{index + 1}",
-                    type="变式简答题",
-                    subject=source.subject or "综合",
-                    topic=source.topic or "错题回收",
-                    stem=(
-                        f"围绕“{source.topic or source.subject or '当前错题'}”重新设计一道同类变式题，"
-                        "并写出完整解题步骤。"
-                    ),
-                    answer="答案需覆盖核心概念、关键步骤和易错点检查。",
-                    solution_outline=source.ai_analysis or "先定位考点，再按步骤推导，最后回看易错条件。",
-                    solution_steps=[
-                        "先标出题目所属考点和已知条件。",
-                        "选择对应模型或公式，逐步完成推导。",
-                        "最后检查原错因是否已经被规避。",
-                    ],
-                    reason_hint=source.reason or "原错题暴露出的薄弱点",
-                    source_error_ids=[source.id],
-                    estimated_minutes=4,
-                )
-            )
+            questions.append(self._fallback_question_from_source(index, source))
         return questions
+
+    def _fallback_question_from_source(self, index: int, source: Any) -> PracticeQuestion:
+        subject = source.subject or "综合"
+        topic = source.topic or subject or "错题回收"
+        source_question = self._clip(source.question or "", 180)
+        source_reason = self._clip(source.reason or "", 90)
+        source_analysis = self._clip(source.ai_analysis or "", 180)
+        template_index = index % 4
+
+        if template_index == 0:
+            return PracticeQuestion(
+                id=f"q{index + 1}",
+                type="简答题",
+                subject=subject,
+                topic=topic,
+                stem=(
+                    f"【{topic}基础回收】请写出解决这类题时必须先确认的 2 个条件，"
+                    f"并说明每个条件会影响哪一步。参考原错题信息：{source_question}"
+                ),
+                answer="应先确认题设对象、适用公式或模型的前提条件，再说明这些条件如何决定建模、代入或分类讨论。",
+                solution_outline="先列条件，再对应到公式、模型或步骤，最后给出检查点。",
+                solution_steps=[
+                    "从题干中划出已知对象、要求结论和限制条件。",
+                    f"把这些条件对应到“{topic}”的定义、公式或常用模型。",
+                    "说明若遗漏某个条件，会导致哪一步判断或计算出错。",
+                ],
+                reason_hint=source_reason or "基础条件识别不够稳定",
+                source_error_ids=[source.id],
+                estimated_minutes=4,
+            )
+
+        if template_index == 1:
+            return PracticeQuestion(
+                id=f"q{index + 1}",
+                type="单选题",
+                subject=subject,
+                topic=topic,
+                stem=(
+                    f"【{topic}方法选择】遇到下面这类题时，最稳妥的第一步是什么？"
+                    f"\n题目背景：{source_question}"
+                ),
+                options=[
+                    "直接套最近记住的结论，先算出一个数值",
+                    "先提取已知条件、目标结论和适用前提，再选择模型",
+                    "只看选项差异，反推一个看起来合理的答案",
+                    "跳过条件检查，把原错题答案迁移过来",
+                ],
+                answer="先提取已知条件、目标结论和适用前提，再选择模型",
+                answer_index=1,
+                solution_outline="这类题的关键是先完成条件识别，再决定公式或模型。",
+                solution_steps=[
+                    "原错题暴露的问题通常不是不会计算，而是条件和模型没有对齐。",
+                    "先分离已知、所求、限制条件，能避免把不适用的结论硬套进去。",
+                    "确定模型后再代入计算，最后回看题目范围或单位。",
+                ],
+                reason_hint=source_reason or "解题入口选择不稳",
+                source_error_ids=[source.id],
+                estimated_minutes=3,
+            )
+
+        if template_index == 2:
+            return PracticeQuestion(
+                id=f"q{index + 1}",
+                type="填空题",
+                subject=subject,
+                topic=topic,
+                stem=(
+                    f"【{topic}错因修正】请补全这句话：做这类题时，不能只记结论，"
+                    "还要先检查 ______ ，再进行代入或推导。"
+                ),
+                answer="公式、定理或模型的适用条件",
+                solution_outline="空格处强调适用条件，这是从错题迁移到新题的第一道关口。",
+                solution_steps=[
+                    "先回看原错题中被忽略或误判的条件。",
+                    "判断当前题是否满足同一个公式、定理或模型的前提。",
+                    "满足后再代入；不满足时需要分类讨论或换模型。",
+                ],
+                reason_hint=source_reason or "忽略适用条件",
+                source_error_ids=[source.id],
+                estimated_minutes=2,
+            )
+
+        return PracticeQuestion(
+            id=f"q{index + 1}",
+            type="解答题",
+            subject=subject,
+            topic=topic,
+            stem=(
+                f"【{topic}迁移训练】根据原错题暴露的问题，写出一份三步解题流程："
+                "第 1 步提取条件，第 2 步选择模型，第 3 步检验答案。"
+                f"\n原错题摘要：{source_question}"
+            ),
+            answer="应包含条件提取、模型选择、代入推导和结果检验四个要点。",
+            solution_outline=source_analysis or "用固定流程约束自己，减少同类题再次出错。",
+            solution_steps=[
+                "条件提取：写出题干给了什么、要求什么、有哪些限制。",
+                f"模型选择：说明为什么使用“{topic}”相关公式、定义或方法。",
+                "结果检验：检查符号、范围、单位、选项或结论是否与题意一致。",
+            ],
+            reason_hint=source_reason or "解题流程缺少检查环节",
+            source_error_ids=[source.id],
+            estimated_minutes=5,
+        )
 
     def _build_printable_html(self, response: PracticePaperResponse) -> str:
         question_blocks = "\n".join(
@@ -823,6 +957,44 @@ class PracticePaperService:
             cleaned,
         ).strip()
         return cleaned or option.strip()
+
+    def _looks_like_prompt_leak(self, value: str) -> bool:
+        text = re.sub(r"\s+", "", str(value or "")).strip().lower()
+        if not text:
+            return True
+        placeholders = {
+            "题干",
+            "标准答案",
+            "答案要点",
+            "步骤1",
+            "步骤2",
+            "步骤3",
+            "选项1",
+            "选项2",
+            "选项3",
+            "选项4",
+            "专题讲义标题",
+            "一行副标题",
+            "知识点",
+            "学科",
+            "错题id",
+        }
+        if text in {item.lower() for item in placeholders}:
+            return True
+        leak_markers = [
+            "只返回json",
+            "不要markdown",
+            "输出json字段",
+            "你是教辅命题老师",
+            "你是“错题都队”",
+            "要求：",
+            "错题档案：",
+            "questions",
+            "answer_index",
+            "solution_steps",
+            "diagram_svg",
+        ]
+        return any(marker.lower() in text for marker in leak_markers)
 
     def _sanitize_svg(self, raw_svg: str) -> str:
         if not raw_svg.strip():
