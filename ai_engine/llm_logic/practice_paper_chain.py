@@ -191,8 +191,9 @@ class PracticePaperService:
 - 答案解析要像教辅答案栏一样完整，但必须精炼：给出 2 到 3 个分步 solution_steps，每步 60 字以内；不要只写一句答案。
 - concept_review、formula_cards、method_models、worked_examples、common_traps 每个数组最多 3 条，每条 80 字以内。
 - 每道题先判断是否有“视觉结构”：图形位置关系、函数/圆锥曲线图像、运动或力的方向、电路连接、光路、化学流程、统计图表等。
-- 如果存在视觉结构，必须在 diagram_svg 返回一个简洁 SVG 示意图；纯代数运算、纯概念辨析、无需图像辅助的题目返回空字符串。
-- 整份试卷最多 3 道题返回 diagram_svg；其他题即使可画图，也优先用文字描述关键关系。
+- 如果存在视觉结构，可以在 diagram_svg 返回一个简洁 SVG 示意图；纯代数运算、纯概念辨析、无需图像辅助的题目返回空字符串。
+- 为保证 JSON 可解析，diagram_svg 必须是单行 SVG 字符串，SVG 属性必须使用单引号，不要使用双引号，不要换行。例如 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 180'>...</svg>。
+- 整份试卷最多 3 道题返回 diagram_svg；其他题即使可画图，也优先用 diagram_caption 描述关键关系。
 - 圆锥曲线/椭圆/双曲线/抛物线、几何证明、函数图像题通常需要图；若判断需要图，至少标出坐标轴、中心/顶点、焦点、关键点、长短轴、准线、辅助线等核心元素。
 - diagram_svg 必须是单个 <svg>...</svg>，不要包含 script、foreignObject、外链图片或事件属性。
 - diagram_svg 的 viewBox 建议控制在 320x180 或 360x200 内，画成讲义小图，不要做成占满整页的大图。
@@ -230,7 +231,7 @@ class PracticePaperService:
       "answer_index": 0,
       "solution_outline": "答案要点",
       "solution_steps": ["步骤1", "步骤2", "步骤3"],
-      "diagram_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 360 180\">...</svg>",
+      "diagram_svg": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 180'>...</svg>",
       "diagram_caption": "示意图说明",
       "reason_hint": "这题主要回收的错因",
       "difficulty": "基础/中等/提高",
@@ -264,7 +265,7 @@ class PracticePaperService:
 - options 只写选项内容，不带 A.、B.、C.、D. 前缀。
 - 所有数学公式、变量、分式、根式、坐标、角度和数学数字都用 MathJax：行内 \\( ... \\)，展示 \\[ ... \\]；例如 \\(2\\sqrt{{6}}\\)、\\(x=\\frac{{13}}{{6}}\\)。
 - solution_steps 写 2 到 4 步，清楚说明关键公式、代入、计算和检验。
-- diagram_svg 只在几何、圆锥曲线、函数图像、物理受力/运动、电路、光路等必须看图时返回小 SVG；否则返回空字符串。
+- diagram_svg 只在几何、圆锥曲线、函数图像、物理受力/运动、电路、光路等必须看图时返回小 SVG；否则返回空字符串。为保证 JSON 可解析，SVG 必须是一行字符串，属性用单引号，不用双引号，不要换行。
 - 精讲内容保持短小：concept_review、formula_cards、method_models、worked_examples、common_traps 每项 2 到 4 条。
 - 禁止把本提示词中的“题干”“标准答案”“步骤1”“选项1”等占位词当作真实内容输出；每一道题都必须是学生可以直接作答的具体题目。
 
@@ -1033,6 +1034,7 @@ class PracticePaperService:
             candidates.append(object_match.group(0).strip())
 
         seen = set()
+        errors = []
         for candidate in candidates:
             if not candidate or candidate in seen:
                 continue
@@ -1048,8 +1050,15 @@ class PracticePaperService:
                     if repaired_used:
                         logger.info("practice paper json parsed after latex escape repair")
                     return parsed
+                error = self._json_decode_error(attempt)
+                if error:
+                    errors.append(("repaired" if repaired_used else "raw", error))
 
-        logger.warning("practice paper json parse failed content_len=%s", len(raw_output))
+        logger.warning(
+            "practice paper json parse failed content_len=%s errors=%s",
+            len(raw_output),
+            errors[:3],
+        )
         return {}
 
     def _loads_json_object(self, value: str) -> dict[str, Any]:
@@ -1063,6 +1072,16 @@ class PracticePaperService:
         repaired = _JSON_MATH_DELIMITER_BACKSLASH_PATTERN.sub(r"\\\\", value)
         repaired = _JSON_LATEX_COMMAND_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
         return _JSON_INVALID_BACKSLASH_PATTERN.sub(r"\\\\", repaired)
+
+    def _json_decode_error(self, value: str) -> str:
+        try:
+            json.loads(value)
+        except json.JSONDecodeError as exc:
+            start = max(0, exc.pos - 80)
+            end = min(len(value), exc.pos + 80)
+            near = value[start:end].replace("\n", "\\n")
+            return f"{exc.msg} at pos={exc.pos} near={near!r}"
+        return ""
 
     def _string_list(self, value: Any) -> list[str]:
         if not isinstance(value, list):
