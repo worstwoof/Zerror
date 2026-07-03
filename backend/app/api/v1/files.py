@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import mimetypes
 import re
+import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from backend.app.core.auth import get_current_user
-from backend.app.core.config import settings
+from backend.app.core.config import PROJECT_ROOT, settings
 from backend.app.core.object_storage import ObjectStorageError, TencentCOSStorage
 from backend.app.db.models import User
 from backend.app.db.session import get_db
@@ -26,12 +29,6 @@ async def upload_file(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> FileUploadResponse:
-    if cos_storage is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Tencent COS is not configured.",
-        )
-
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(
@@ -41,11 +38,37 @@ async def upload_file(
 
     effective_sync_user_id = current_user.sync_user_id or sync_user_id
     folder = _build_folder(sync_user_id=effective_sync_user_id, category=category)
+    content_type = file.content_type or "application/octet-stream"
+
+    if cos_storage is None:
+        object_key, file_url = _save_local_upload(
+            file_bytes=file_bytes,
+            filename=file.filename,
+            content_type=content_type,
+            folder=folder,
+        )
+        create_or_update_media_asset(
+            db,
+            user=current_user,
+            category=category,
+            object_key=object_key,
+            file_url=file_url,
+            content_type=content_type,
+            size_bytes=len(file_bytes),
+        )
+        db.commit()
+        return FileUploadResponse(
+            object_key=object_key,
+            file_url=file_url,
+            content_type=content_type,
+            size_bytes=len(file_bytes),
+        )
+
     try:
         object_key, file_url = cos_storage.upload_bytes(
             file_bytes=file_bytes,
             filename=file.filename,
-            content_type=file.content_type,
+            content_type=content_type,
             folder=folder,
         )
     except ObjectStorageError as exc:
@@ -60,7 +83,7 @@ async def upload_file(
         category=category,
         object_key=object_key,
         file_url=file_url,
-        content_type=file.content_type or "application/octet-stream",
+        content_type=content_type,
         size_bytes=len(file_bytes),
     )
     db.commit()
@@ -68,7 +91,7 @@ async def upload_file(
     return FileUploadResponse(
         object_key=object_key,
         file_url=file_url,
-        content_type=file.content_type or "application/octet-stream",
+        content_type=content_type,
         size_bytes=len(file_bytes),
     )
 
@@ -77,6 +100,25 @@ def _build_folder(*, sync_user_id: str, category: str) -> str:
     safe_user_id = _sanitize_segment(sync_user_id, fallback="anonymous")
     safe_category = _sanitize_segment(category, fallback="general")
     return f"uploads/{safe_user_id}/{safe_category}"
+
+
+def _save_local_upload(
+    *,
+    file_bytes: bytes,
+    filename: str | None,
+    content_type: str,
+    folder: str,
+) -> tuple[str, str]:
+    suffix = Path(filename or "").suffix
+    if not suffix:
+        guessed_suffix = mimetypes.guess_extension(content_type)
+        suffix = guessed_suffix or ".bin"
+    safe_suffix = re.sub(r"[^a-zA-Z0-9.]+", "", suffix)[:16] or ".bin"
+    object_key = f"{folder}/{uuid.uuid4().hex}{safe_suffix}"
+    target_path = PROJECT_ROOT / "static" / object_key
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_bytes(file_bytes)
+    return object_key, f"/static/{object_key}"
 
 
 def _sanitize_segment(value: str, *, fallback: str) -> str:
