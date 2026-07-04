@@ -66,6 +66,30 @@ class AssistantService:
             ensure_ascii=False,
             indent=2,
         )
+        selection_context = (
+            request.selection_context.model_dump()
+            if request.selection_context is not None
+            else None
+        )
+        selection_json = json.dumps(
+            selection_context or {},
+            ensure_ascii=False,
+            indent=2,
+        )
+        selection_instruction = ""
+        if selection_context:
+            selection_instruction = f"""
+
+局部追问上下文：
+{selection_json}
+
+局部追问要求：
+- 只围绕 selected_text 和 user_question 解释，不要重新完整讲整道题。
+- 先用一句话说清这段文字/公式在解题中承担什么作用。
+- 再拆成 2 到 4 个小步骤解释“为什么这样做、条件从哪里来、公式是什么意思”。
+- 如果 selected_text 是公式，要解释每个关键符号、等号/不等号来源，以及这一步和题干的关系。
+- 最后给一个“回到原题时怎么检查”的小提醒。
+""".rstrip()
         mode_label = self._mode_label(request.mode)
         mode_instruction = self._mode_instruction(request.mode)
         now = datetime.now(ZoneInfo("Asia/Shanghai"))
@@ -93,6 +117,7 @@ class AssistantService:
 
 错题档案节选：
 {errors_json}
+{selection_instruction}
 
 回答要求：
 - 如果学生问今天日期、星期几或当前时间，直接按“当前北京时间”回答，不要说无法获取实时日期。
@@ -165,6 +190,34 @@ class AssistantService:
         knowledge = self._knowledge_candidates(request.errors, limit=6)
         pending = request.context.pending_review_count
         note = service_note.strip()
+        selection = request.selection_context
+        if selection is not None and selection.selected_text.strip():
+            selected = self._clip(selection.selected_text.strip(), 80)
+            question = self._clip(
+                selection.user_question.strip() or request.message,
+                80,
+            )
+            return AssistantChatResponse(
+                mode=request.mode,
+                title="这段我帮你拆开",
+                summary=f"你问的是「{selected}」。先把它当成当前步骤的关键依据来看。",
+                sections=[
+                    AssistantChatSection(
+                        title="局部解释",
+                        body=f"这段的作用是连接题干条件和下一步推导。你的疑惑是：{question}",
+                        bullets=[
+                            "先找这一步引用了题干中的哪个条件。",
+                            "再看公式或判断把哪个量转成了可计算对象。",
+                            "最后回到原题检查结论是否满足范围或前提。",
+                        ],
+                    )
+                ],
+                linked_knowledge=knowledge,
+                follow_up_prompts=["这一步的公式从哪里来？", "能不能举一个反例？"],
+                sprint_minutes=0,
+                fallback=True,
+                raw_model_output=raw_output,
+            )
 
         if request.mode == "error_memory":
             sections = [

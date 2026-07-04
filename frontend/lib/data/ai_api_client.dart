@@ -1359,7 +1359,15 @@ class AiApiClient {
     required String mode,
     required Map<String, dynamic> context,
     required List<Map<String, dynamic>> errors,
+    Map<String, dynamic>? selectionContext,
   }) async {
+    final body = <String, dynamic>{
+      'message': message,
+      'mode': mode,
+      'context': context,
+      'errors': errors,
+      if (selectionContext != null) 'selection_context': selectionContext,
+    };
     late final http.Response response;
     try {
       response = await http
@@ -1368,12 +1376,7 @@ class AiApiClient {
             headers: const {
               'Content-Type': 'application/json; charset=utf-8',
             },
-            body: jsonEncode({
-              'message': message,
-              'mode': mode,
-              'context': context,
-              'errors': errors,
-            }),
+            body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 75));
     } on TimeoutException catch (_) {

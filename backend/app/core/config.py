@@ -177,7 +177,7 @@ def get_settings() -> Settings:
         vivo_animation_model=_get_setting(
             "VIVO_ANIMATION_MODEL",
             file_values,
-            _get_setting("VIVO_TEXT_MODEL", file_values, "Doubao-Seed-2.0-mini"),
+            "Doubao-Seed-2.0-pro",
         ),
         vivo_animation_thinking_mode=_get_setting(
             "VIVO_ANIMATION_THINKING_MODE",
@@ -195,7 +195,7 @@ def get_settings() -> Settings:
             _get_setting(
                 "VIVO_ANIMATION_TIMEOUT_SECONDS",
                 file_values,
-                _get_setting("VIVO_TIMEOUT_SECONDS", file_values, "120"),
+                "240",
             )
         ),
         vivo_max_tokens=int(_get_setting("VIVO_MAX_TOKENS", file_values, "4096")),
@@ -203,7 +203,7 @@ def get_settings() -> Settings:
             _get_setting(
                 "VIVO_ANIMATION_MAX_TOKENS",
                 file_values,
-                _get_setting("VIVO_MAX_TOKENS", file_values, "4096"),
+                "8192",
             )
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",

@@ -25,7 +25,7 @@ class _FakeClient:
         self.raw_output = raw_output
         self.prompts: list[str] = []
         self.settings = SimpleNamespace(
-            vivo_animation_model="Doubao-Seed-2.0-mini",
+            vivo_animation_model="Doubao-Seed-2.0-pro",
         )
 
     def animation_chat_completion(self, prompt: str) -> str:
@@ -107,7 +107,13 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertEqual("generic", scene_spec["scene_type"])
         self.assertEqual("general", scene_spec["subject"])
         self.assertTrue(scene_spec["objects"])
+        self.assertGreaterEqual(len(scene_spec["steps"]), 8)
+        self.assertGreaterEqual(len(scene_spec["teaching_stages"]), 8)
+        self.assertGreaterEqual(scene_spec["parameters"]["target_duration_seconds"], 120)
+        self.assertLessEqual(scene_spec["parameters"]["target_duration_seconds"], 240)
         self.assertIn("不要写 Python", service.client.prompts[0])
+        self.assertIn("teaching_stages", service.client.prompts[0])
+        self.assertIn("8 到 12", service.client.prompts[0])
 
     def test_job_create_query_failure_and_retry(self) -> None:
         service = _FlakyVideoService()

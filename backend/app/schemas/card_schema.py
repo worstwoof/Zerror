@@ -309,11 +309,20 @@ class AssistantMemoryContext(BaseModel):
     subject_distribution: Dict[str, int] = Field(default_factory=dict)
 
 
+class AssistantSelectionContext(BaseModel):
+    question_text: str = ""
+    analysis_summary: str = ""
+    selected_text: str = ""
+    user_question: str = ""
+    source_section: str = ""
+
+
 class AssistantChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     mode: AssistantMode = "quick_answer"
     context: AssistantMemoryContext = Field(default_factory=AssistantMemoryContext)
     errors: List[PracticePaperSourceError] = Field(default_factory=list)
+    selection_context: Optional[AssistantSelectionContext] = None
 
 
 class AssistantChatSection(BaseModel):

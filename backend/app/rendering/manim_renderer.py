@@ -331,9 +331,9 @@ class LearningScene(Scene):
             summary = str(spec.get("fallback_text") or "根据结构化场景生成讲解动画。")
             note = self._caption(summary[:58], color=YELLOW)
             self.play(FadeIn(note, shift=UP * 0.15))
-            self.wait(2.2)
+            self.wait(4.2)
             self.play(FadeOut(note))
-        self.wait(1.8)
+        self.wait(2.2)
 
     def _fit_to_zone(self, mob, *, width, height, center):
         if mob.width > width:
@@ -342,6 +342,31 @@ class LearningScene(Scene):
             mob.scale_to_fit_height(height)
         mob.move_to(center)
         return mob
+
+    def _target_duration_seconds(self, spec):
+        params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
+        try:
+            value = int(float(params.get("target_duration_seconds") or 150))
+        except Exception:
+            value = 150
+        return max(120, min(240, value))
+
+    def _stage_wait_time(self, spec, stage_count):
+        target = self._target_duration_seconds(spec)
+        available = max(72, target - 36)
+        return max(7.0, min(16.0, available / max(1, stage_count)))
+
+    def _stage_text_lines(self, spec, index, fallback):
+        raw_stages = spec.get("teaching_stages") if isinstance(spec.get("teaching_stages"), list) else []
+        if index < len(raw_stages) and isinstance(raw_stages[index], dict):
+            stage = raw_stages[index]
+            lines = [
+                str(stage.get("narration") or fallback).strip(),
+                str(stage.get("key_conclusion") or "").strip(),
+                str(stage.get("checkpoint") or "").strip(),
+            ]
+            return [line for line in lines if line][:3] or [fallback]
+        return [fallback]
 
     def _stage_panel(self, title, lines, *, accent=YELLOW, max_lines=4):
         heading = cjk_text(compact_text(title, 18), font_size=21, color=accent)
@@ -2131,7 +2156,7 @@ class LearningScene(Scene):
         group.to_edge(DOWN, buff=0.28)
         panel.move_to(box.get_center())
         self.play(FadeIn(group, shift=UP * 0.18), run_time=0.7)
-        self.wait(2.0)
+        self.wait(4.0)
         self.play(FadeOut(group, shift=DOWN * 0.12), run_time=0.5)
 
     def _caption(self, text, color=WHITE):
@@ -2164,16 +2189,17 @@ class LearningScene(Scene):
         steps = [str(item).strip() for item in spec.get("steps") or [] if str(item).strip()]
         if not steps:
             return
-        visible_steps = steps[:8]
-        for group_start in range(0, len(visible_steps), 2):
+        visible_steps = steps[:12]
+        wait_time = self._stage_wait_time(spec, len(visible_steps))
+        for index, step in enumerate(visible_steps):
             panel = self._stage_panel(
-                "文字解析",
-                visible_steps[group_start:group_start + 2],
+                f"第 {{index + 1}} 阶段",
+                self._stage_text_lines(spec, index, step),
                 accent=YELLOW,
-                max_lines=2,
+                max_lines=3,
             )
             self.play(FadeIn(panel, shift=LEFT * 0.12), run_time=0.55)
-            self.wait(3.2)
+            self.wait(wait_time)
             self.play(FadeOut(panel, shift=RIGHT * 0.10), run_time=0.45)
 
     def _show_formula_review(self, spec):
@@ -2193,8 +2219,8 @@ class LearningScene(Scene):
         self.play(FadeIn(panel, shift=LEFT * 0.12), run_time=0.45)
         for item in (panel[1][1] if len(panel[1]) > 1 else []):
             self.play(Indicate(item, color=YELLOW, scale_factor=1.02), run_time=0.45)
-            self.wait(0.55)
-        self.wait(1.8)
+            self.wait(1.0)
+        self.wait(2.6)
         self.play(FadeOut(panel, shift=RIGHT * 0.12), run_time=0.55)
 
     def _draw_board_block_scene(self, spec):

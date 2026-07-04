@@ -1037,6 +1037,179 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     );
   }
 
+  void _openAnalysisSelectionSheet() {
+    final analysisText = _analysisPlainText();
+    if (analysisText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前还没有可追问的解析内容。')),
+      );
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _AnalysisSelectionSheet(
+          analysisText: analysisText,
+          onAsk: (selectedText) {
+            Navigator.of(sheetContext).pop();
+            Future.microtask(
+              () => _openAskAboutSelection(
+                selectedText: selectedText,
+                sourceSection: 'AI 解析全文',
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openAskAboutSelection({
+    required String selectedText,
+    required String sourceSection,
+  }) async {
+    final selected = selectedText.trim();
+    if (selected.isEmpty || !mounted) return;
+    final reply = await showModalBottomSheet<AssistantChatReply>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return _AskAboutSelectionSheet(
+          selectedText: selected,
+          onSubmit: (question) => _askSelectionAssistant(
+            selectedText: selected,
+            userQuestion: question,
+            sourceSection: sourceSection,
+          ),
+        );
+      },
+    );
+    if (!mounted || reply == null) return;
+    await _showSelectionAnswer(
+      selectedText: selected,
+      sourceSection: sourceSection,
+      initialReply: reply,
+    );
+  }
+
+  Future<void> _showSelectionAnswer({
+    required String selectedText,
+    required String sourceSection,
+    required AssistantChatReply initialReply,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return _SelectionAnswerSheet(
+          selectedText: selectedText,
+          initialReply: initialReply,
+          onFollowUp: (question) => _askSelectionAssistant(
+            selectedText: selectedText,
+            userQuestion: question,
+            sourceSection: sourceSection,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<AssistantChatReply> _askSelectionAssistant({
+    required String selectedText,
+    required String userQuestion,
+    required String sourceSection,
+  }) {
+    final question = userQuestion.trim().isEmpty
+        ? '我不懂这段：$selectedText'
+        : userQuestion.trim();
+    final subject =
+        _subject == '通用' ? _inferSubject(_questionController.text) : _subject;
+    final topic = _inferTopic(_questionController.text, subject);
+    return _apiClient.askAssistant(
+      message: question,
+      mode: 'quick_answer',
+      context: {
+        'total_errors': 1,
+        'pending_review_count': 0,
+        'mastered_count': 0,
+        'weakest_subject': subject,
+        'weakest_topic': topic,
+        'weakest_subject_pending_count': 1,
+        'weakest_topic_pending_count': 1,
+        'subject_distribution': {subject: 1},
+      },
+      errors: [
+        {
+          'id': 'current-capture-analysis',
+          'subject': subject,
+          'topic': topic,
+          'question': _clipSelectionText(_questionController.text, 520),
+          'reason': _selectedErrorReason,
+          'tags': _buildTags(subject, topic).take(8).toList(growable: false),
+          'question_format': _questionFormat,
+          'type_tags': _typeTags.take(6).toList(growable: false),
+          'model_tags': _modelTags.take(6).toList(growable: false),
+          'difficulty': _difficulty,
+          'classification_confidence': _classificationConfidence,
+          'my_answer': _clipSelectionText(_reflectionController.text, 180),
+          'ai_analysis': _clipSelectionText(_analysisPlainText(), 900),
+        },
+      ],
+      selectionContext: {
+        'question_text': _clipSelectionText(_questionController.text, 900),
+        'analysis_summary':
+            _clipSelectionText(_selectionAnalysisSummary(), 900),
+        'selected_text': _clipSelectionText(selectedText, 900),
+        'user_question': _clipSelectionText(question, 220),
+        'source_section': sourceSection,
+      },
+    );
+  }
+
+  String _analysisPlainText() {
+    final buffer = StringBuffer();
+    void writeBlock(String title, String body) {
+      final text = body.trim();
+      if (text.isEmpty) return;
+      if (buffer.isNotEmpty) buffer.writeln('\n');
+      buffer.writeln(title);
+      buffer.writeln(text);
+    }
+
+    writeBlock('破题技巧', _solutionSummary);
+    if (_solutionSteps.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.writeln('\n');
+      buffer.writeln('详细推导步骤');
+      for (var i = 0; i < _solutionSteps.length; i += 1) {
+        buffer.writeln('${i + 1}. ${_solutionSteps[i].trim()}');
+      }
+    }
+    writeBlock('错因诊断', _mistakeDiagnosis);
+    writeBlock('复习建议', _reviewFocus);
+    if (_knowledgePoints.isNotEmpty) {
+      writeBlock('知识点', _knowledgePoints.join('、'));
+    }
+    return buffer.toString().trim();
+  }
+
+  String _selectionAnalysisSummary() {
+    return [
+      if (_solutionSummary.trim().isNotEmpty) _solutionSummary.trim(),
+      if (_mistakeDiagnosis.trim().isNotEmpty) '错因诊断：$_mistakeDiagnosis',
+      if (_reviewFocus.trim().isNotEmpty) '复习建议：$_reviewFocus',
+    ].join('\n');
+  }
+
+  String _clipSelectionText(String text, int limit) {
+    final compact = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= limit) return compact;
+    return '${compact.substring(0, limit)}...';
+  }
+
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
       color: _readablePanel,
@@ -1068,6 +1241,35 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             icon: Icons.auto_awesome,
             iconBackgroundColor: _readableAccentSoft,
             iconColor: _readableAccent,
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _analysisPlainText().isEmpty
+                  ? null
+                  : _openAnalysisSelectionSheet,
+              icon: const Icon(
+                Icons.question_answer_rounded,
+                size: 18,
+                color: _readableAccent,
+              ),
+              label: const Text(
+                '划线问 AI',
+                style: TextStyle(
+                  color: _readableAccent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           _buildSectionLabel('💡 破题技巧'),
@@ -3189,6 +3391,539 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
         return scene;
     }
   }
+}
+
+class _AnalysisSelectionSheet extends StatelessWidget {
+  const _AnalysisSelectionSheet({
+    required this.analysisText,
+    required this.onAsk,
+  });
+
+  final String analysisText;
+  final ValueChanged<String> onAsk;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: Column(
+            children: [
+              _SheetHeader(
+                title: '选择解析片段',
+                icon: Icons.text_fields_rounded,
+                onClose: () => Navigator.of(context).pop(),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  child: SelectableText(
+                    analysisText,
+                    style: const TextStyle(
+                      color: AppPalette.textPrimary,
+                      fontSize: 15,
+                      height: 1.7,
+                    ),
+                    contextMenuBuilder: (context, editableTextState) {
+                      final value = editableTextState.textEditingValue;
+                      final selection = value.selection;
+                      final selectedText =
+                          selection.isValid && !selection.isCollapsed
+                              ? selection.textInside(value.text).trim()
+                              : '';
+                      final items = <ContextMenuButtonItem>[
+                        ...editableTextState.contextMenuButtonItems,
+                        if (selectedText.isNotEmpty)
+                          ContextMenuButtonItem(
+                            label: '问 AI',
+                            onPressed: () {
+                              ContextMenuController.removeAny();
+                              onAsk(selectedText);
+                            },
+                          ),
+                      ];
+                      return AdaptiveTextSelectionToolbar.buttonItems(
+                        anchors: editableTextState.contextMenuAnchors,
+                        buttonItems: items,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AskAboutSelectionSheet extends StatefulWidget {
+  const _AskAboutSelectionSheet({
+    required this.selectedText,
+    required this.onSubmit,
+  });
+
+  final String selectedText;
+  final Future<AssistantChatReply> Function(String question) onSubmit;
+
+  @override
+  State<_AskAboutSelectionSheet> createState() =>
+      _AskAboutSelectionSheetState();
+}
+
+class _AskAboutSelectionSheetState extends State<_AskAboutSelectionSheet> {
+  late final TextEditingController _controller;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: '我不懂这段：${_clipSheetText(widget.selectedText, 48)}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_loading) return;
+    final question = _controller.text.trim();
+    if (question.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final reply = await widget.onSubmit(question);
+      if (!mounted) return;
+      Navigator.of(context).pop(reply);
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'AI 暂时没有回答出来，请稍后重试。';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SheetHeader(
+                  title: '问 AI',
+                  icon: Icons.psychology_alt_rounded,
+                  onClose: _loading ? null : () => Navigator.of(context).pop(),
+                ),
+                _SelectedTextBox(text: widget.selectedText),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _controller,
+                  maxLines: 3,
+                  minLines: 2,
+                  autofocus: true,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFFF6F9FF),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: AppPalette.inkBlue.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: AppPalette.inkBlue.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: AppPalette.moodBlue.withValues(alpha: 0.42),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: AppPalette.coral,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading ? null : _submit,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send_rounded),
+                    label: Text(_loading ? '正在回答' : '发送'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.moodBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionAnswerSheet extends StatefulWidget {
+  const _SelectionAnswerSheet({
+    required this.selectedText,
+    required this.initialReply,
+    required this.onFollowUp,
+  });
+
+  final String selectedText;
+  final AssistantChatReply initialReply;
+  final Future<AssistantChatReply> Function(String question) onFollowUp;
+
+  @override
+  State<_SelectionAnswerSheet> createState() => _SelectionAnswerSheetState();
+}
+
+class _SelectionAnswerSheetState extends State<_SelectionAnswerSheet> {
+  late AssistantChatReply _reply;
+  late final TextEditingController _controller;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reply = widget.initialReply;
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _followUp() async {
+    if (_loading) return;
+    final question = _controller.text.trim();
+    if (question.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final reply = await widget.onFollowUp(question);
+      if (!mounted) return;
+      setState(() {
+        _reply = reply;
+        _loading = false;
+        _controller.clear();
+      });
+    } on AiApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = '继续追问失败，请稍后再试。';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: Column(
+            children: [
+              _SheetHeader(
+                title: _reply.title.isEmpty ? 'AI 回答' : _reply.title,
+                icon: Icons.chat_bubble_outline_rounded,
+                onClose: () => Navigator.of(context).pop(),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SelectedTextBox(text: widget.selectedText),
+                      const SizedBox(height: 14),
+                      AppLatexText(
+                        _reply.summary,
+                        style: const TextStyle(
+                          color: AppPalette.textPrimary,
+                          fontSize: 15,
+                          height: 1.65,
+                        ),
+                      ),
+                      ..._reply.sections.map(_buildReplySection),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_error != null) ...[
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: AppPalette.coral,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            minLines: 1,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: '继续追问这段',
+                              filled: true,
+                              fillColor: const Color(0xFFF6F9FF),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton.filled(
+                          onPressed: _loading ? null : _followUp,
+                          icon: _loading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_upward_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppPalette.moodBlue,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReplySection(AssistantReplySection section) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            section.title,
+            style: const TextStyle(
+              color: AppPalette.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (section.body.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            AppLatexText(
+              section.body,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+          ],
+          ...section.bullets.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: AppLatexText(
+                '• $item',
+                style: const TextStyle(
+                  color: AppPalette.textPrimary,
+                  fontSize: 14,
+                  height: 1.55,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectedTextBox extends StatelessWidget {
+  const _SelectedTextBox({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F9FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.inkBlue.withValues(alpha: 0.08)),
+      ),
+      child: Text(
+        _clipSheetText(text, 180),
+        style: const TextStyle(
+          color: AppPalette.textSecondary,
+          fontSize: 13,
+          height: 1.45,
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetHeader extends StatelessWidget {
+  const _SheetHeader({
+    required this.title,
+    required this.icon,
+    this.onClose,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 12, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7ECF6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: const Color(0xFF38558F), size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _clipSheetText(String text, int limit) {
+  final compact = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (compact.length <= limit) return compact;
+  return '${compact.substring(0, limit)}...';
 }
 
 class QuestionTextEditorScreen extends StatefulWidget {

@@ -63,7 +63,7 @@ class LectureVideoService:
         topic = request.topic.strip() or "从用户输入判断"
         return f"""
 只返回 JSON，不要 Markdown，不要代码围栏。
-你是 Zerror 的知识点视频讲解导演。目标是把学生的一句话需求拆成 60-120 秒的黑板式 Manim 分镜。
+你是 Zerror 的知识点视频讲解导演。目标是把学生的一句话需求拆成 2-4 分钟的黑板式 Manim 分阶段讲解。
 
 用户原话：{request.prompt}
 学科提示：{subject}
@@ -77,7 +77,10 @@ class LectureVideoService:
 - 不要把长文字、公式卡、标题压在图像上；文字解析每条短而具体，不能空泛。
 - 分镜要饱满：每个阶段都要让学生学到一个明确结论、判定方法或易错边界。
 - 数学和物理可以给公式；其他学科公式数组留空。
-- steps 每条控制在 36 字以内，5 到 8 条。
+- teaching_stages 必须 8 到 12 条，不能少于 8 条。
+- 每个 teaching_stage 都要包含 visual_action、narration、key_conclusion、checkpoint 四个字段。
+- visual_action 写图像/公式卡如何出现、移动、强调或切换；narration 写底部字幕；key_conclusion 写学生该记住的二级结论；checkpoint 写易错提醒或自检问题。
+- steps 是 teaching_stages 的短字幕摘要，每条控制在 36 字以内，8 到 12 条。
 - formula_steps 每条只放纯公式或很短的数学/物理关系，不要放长中文。
 - summary 用一句话说明这个视频会讲什么。
 
@@ -89,7 +92,15 @@ class LectureVideoService:
   "scene_type": "generic/mechanics/electromagnetism/optics/wave/board_block",
   "summary": "一句话简介",
   "focus_points": ["核心点1", "核心点2", "核心点3"],
-  "steps": ["分镜步骤1", "分镜步骤2", "分镜步骤3", "分镜步骤4", "分镜步骤5"],
+  "teaching_stages": [
+    {{
+      "visual_action": "左侧图像/公式/对象如何变化",
+      "narration": "底部字幕讲解",
+      "key_conclusion": "本阶段必须学会的结论",
+      "checkpoint": "易错提醒或自检问题"
+    }}
+  ],
+  "steps": ["阶段字幕1", "阶段字幕2", "阶段字幕3", "阶段字幕4", "阶段字幕5", "阶段字幕6", "阶段字幕7", "阶段字幕8"],
   "formula_steps": ["公式1", "公式2"],
   "common_traps": ["易错点1", "易错点2"]
 }}
@@ -112,16 +123,21 @@ class LectureVideoService:
             str(parsed.get("summary") or f"用动画把「{topic or prompt}」的核心关系讲清楚。"),
             90,
         )
-        steps = self._list(parsed.get("steps"), limit=8, item_limit=36)
-        if len(steps) < 4:
-            steps = self._fallback_steps(topic or prompt, subject_text)
         traps = self._list(parsed.get("common_traps"), limit=3, item_limit=32)
-        if traps:
-            steps = (steps + [f"最后提醒：{item}" for item in traps])[:8]
         focus_points = self._list(parsed.get("focus_points"), limit=4, item_limit=24)
         if not focus_points:
             focus_points = [topic or "核心概念", "关键关系", "易错边界"]
         formulas = self._formula_list(parsed.get("formula_steps"), limit=8)
+        stages = self._teaching_stages(
+            parsed.get("teaching_stages"),
+            fallback_steps=self._list(parsed.get("steps"), limit=12, item_limit=52),
+            topic=topic or prompt,
+            subject=subject_text,
+            focus_points=focus_points,
+            traps=traps,
+        )
+        steps = [stage["narration"] for stage in stages]
+        target_duration_seconds = max(120, min(240, len(stages) * 18))
         scene_type = self._scene_type(
             raw=str(parsed.get("scene_type") or ""),
             subject=subject_text,
@@ -139,7 +155,7 @@ class LectureVideoService:
                 "question_excerpt": self._clip(prompt, 120),
                 "focus_points": focus_points,
                 "solution_outline": steps,
-                "target_duration_seconds": 70,
+                "target_duration_seconds": target_duration_seconds,
             },
             "layout": {
                 "title_region": "top",
@@ -150,11 +166,12 @@ class LectureVideoService:
             "audio": {
                 "background_music": True,
                 "voiceover": False,
-                "narration_outline": [summary, *steps[:6]],
+                "narration_outline": [summary, *steps],
             },
             "background_music": True,
             "formula_steps": formulas,
             "steps": steps,
+            "teaching_stages": stages,
             "render_targets": ["manim"],
             "fallback_text": summary,
             "show_title": True,
@@ -245,6 +262,128 @@ class LectureVideoService:
             "再看关键关系如何一步步变化",
             "最后整理易错边界和检查点",
         ]
+
+    def _teaching_stages(
+        self,
+        value: Any,
+        *,
+        fallback_steps: list[str],
+        topic: str,
+        subject: str,
+        focus_points: list[str],
+        traps: list[str],
+    ) -> list[dict[str, str]]:
+        stages: list[dict[str, str]] = []
+        if isinstance(value, list):
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                narration = self._clip(
+                    str(item.get("narration") or item.get("subtitle") or ""),
+                    52,
+                )
+                visual_action = self._clip(str(item.get("visual_action") or ""), 56)
+                key_conclusion = self._clip(str(item.get("key_conclusion") or ""), 56)
+                checkpoint = self._clip(str(item.get("checkpoint") or ""), 56)
+                if not any([narration, visual_action, key_conclusion, checkpoint]):
+                    continue
+                stages.append(
+                    {
+                        "visual_action": visual_action or "左侧图像区突出当前对象和关系。",
+                        "narration": narration or key_conclusion or "观察当前阶段的关键变化。",
+                        "key_conclusion": key_conclusion or narration or "本阶段抓住一个可复述的判断。",
+                        "checkpoint": checkpoint or "停一下检查这一步的前提是否满足。",
+                    }
+                )
+                if len(stages) >= 12:
+                    break
+
+        for step in fallback_steps:
+            if len(stages) >= 8:
+                break
+            cleaned = self._clip(step, 52)
+            if not cleaned:
+                continue
+            stages.append(
+                {
+                    "visual_action": "左侧图像区同步高亮这一步对应的对象或公式。",
+                    "narration": cleaned,
+                    "key_conclusion": cleaned,
+                    "checkpoint": "回到题干确认这一步用到的条件。",
+                }
+            )
+
+        if len(stages) >= 8:
+            return stages[:12]
+
+        subject_hint = subject or "这个知识点"
+        topic_hint = self._clip(topic or "核心知识点", 16)
+        focus_a = focus_points[0] if focus_points else "核心定义"
+        focus_b = focus_points[1] if len(focus_points) > 1 else "关键关系"
+        focus_c = focus_points[2] if len(focus_points) > 2 else "易错边界"
+        trap = traps[0] if traps else "不要把局部结论直接当成全局结论"
+        templates = [
+            (
+                "左侧先放标题和问题对象，右侧列学习目标。",
+                f"先明确「{topic_hint}」到底要解决什么。",
+                f"{topic_hint}不是背结论，要知道它回答哪类问题。",
+                "能不能一句话说出本节要判断什么？",
+            ),
+            (
+                "把定义或基础模型放到图像区，并标出关键词。",
+                f"先把{subject_hint}里的{focus_a}放到图上。",
+                "定义是后面判断的出发点，不能跳过。",
+                "题干中哪个条件对应这个定义？",
+            ),
+            (
+                "用箭头连接已知条件和待求目标。",
+                f"看清{focus_b}如何连接题干和结论。",
+                "关键关系负责把文字条件转成可操作判断。",
+                "这一步有没有偷换变量或区间？",
+            ),
+            (
+                "让图像或对象发生一次有目的的移动。",
+                "观察量变化时，结论为什么跟着变化。",
+                "动画里的变化要对应到一个明确判断。",
+                "变化前后保持不变的量是什么？",
+            ),
+            (
+                "右侧公式卡逐行出现，左侧同步高亮来源。",
+                "把图像观察翻译成公式或判定规则。",
+                "公式不是孤立出现，每一项都要有来源。",
+                "公式里的每个符号在题干中代表什么？",
+            ),
+            (
+                "加入一个边界位置或特殊情况做对比。",
+                f"专门检查{focus_c}，避免结论用过头。",
+                "边界情况常常决定答案是否完整。",
+                "端点、零点、临界值是否要单独讨论？",
+            ),
+            (
+                "展示一条常见错误路径，再用标记划掉。",
+                f"易错提醒：{trap}。",
+                "识别错法比记住答案更能防止复错。",
+                "这类题最容易漏掉哪一个前提？",
+            ),
+            (
+                "最后把图像、公式和检查点收束成清单。",
+                "用三步清单复述：识别、判断、检查。",
+                "能复述流程，才算真正看懂这个知识点。",
+                "合上视频后能不能独立说出解题路线？",
+            ),
+        ]
+        for visual_action, narration, key_conclusion, checkpoint in templates:
+            if len(stages) >= 8:
+                break
+            stages.append(
+                {
+                    "visual_action": self._clip(visual_action, 56),
+                    "narration": self._clip(narration, 52),
+                    "key_conclusion": self._clip(key_conclusion, 56),
+                    "checkpoint": self._clip(checkpoint, 56),
+                }
+            )
+        return stages[:12]
 
     def _topic_from_prompt(self, prompt: str) -> str:
         topic = prompt

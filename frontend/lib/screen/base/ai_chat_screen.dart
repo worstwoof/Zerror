@@ -411,20 +411,27 @@ class _AiChatScreenState extends State<AiChatScreen>
       _detectLectureVideoIntent(String text) {
     final normalized = text.replaceAll(RegExp(r'\s+'), '');
     final hasVideoKeyword = normalized.contains('视频讲解') ||
+        normalized.contains('讲解视频') ||
         normalized.contains('视频讲一下') ||
+        normalized.contains('视频讲讲') ||
         normalized.contains('用视频讲') ||
         normalized.contains('生成视频') ||
+        normalized.contains('做成视频') ||
+        normalized.contains('做个视频') ||
+        normalized.contains('做一个视频') ||
         normalized.contains('动画讲解') ||
         normalized.contains('manim') ||
         normalized.contains('Manim');
-    final hasLearningKeyword = normalized.contains('知识点') ||
-        normalized.contains('讲一下') ||
-        normalized.contains('讲讲') ||
-        normalized.contains('解释') ||
-        normalized.contains('原理') ||
-        normalized.contains('模型') ||
-        normalized.contains('公式');
-    if (!(hasVideoKeyword && hasLearningKeyword)) {
+    final isTroubleshooting = normalized.contains('为什么') ||
+        normalized.contains('怎么回事') ||
+        normalized.contains('生成不了') ||
+        normalized.contains('无法生成') ||
+        normalized.contains('不能生成') ||
+        normalized.contains('打不开') ||
+        normalized.contains('无法打开') ||
+        normalized.contains('失败') ||
+        normalized.contains('报错');
+    if (!hasVideoKeyword || isTroubleshooting) {
       return (shouldGenerate: false, subject: '', topic: '');
     }
     final subject = _extractSubject(text);
@@ -489,12 +496,20 @@ class _AiChatScreenState extends State<AiChatScreen>
     var topic = text;
     final removals = [
       '帮我',
+      '给我',
       '请',
       '用视频',
       '视频讲解',
+      '讲解视频',
       '视频讲一下',
+      '视频讲讲',
       '生成视频',
+      '生成',
+      '关于',
+      '一下',
       '做成视频',
+      '做个视频',
+      '做一个视频',
       '动画讲解',
       'Manim',
       'manim',
@@ -512,6 +527,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       topic = topic.replaceAll(subject, ' ');
     }
     topic = topic.replaceAll(RegExp(r'[\s，。；;、]+'), ' ').trim();
+    topic = topic.replaceAll(RegExp(r'[的地得]+$'), '').trim();
     if (topic.isEmpty) {
       return subject.isEmpty ? '核心知识点' : '$subject核心知识点';
     }
