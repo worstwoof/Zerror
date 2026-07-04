@@ -119,6 +119,7 @@ class AppPersistenceSnapshot {
     this.errors = const [],
     this.practicePaperTasks = const [],
     this.lectureHandoutTasks = const [],
+    this.assistantChatMessages = const [],
   });
 
   final Set<String> favoriteIds;
@@ -130,6 +131,7 @@ class AppPersistenceSnapshot {
   final List<Map<String, dynamic>> errors;
   final List<Map<String, dynamic>> practicePaperTasks;
   final List<Map<String, dynamic>> lectureHandoutTasks;
+  final List<Map<String, dynamic>> assistantChatMessages;
 
   Map<String, dynamic> toJson() {
     return {
@@ -142,6 +144,7 @@ class AppPersistenceSnapshot {
       'errors': errors,
       'practice_paper_tasks': practicePaperTasks,
       'lecture_handout_tasks': lectureHandoutTasks,
+      'assistant_chat_messages': assistantChatMessages,
     };
   }
 
@@ -185,6 +188,7 @@ class AppPersistenceSnapshot {
       errors: _toStringMapList(json['errors']),
       practicePaperTasks: _toStringMapList(json['practice_paper_tasks']),
       lectureHandoutTasks: _toStringMapList(json['lecture_handout_tasks']),
+      assistantChatMessages: _toStringMapList(json['assistant_chat_messages']),
     );
   }
 

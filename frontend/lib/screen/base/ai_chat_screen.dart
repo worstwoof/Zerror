@@ -27,6 +27,7 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _showChat = false;
   bool _isFlipping = false;
   bool _isThinking = false;
+  bool _didRestoreMessages = false;
 
   static const List<_AssistantQuickAction> _quickActions = [
     _AssistantQuickAction(
@@ -67,6 +68,18 @@ class _AiChatScreenState extends State<AiChatScreen>
   void initState() {
     super.initState();
     _ensureFlipController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didRestoreMessages) return;
+    _didRestoreMessages = true;
+    _messages.addAll(
+      AppStateScope.of(context)
+          .assistantChatMessages
+          .map(_ChatMessage.fromRecord),
+    );
   }
 
   AnimationController _ensureFlipController() {
@@ -121,19 +134,22 @@ class _AiChatScreenState extends State<AiChatScreen>
         subject: lectureIntent.subject,
         topic: lectureIntent.topic,
       );
+      final userMessage = store.addAssistantChatUserMessage(text);
+      final handoutMessage = store.addAssistantChatLectureHandoutTask(task.id);
       setState(() {
         _activeMode = selectedMode;
-        _messages.add(_ChatMessage.user(text));
-        _messages.add(_ChatMessage.lectureHandout(task.id));
+        _messages.add(_ChatMessage.fromRecord(userMessage));
+        _messages.add(_ChatMessage.fromRecord(handoutMessage));
         _controller.clear();
       });
       _scrollToBottom();
       return;
     }
 
+    final userMessage = store.addAssistantChatUserMessage(text);
     setState(() {
       _activeMode = selectedMode;
-      _messages.add(_ChatMessage.user(text));
+      _messages.add(_ChatMessage.fromRecord(userMessage));
       _controller.clear();
       _isThinking = true;
     });
@@ -162,9 +178,10 @@ class _AiChatScreenState extends State<AiChatScreen>
         'AI 助教暂时不可用，我先按本地错题档案整理。',
       );
     }
+    final assistantMessage = store.addAssistantChatAssistantReply(reply);
     if (!mounted) return;
     setState(() {
-      _messages.add(_ChatMessage.assistant(reply));
+      _messages.add(_ChatMessage.fromRecord(assistantMessage));
       _isThinking = false;
     });
     _scrollToBottom();
@@ -1285,6 +1302,20 @@ class _ChatMessage {
       : text = '',
         isUser = false,
         reply = null;
+
+  factory _ChatMessage.fromRecord(AssistantChatMessageRecord record) {
+    if (record.isUser) {
+      return _ChatMessage.user(record.text);
+    }
+    if (record.isLectureHandout) {
+      return _ChatMessage.lectureHandout(record.lectureHandoutTaskId ?? '');
+    }
+    final reply = record.reply;
+    if (reply != null) {
+      return _ChatMessage.assistant(reply);
+    }
+    return const _ChatMessage.user('');
+  }
 
   final String text;
   final bool isUser;

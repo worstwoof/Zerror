@@ -535,8 +535,102 @@ class BackgroundLectureHandoutTask {
   }
 }
 
+class AssistantChatMessageRecord {
+  const AssistantChatMessageRecord({
+    required this.id,
+    required this.createdAt,
+    required this.kind,
+    this.text = '',
+    this.reply,
+    this.lectureHandoutTaskId,
+  });
+
+  factory AssistantChatMessageRecord.user({
+    required String id,
+    required DateTime createdAt,
+    required String text,
+  }) {
+    return AssistantChatMessageRecord(
+      id: id,
+      createdAt: createdAt,
+      kind: 'user',
+      text: text,
+    );
+  }
+
+  factory AssistantChatMessageRecord.assistant({
+    required String id,
+    required DateTime createdAt,
+    required AssistantChatReply reply,
+  }) {
+    return AssistantChatMessageRecord(
+      id: id,
+      createdAt: createdAt,
+      kind: 'assistant',
+      reply: reply,
+    );
+  }
+
+  factory AssistantChatMessageRecord.lectureHandout({
+    required String id,
+    required DateTime createdAt,
+    required String lectureHandoutTaskId,
+  }) {
+    return AssistantChatMessageRecord(
+      id: id,
+      createdAt: createdAt,
+      kind: 'lecture_handout',
+      lectureHandoutTaskId: lectureHandoutTaskId,
+    );
+  }
+
+  final String id;
+  final DateTime createdAt;
+  final String kind;
+  final String text;
+  final AssistantChatReply? reply;
+  final String? lectureHandoutTaskId;
+
+  bool get isUser => kind == 'user';
+  bool get isAssistant => kind == 'assistant';
+  bool get isLectureHandout => kind == 'lecture_handout';
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'created_at': createdAt.toIso8601String(),
+      'kind': kind,
+      'text': text,
+      'reply': reply?.toJson(includeRawModelOutput: false),
+      'lecture_handout_task_id': lectureHandoutTaskId,
+    };
+  }
+
+  factory AssistantChatMessageRecord.fromJson(Map<String, dynamic> json) {
+    final replyJson = json['reply'];
+    return AssistantChatMessageRecord(
+      id: (json['id'] ?? 'assistant-chat-restored').toString(),
+      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+          DateTime.now(),
+      kind: (json['kind'] ?? 'assistant').toString(),
+      text: (json['text'] ?? '').toString(),
+      reply: replyJson is Map<String, dynamic>
+          ? AssistantChatReply.fromJson(replyJson)
+          : replyJson is Map
+              ? AssistantChatReply.fromJson(
+                  replyJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+      lectureHandoutTaskId: json['lecture_handout_task_id']?.toString(),
+    );
+  }
+}
+
 class AppStore extends ChangeNotifier {
   static const Duration _analysisPollInterval = Duration(seconds: 3);
+  static const int _assistantChatMessageLimit = 80;
 
   AppStore.seeded({
     AppRepository? repository,
@@ -567,6 +661,7 @@ class AppStore extends ChangeNotifier {
             : _defaultDevices(session) {
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
     _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
+    _assistantChatMessages.addAll(_restoreAssistantChatMessages(snapshot));
   }
 
   static const UserProfileData _defaultProfile = UserProfileData(
@@ -591,6 +686,8 @@ class AppStore extends ChangeNotifier {
       <BackgroundPracticePaperTask>[];
   final List<BackgroundLectureHandoutTask> _lectureHandoutTasks =
       <BackgroundLectureHandoutTask>[];
+  final List<AssistantChatMessageRecord> _assistantChatMessages =
+      <AssistantChatMessageRecord>[];
   final Set<String> _backgroundedAnalysisTaskIds = <String>{};
   final Set<String> _notifiedCompletedAnalysisTaskIds = <String>{};
   final Set<String> _runningPracticePaperTaskIds = <String>{};
@@ -690,6 +787,28 @@ class AppStore extends ChangeNotifier {
         .toList(growable: true);
   }
 
+  static List<AssistantChatMessageRecord> _restoreAssistantChatMessages(
+    AppPersistenceSnapshot? snapshot,
+  ) {
+    if (snapshot == null || snapshot.assistantChatMessages.isEmpty) {
+      return <AssistantChatMessageRecord>[];
+    }
+    final restored = snapshot.assistantChatMessages
+        .map(AssistantChatMessageRecord.fromJson)
+        .where(
+          (item) =>
+              item.isUser ||
+              (item.isAssistant && item.reply != null) ||
+              (item.isLectureHandout &&
+                  (item.lectureHandoutTaskId ?? '').isNotEmpty),
+        )
+        .toList(growable: true);
+    if (restored.length <= _assistantChatMessageLimit) {
+      return restored;
+    }
+    return restored.sublist(restored.length - _assistantChatMessageLimit);
+  }
+
   AppPersistenceSnapshot get snapshot {
     return AppPersistenceSnapshot(
       favoriteIds: favorites.map((item) => item.id).toSet(),
@@ -705,6 +824,10 @@ class AppStore extends ChangeNotifier {
               ),
       lectureHandoutTasks:
           _lectureHandoutTasks.map((item) => item.toJson()).toList(
+                growable: false,
+              ),
+      assistantChatMessages:
+          _assistantChatMessages.map((item) => item.toJson()).toList(
                 growable: false,
               ),
     );
@@ -778,6 +901,8 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_practicePaperTasks);
   UnmodifiableListView<BackgroundLectureHandoutTask> get lectureHandoutTasks =>
       UnmodifiableListView(_lectureHandoutTasks);
+  UnmodifiableListView<AssistantChatMessageRecord> get assistantChatMessages =>
+      UnmodifiableListView(_assistantChatMessages);
 
   DeviceSession get currentDevice => _devices.firstWhere(
         (item) => item.isCurrent,
@@ -886,6 +1011,47 @@ class AppStore extends ChangeNotifier {
     final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
     if (index == -1) return null;
     return _lectureHandoutTasks[index];
+  }
+
+  AssistantChatMessageRecord addAssistantChatUserMessage(String text) {
+    final now = DateTime.now();
+    final message = AssistantChatMessageRecord.user(
+      id: _assistantChatMessageId('user', now),
+      createdAt: now,
+      text: text,
+    );
+    _appendAssistantChatMessage(message);
+    return message;
+  }
+
+  AssistantChatMessageRecord addAssistantChatAssistantReply(
+    AssistantChatReply reply,
+  ) {
+    final now = DateTime.now();
+    final message = AssistantChatMessageRecord.assistant(
+      id: _assistantChatMessageId('assistant', now),
+      createdAt: now,
+      reply: reply,
+    );
+    _appendAssistantChatMessage(message);
+    return message;
+  }
+
+  AssistantChatMessageRecord addAssistantChatLectureHandoutTask(String taskId) {
+    final now = DateTime.now();
+    final message = AssistantChatMessageRecord.lectureHandout(
+      id: _assistantChatMessageId('handout', now),
+      createdAt: now,
+      lectureHandoutTaskId: taskId,
+    );
+    _appendAssistantChatMessage(message);
+    return message;
+  }
+
+  void clearAssistantChatMessages() {
+    if (_assistantChatMessages.isEmpty) return;
+    _assistantChatMessages.clear();
+    _commit();
   }
 
   int get knowledgePointCount =>
@@ -2141,10 +2307,12 @@ class AppStore extends ChangeNotifier {
     _analysisTasks.clear();
     _practicePaperTasks.clear();
     _lectureHandoutTasks.clear();
+    _assistantChatMessages.clear();
     _runningPracticePaperTaskIds.clear();
     _runningLectureHandoutTaskIds.clear();
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
     _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
+    _assistantChatMessages.addAll(_restoreAssistantChatMessages(snapshot));
     _profile =
         snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;
@@ -2157,6 +2325,21 @@ class AppStore extends ChangeNotifier {
   void _commit() {
     notifyListeners();
     unawaited(_persist());
+  }
+
+  void _appendAssistantChatMessage(AssistantChatMessageRecord message) {
+    _assistantChatMessages.add(message);
+    if (_assistantChatMessages.length > _assistantChatMessageLimit) {
+      _assistantChatMessages.removeRange(
+        0,
+        _assistantChatMessages.length - _assistantChatMessageLimit,
+      );
+    }
+    _commit();
+  }
+
+  String _assistantChatMessageId(String kind, DateTime now) {
+    return 'assistant-chat-$kind-${now.microsecondsSinceEpoch}-${_assistantChatMessages.length}';
   }
 
   Future<void> _persist() async {

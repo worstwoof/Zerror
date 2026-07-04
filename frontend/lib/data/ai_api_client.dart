@@ -726,6 +726,14 @@ class AssistantReplySection {
       bullets: _asStringList(json['bullets']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'body': body,
+      'bullets': bullets,
+    };
+  }
 }
 
 class AssistantChatReply {
@@ -776,6 +784,20 @@ class AssistantChatReply {
       fallback: json['fallback'] == true,
       rawModelOutput: (json['raw_model_output'] ?? '').toString(),
     );
+  }
+
+  Map<String, dynamic> toJson({bool includeRawModelOutput = true}) {
+    return {
+      'mode': mode,
+      'title': title,
+      'summary': summary,
+      'sections': sections.map((item) => item.toJson()).toList(growable: false),
+      'linked_knowledge': linkedKnowledge,
+      'follow_up_prompts': followUpPrompts,
+      'sprint_minutes': sprintMinutes,
+      'fallback': fallback,
+      'raw_model_output': includeRawModelOutput ? rawModelOutput : '',
+    };
   }
 }
 
