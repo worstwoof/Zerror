@@ -1733,6 +1733,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 18,
@@ -1825,9 +1826,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
-          '可以继续提问或学习其他内容',
-          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        const Expanded(
+          child: Text(
+            '可以继续提问或学习其他内容',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+          ),
         ),
       ],
     );
@@ -1893,6 +1898,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 18,
@@ -1905,9 +1911,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
-          '可以继续提问，视频生成好会留在这里',
-          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        const Expanded(
+          child: Text(
+            '可以继续提问，视频生成好会留在这里',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+          ),
         ),
       ],
     );
