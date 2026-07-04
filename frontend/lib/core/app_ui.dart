@@ -579,7 +579,7 @@ class AppChatInputBar extends StatelessWidget {
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 340),
+          constraints: const BoxConstraints(maxWidth: 312),
           child: Row(
             children: [
               Expanded(
