@@ -184,13 +184,46 @@ class LectureHandoutSection(BaseModel):
     bullets: List[str] = Field(default_factory=list)
 
 
+class LectureHandoutExample(BaseModel):
+    title: str = ""
+    source: str = ""
+    stem: str = ""
+    answer: str = ""
+    analysis: str = ""
+    solution_steps: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
+class LectureHandoutModelCard(BaseModel):
+    title: str
+    feature: str = ""
+    logic: str = ""
+    procedure: List[str] = Field(default_factory=list)
+    secondary_conclusions: List[str] = Field(default_factory=list)
+    examples: List[LectureHandoutExample] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+    traps: List[str] = Field(default_factory=list)
+
+
+class LectureHandoutSummaryTable(BaseModel):
+    title: str = ""
+    headers: List[str] = Field(default_factory=list)
+    rows: List[List[str]] = Field(default_factory=list)
+
+
 class LectureHandoutResponse(BaseModel):
     title: str
     subtitle: str = ""
     subject: str = ""
     topic: str = ""
     overview: str = ""
+    exam_analysis: str = ""
+    knowledge_map: List[str] = Field(default_factory=list)
     sections: List[LectureHandoutSection] = Field(default_factory=list)
+    model_cards: List[LectureHandoutModelCard] = Field(default_factory=list)
+    secondary_conclusions: List[str] = Field(default_factory=list)
+    example_walkthroughs: List[LectureHandoutExample] = Field(default_factory=list)
+    summary_tables: List[LectureHandoutSummaryTable] = Field(default_factory=list)
     key_points: List[str] = Field(default_factory=list)
     formula_cards: List[str] = Field(default_factory=list)
     method_notes: List[str] = Field(default_factory=list)
