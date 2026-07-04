@@ -14,6 +14,12 @@ class PracticePaperEntryScreen extends StatelessWidget {
     required this.strategyLabel,
   });
 
+  static const Color _entryAccent = Color(0xFF38558F);
+  static const Color _practiceAccent = Color(0xFF557A1F);
+  static const Color _handoutAccent = Color(0xFF9A5E00);
+  static const Color _cardBorder = Color(0x1F111A3A);
+  static const Color _cardShadow = Color(0x14111A3A);
+
   final PracticePaperResult paper;
   final List<String> selectedSubjects;
   final String strategyLabel;
@@ -73,14 +79,14 @@ class PracticePaperEntryScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppPalette.night,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppPalette.night,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           '智能组卷',
           style: TextStyle(
-            color: AppPalette.textPrimary,
+            color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -96,9 +102,9 @@ class PracticePaperEntryScreen extends StatelessWidget {
               paper.title.isEmpty ? '专题针对性练习' : paper.title,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
-                fontSize: 24,
+                fontSize: 23,
                 fontWeight: FontWeight.w800,
-                height: 1.25,
+                height: 1.22,
               ),
             ),
             if (paper.subtitle.trim().isNotEmpty) ...[
@@ -132,15 +138,17 @@ class PracticePaperEntryScreen extends StatelessWidget {
             const SizedBox(height: 22),
             AppPanel(
               padding: const EdgeInsets.all(18),
+              color: Colors.white,
+              borderRadius: 22,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     '本次重点',
                     style: TextStyle(
-                      color: AppPalette.almondCream,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      color: _entryAccent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -148,7 +156,8 @@ class PracticePaperEntryScreen extends StatelessWidget {
                     topics,
                     style: const TextStyle(
                       color: AppPalette.textPrimary,
-                      fontSize: 14,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                       height: 1.5,
                     ),
                   ),
@@ -158,7 +167,7 @@ class PracticePaperEntryScreen extends StatelessWidget {
                       paper.handoutOverview,
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
-                        fontSize: 13,
+                        fontSize: 14,
                         height: 1.55,
                       ),
                     ),
@@ -172,7 +181,7 @@ class PracticePaperEntryScreen extends StatelessWidget {
               title: '计时练习',
               subtitle: '进入答题模式，记录用时、作答进度和存疑题。',
               actionLabel: '开始练习',
-              accentColor: AppPalette.matchaMist,
+              accentColor: _practiceAccent,
               onTap: () => _openTimedPractice(context),
             ),
             const SizedBox(height: 14),
@@ -181,7 +190,7 @@ class PracticePaperEntryScreen extends StatelessWidget {
               title: '专题讲义',
               subtitle: '查看 A4 版式内容，适合复盘、批注和打印。',
               actionLabel: '查看讲义',
-              accentColor: AppPalette.almondCream,
+              accentColor: _handoutAccent,
               onTap: () => _openHandout(context),
             ),
           ],
@@ -205,21 +214,21 @@ class _MetaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Colors.white.withValues(alpha: 0.86),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: PracticePaperEntryScreen._cardBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: AppPalette.almondCream),
+          Icon(icon, size: 15, color: PracticePaperEntryScreen._entryAccent),
           const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
-              color: AppPalette.textSecondary,
+              color: AppPalette.textPrimary,
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -251,17 +260,28 @@ class _EntryCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: AppPanel(
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
           padding: const EdgeInsets.all(18),
-          color: AppPalette.pastelGrey.withValues(alpha: 0.07),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: PracticePaperEntryScreen._cardBorder),
+            boxShadow: const [
+              BoxShadow(
+                color: PracticePaperEntryScreen._cardShadow,
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
           child: Row(
             children: [
               Container(
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.16),
+                  color: accentColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: accentColor, size: 26),
@@ -275,8 +295,8 @@ class _EntryCard extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: AppPalette.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -284,7 +304,7 @@ class _EntryCard extends StatelessWidget {
                       subtitle,
                       style: const TextStyle(
                         color: AppPalette.textSecondary,
-                        fontSize: 12.5,
+                        fontSize: 13,
                         height: 1.45,
                       ),
                     ),
@@ -292,20 +312,30 @@ class _EntryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_forward_rounded, color: accentColor),
-                  const SizedBox(height: 4),
-                  Text(
-                    actionLabel,
-                    style: TextStyle(
-                      color: accentColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: accentColor.withValues(alpha: 0.20)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_forward_rounded, color: accentColor),
+                    const SizedBox(height: 4),
+                    Text(
+                      actionLabel,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
