@@ -4,7 +4,9 @@ import json
 import logging
 import re
 from collections import Counter
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from backend.app.schemas.card_schema import (
     AssistantChatRequest,
@@ -24,9 +26,6 @@ class AssistantService:
         self.client = client
 
     def generate_reply(self, request: AssistantChatRequest) -> AssistantChatResponse:
-        direct_reply = self._direct_reply(request)
-        if direct_reply is not None:
-            return direct_reply
         prompt = self._build_prompt(request)
         raw_output = self.client.chat_completion(prompt)
         parsed = self._parse_json(raw_output)
@@ -69,11 +68,19 @@ class AssistantService:
         )
         mode_label = self._mode_label(request.mode)
         mode_instruction = self._mode_instruction(request.mode)
+        now = datetime.now(ZoneInfo("Asia/Shanghai"))
+        weekday = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"][
+            now.weekday()
+        ]
+        current_time_text = now.strftime("%Y-%m-%d %H:%M:%S")
+        model_name = self.client.settings.vivo_text_model
 
         return f"""
 只返回 JSON，不要 Markdown，不要代码围栏。
 你是 Zerror 的 AI 助教，目标是让学生在很短时间内看懂下一步该怎么学。你的语气要像靠谱的学长：简洁、直接、能落地。
 
+当前北京时间：{current_time_text}，今天是{weekday}。
+当前普通聊天模型：{model_name}。
 当前模式：{mode_label}
 模式要求：
 {mode_instruction}
@@ -88,9 +95,11 @@ class AssistantService:
 {errors_json}
 
 回答要求：
-- 如果学生只是寒暄、问你是谁、问模型/能力/使用方式，直接自然回答，不要强行引用错题档案。
+- 如果学生问今天日期、星期几或当前时间，直接按“当前北京时间”回答，不要说无法获取实时日期。
+- 如果学生只是寒暄、问你是谁、问模型/能力/使用方式，直接自然回答，不要强行引用错题档案；问模型时可以说明当前普通聊天模型。
 - 如果问题和学习、题目、复习、错题、讲义、知识点有关，再利用错题档案中的学科、知识点、错因和已有解析；没有档案时，要先给可执行的第一步。
-- 不要空泛鼓励，不要写长篇大论；每个 section 控制在 80 字以内。
+- 普通聊天可以只返回 summary，sections 可以为空；学习问题再按需返回 sections。
+- 不要空泛鼓励，不要写长篇大论；summary 尽量像一个自然聊天气泡，每个 section 控制在 80 字以内。
 - “主动关联知识点”要指出前置知识、相邻知识和容易混淆点。
 - “考前短时复习”要给出分钟级安排，适合 10 到 45 分钟内执行。
 - 如果用户问具体题目，先给快答，再说明需要补充哪些条件。
@@ -112,137 +121,6 @@ class AssistantService:
 }}
 """.strip()
 
-    def _direct_reply(self, request: AssistantChatRequest) -> AssistantChatResponse | None:
-        message = request.message.strip()
-        normalized = re.sub(r"\s+", "", message.lower())
-        if not normalized:
-            return None
-
-        if self._is_model_identity_question(normalized) or self._is_assistant_identity_question(normalized):
-            model_name = self.client.settings.vivo_text_model
-            return AssistantChatResponse(
-                mode=request.mode,
-                title="我是 Zerror AI 助教",
-                summary=f"我是 Zerror 的学习助教；普通对话当前由 {model_name} 提供能力。",
-                sections=[
-                    AssistantChatSection(
-                        title="我能怎么帮你",
-                        body="我可以直接聊天答疑，也可以结合你的错题档案做复习建议；当你说“帮我整理某个知识点讲义”时，会自动后台生成可导出的讲义。",
-                        bullets=[
-                            "普通问题：直接回答，不强行套错题档案。",
-                            "学习问题：可结合错题、薄弱点和知识点。",
-                            "讲义需求：后台生成，可继续聊天。",
-                        ],
-                    )
-                ],
-                linked_knowledge=[],
-                follow_up_prompts=[
-                    "你能帮我做什么？",
-                    "帮我整理一次函数知识点讲义",
-                    "根据我的错题给复习建议",
-                ],
-                sprint_minutes=0,
-                fallback=False,
-                raw_model_output="local direct identity reply",
-            )
-
-        if self._is_greeting(normalized):
-            return AssistantChatResponse(
-                mode=request.mode,
-                title="你好，我在",
-                summary="你好，我是 Zerror AI 助教。你可以直接聊天，也可以发题目、错因或复习目标给我。",
-                sections=[
-                    AssistantChatSection(
-                        title="可以直接这样问",
-                        body="如果是普通问题，我会正常回答；如果是学习问题，我再结合你的错题和薄弱点。",
-                        bullets=[
-                            "问一道题怎么做",
-                            "让我解释一个知识点",
-                            "让我整理一份可导出的讲义",
-                        ],
-                    )
-                ],
-                linked_knowledge=[],
-                follow_up_prompts=[
-                    "你是什么模型？",
-                    "帮我整理初中数学一次函数知识点",
-                    "我今天该复习什么？",
-                ],
-                sprint_minutes=0,
-                fallback=False,
-                raw_model_output="local direct greeting reply",
-            )
-
-        if self._is_capability_question(normalized):
-            return AssistantChatResponse(
-                mode=request.mode,
-                title="我能帮你做这些",
-                summary="我可以普通对话、解题答疑、读错题档案给建议，也能后台生成知识讲义 PDF 预览。",
-                sections=[
-                    AssistantChatSection(
-                        title="主要能力",
-                        body="你不用固定格式提问。直接说需求，我会判断是聊天、答疑、复习安排，还是讲义生成。",
-                        bullets=[
-                            "题目解析和知识点解释",
-                            "错题档案复习建议",
-                            "讲义后台生成与 PDF 导出",
-                        ],
-                    )
-                ],
-                linked_knowledge=[],
-                follow_up_prompts=[
-                    "帮我看一道题",
-                    "帮我整理物理牛顿第二定律讲义",
-                    "根据错题安排 20 分钟复习",
-                ],
-                sprint_minutes=0,
-                fallback=False,
-                raw_model_output="local direct capability reply",
-            )
-
-        return None
-
-    def _is_model_identity_question(self, normalized: str) -> bool:
-        model_markers = ("模型", "model", "gpt", "doubao", "豆包", "deepseek", "qwen")
-        identity_markers = ("你是", "你用", "什么", "哪个", "版本", "是谁", "叫什么")
-        return any(marker in normalized for marker in model_markers) and any(
-            marker in normalized for marker in identity_markers
-        )
-
-    def _is_assistant_identity_question(self, normalized: str) -> bool:
-        return normalized in {"你是谁", "你叫什么", "你是干嘛的", "介绍一下你自己"} or any(
-            marker in normalized
-            for marker in ("你是谁呀", "你叫什么名字", "你是哪个助手")
-        )
-
-    def _is_greeting(self, normalized: str) -> bool:
-        greetings = {
-            "你好",
-            "您好",
-            "hello",
-            "hi",
-            "嗨",
-            "在吗",
-            "在不在",
-            "哈喽",
-            "早上好",
-            "晚上好",
-        }
-        return normalized in greetings or normalized.rstrip("！!。.") in greetings
-
-    def _is_capability_question(self, normalized: str) -> bool:
-        return any(
-            marker in normalized
-            for marker in (
-                "你能做什么",
-                "你会做什么",
-                "怎么用你",
-                "你有什么功能",
-                "能帮我什么",
-                "可以做什么",
-            )
-        )
-
     def _build_response(
         self,
         *,
@@ -251,7 +129,8 @@ class AssistantService:
         raw_output: str,
     ) -> AssistantChatResponse:
         sections = self._sections(parsed.get("sections"))
-        if not sections:
+        summary = self._clip(str(parsed.get("summary") or ""), 120)
+        if not sections and not summary:
             return self._fallback_response(request, raw_output=raw_output)
 
         linked_knowledge = self._string_list(parsed.get("linked_knowledge"))[:8]
@@ -265,10 +144,7 @@ class AssistantService:
         return AssistantChatResponse(
             mode=request.mode,
             title=self._clip(str(parsed.get("title") or self._mode_label(request.mode)), 40),
-            summary=self._clip(
-                str(parsed.get("summary") or sections[0].body or request.message),
-                120,
-            ),
+            summary=summary or self._clip(sections[0].body or request.message, 120),
             sections=sections[:5],
             linked_knowledge=linked_knowledge,
             follow_up_prompts=follow_up_prompts,

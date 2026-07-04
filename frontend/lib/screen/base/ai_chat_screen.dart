@@ -22,34 +22,7 @@ class _AiChatScreenState extends State<AiChatScreen>
   final ScrollController _scrollController = ScrollController();
   final AiApiClient _aiApiClient = const AiApiClient();
   AnimationController? _flipController;
-  final List<_ChatMessage> _messages = const [
-    _ChatMessage.assistant(
-      AssistantChatReply(
-        mode: 'quick_answer',
-        title: 'AI 助教已就绪',
-        summary: '可以快问快答，也可以直接按错题档案帮你找薄弱点、关联知识点、安排考前短复习。',
-        sections: [
-          AssistantReplySection(
-            title: '现在能做什么',
-            body: '选择上方模式后发问，我会优先读取你的错题档案和待复习记录。',
-            bullets: [
-              '快问快答：先给短结论',
-              '错题记忆：按历史错因继续追问',
-              '考前复习：分钟级安排',
-            ],
-          ),
-        ],
-        linkedKnowledge: [],
-        followUpPrompts: [
-          '帮我总结今天最该补的薄弱点',
-          '根据错题档案安排 20 分钟复习',
-        ],
-        sprintMinutes: 0,
-        fallback: false,
-        rawModelOutput: '',
-      ),
-    ),
-  ].toList();
+  final List<_ChatMessage> _messages = <_ChatMessage>[];
   _AssistantMode _activeMode = _AssistantMode.quickAnswer;
   bool _showChat = false;
   bool _isFlipping = false;
@@ -430,6 +403,32 @@ class _AiChatScreenState extends State<AiChatScreen>
     });
   }
 
+  String _assistantBubbleText(AssistantChatReply reply) {
+    final parts = <String>[];
+    final summary = reply.summary.trim();
+    if (summary.isNotEmpty) {
+      parts.add(summary);
+    }
+
+    for (final section in reply.sections) {
+      final body = section.body.trim();
+      if (body.isNotEmpty && body != summary) {
+        parts.add(body);
+      }
+      for (final bullet in section.bullets) {
+        final cleaned = bullet.trim();
+        if (cleaned.isNotEmpty) {
+          parts.add('• $cleaned');
+        }
+      }
+    }
+
+    final text = parts.join('\n').trim();
+    if (text.isNotEmpty) return text;
+    final title = reply.title.trim();
+    return title.isEmpty ? '我在。' : title;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -539,9 +538,9 @@ class _AiChatScreenState extends State<AiChatScreen>
                               onOpen: _openLectureHandoutTask,
                               onRetry: store.retryLectureHandoutTask,
                             )
-                          : _AssistantAnswerCard(
-                              reply: message.reply!,
-                              onPrompt: (prompt) => _send(preset: prompt),
+                          : AppChatBubble(
+                              text: _assistantBubbleText(message.reply!),
+                              isUser: false,
                             ),
                 ),
               ),
@@ -863,234 +862,6 @@ class _AssistantModeButton extends StatelessWidget {
   }
 }
 
-class _AssistantAnswerCard extends StatelessWidget {
-  const _AssistantAnswerCard({
-    required this.reply,
-    required this.onPrompt,
-  });
-
-  final AssistantChatReply reply;
-  final ValueChanged<String> onPrompt;
-
-  @override
-  Widget build(BuildContext context) {
-    final sections = reply.sections.isEmpty
-        ? [
-            AssistantReplySection(
-              title: '助教建议',
-              body: reply.summary,
-              bullets: const [],
-            )
-          ]
-        : reply.sections;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-          child: Row(
-            children: [
-              const Text(
-                'Zerror 助手',
-                style: TextStyle(
-                  color: AppPalette.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (reply.fallback) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppPalette.peach.withOpacity(0.34),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    '本地整理',
-                    style: TextStyle(
-                      color: AppPalette.warmAccentText,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.74),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppPalette.inkBlue.withOpacity(0.05)),
-            boxShadow: [
-              BoxShadow(
-                color: AppPalette.inkBlue.withOpacity(0.05),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 34,
-                    height: 34,
-                    child: _FloatingSlimeOrb(size: 34, compact: true),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          reply.title,
-                          style: const TextStyle(
-                            color: AppPalette.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          reply.summary,
-                          style: const TextStyle(
-                            color: AppPalette.textSecondary,
-                            fontSize: 12,
-                            height: 1.4,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              ...List.generate(
-                sections.length,
-                (index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _AnswerSection(
-                    section: sections[index],
-                    color: _sectionColor(index),
-                  ),
-                ),
-              ),
-              if (reply.linkedKnowledge.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                _LinkedKnowledgeChips(items: reply.linkedKnowledge),
-              ],
-              if (reply.followUpPrompts.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _FollowUpPromptRow(
-                  prompts: reply.followUpPrompts,
-                  onPrompt: onPrompt,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color _sectionColor(int index) {
-    const colors = [
-      AppPalette.mint,
-      AppPalette.peach,
-      AppPalette.blush,
-      AppPalette.leaf,
-    ];
-    return colors[index % colors.length];
-  }
-}
-
-class _LinkedKnowledgeChips extends StatelessWidget {
-  const _LinkedKnowledgeChips({required this.items});
-
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: items.take(8).map((item) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: AppPalette.moodBlue.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppPalette.moodBlue.withOpacity(0.10)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.bubble_chart_rounded,
-                color: AppPalette.moodBlue,
-                size: 14,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                item,
-                style: const TextStyle(
-                  color: AppPalette.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _FollowUpPromptRow extends StatelessWidget {
-  const _FollowUpPromptRow({
-    required this.prompts,
-    required this.onPrompt,
-  });
-
-  final List<String> prompts;
-  final ValueChanged<String> onPrompt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: prompts.take(4).map((prompt) {
-        return ActionChip(
-          avatar: const Icon(
-            Icons.arrow_forward_rounded,
-            color: AppPalette.inkBlue,
-            size: 15,
-          ),
-          label: Text(prompt),
-          backgroundColor: Colors.white.withOpacity(0.72),
-          side: BorderSide(color: AppPalette.inkBlue.withOpacity(0.06)),
-          labelStyle: const TextStyle(
-            color: AppPalette.textPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-          onPressed: () => onPrompt(prompt),
-        );
-      }).toList(),
-    );
-  }
-}
-
 class _AssistantThinkingCard extends StatelessWidget {
   const _AssistantThinkingCard();
 
@@ -1289,136 +1060,6 @@ class _LectureHandoutChatTaskCard extends StatelessWidget {
     }
     final topic = task.topic.trim().isEmpty ? task.prompt : task.topic;
     return topic.length > 44 ? '${topic.substring(0, 43)}…' : topic;
-  }
-}
-
-class _AnswerSection extends StatelessWidget {
-  const _AnswerSection({
-    required this.section,
-    required this.color,
-  });
-
-  final AssistantReplySection section;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.42),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.56),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  _iconForTitle(section.title),
-                  color: AppPalette.inkBlue,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      section.title,
-                      style: const TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (section.body.trim().isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        section.body,
-                        style: const TextStyle(
-                          color: AppPalette.textPrimary,
-                          fontSize: 13,
-                          height: 1.48,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (section.bullets.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...section.bullets.map(
-                  (bullet) => Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 5,
-                          margin: const EdgeInsets.only(top: 8),
-                          decoration: BoxDecoration(
-                            color: AppPalette.inkBlue.withOpacity(0.64),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            bullet,
-                            style: const TextStyle(
-                              color: AppPalette.textPrimary,
-                              fontSize: 13,
-                              height: 1.45,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  IconData _iconForTitle(String title) {
-    if (title.contains('关联') || title.contains('知识')) {
-      return Icons.hub_rounded;
-    }
-    if (title.contains('考前') || title.contains('分钟') || title.contains('复习')) {
-      return Icons.timer_rounded;
-    }
-    if (title.contains('错题') || title.contains('档案') || title.contains('记忆')) {
-      return Icons.folder_special_rounded;
-    }
-    if (title.contains('行动') || title.contains('下一步')) {
-      return Icons.route_rounded;
-    }
-    if (title.contains('状态')) {
-      return Icons.info_outline_rounded;
-    }
-    return Icons.auto_awesome_rounded;
   }
 }
 
