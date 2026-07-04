@@ -574,7 +574,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           child: AppChatInputBar(
             controller: _controller,
             onSend: () => _send(),
-            hintText: '${_activeMode.title}：输入题干、错因或复习目标',
+            hintText: '',
           ),
         ),
       ],
