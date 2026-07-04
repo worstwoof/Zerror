@@ -1102,6 +1102,65 @@ class _HomeScreenState extends State<HomeScreen> {
     return '拍题解析、智能组卷、讲义和视频讲解都会在这里排队';
   }
 
+  Widget _buildQueueTaskHeader({
+    required ({IconData icon, Color color, String label, String note}) status,
+    required DateTime createdAt,
+    required bool showQueuePosition,
+    required int queuePosition,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(status.icon, color: status.color, size: 17),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                status.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: status.color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (showQueuePosition) ...[
+                const SizedBox(height: 2),
+                Text(
+                  queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Text(
+            _formatTaskTime(createdAt),
+            style: const TextStyle(
+              color: AppPalette.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAnalysisTaskTile(
     BuildContext sheetContext,
     AppStore store,
@@ -1146,38 +1205,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(status.icon, color: status.color, size: 17),
-                        const SizedBox(width: 6),
-                        Text(
-                          status.label,
-                          style: TextStyle(
-                            color: status.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (task.isActive && queuePosition > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
-                            style: const TextStyle(
-                              color: AppPalette.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _formatTaskTime(task.createdAt),
-                          style: const TextStyle(
-                            color: AppPalette.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+                    _buildQueueTaskHeader(
+                      status: status,
+                      createdAt: task.createdAt,
+                      showQueuePosition: task.isActive && queuePosition > 0,
+                      queuePosition: queuePosition,
                     ),
                     const SizedBox(height: 8),
                     _buildTaskPreviewText(task, status.note),
@@ -1232,38 +1264,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(status.icon, color: status.color, size: 17),
-                        const SizedBox(width: 6),
-                        Text(
-                          status.label,
-                          style: TextStyle(
-                            color: status.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (task.isActive && queuePosition > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
-                            style: const TextStyle(
-                              color: AppPalette.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _formatTaskTime(task.createdAt),
-                          style: const TextStyle(
-                            color: AppPalette.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+                    _buildQueueTaskHeader(
+                      status: status,
+                      createdAt: task.createdAt,
+                      showQueuePosition: task.isActive && queuePosition > 0,
+                      queuePosition: queuePosition,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -1327,38 +1332,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(status.icon, color: status.color, size: 17),
-                        const SizedBox(width: 6),
-                        Text(
-                          status.label,
-                          style: TextStyle(
-                            color: status.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (task.isActive && queuePosition > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
-                            style: const TextStyle(
-                              color: AppPalette.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _formatTaskTime(task.createdAt),
-                          style: const TextStyle(
-                            color: AppPalette.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+                    _buildQueueTaskHeader(
+                      status: status,
+                      createdAt: task.createdAt,
+                      showQueuePosition: task.isActive && queuePosition > 0,
+                      queuePosition: queuePosition,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -1422,38 +1400,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(status.icon, color: status.color, size: 17),
-                        const SizedBox(width: 6),
-                        Text(
-                          status.label,
-                          style: TextStyle(
-                            color: status.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (task.isActive && queuePosition > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
-                            style: const TextStyle(
-                              color: AppPalette.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _formatTaskTime(task.createdAt),
-                          style: const TextStyle(
-                            color: AppPalette.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+                    _buildQueueTaskHeader(
+                      status: status,
+                      createdAt: task.createdAt,
+                      showQueuePosition: task.isActive && queuePosition > 0,
+                      queuePosition: queuePosition,
                     ),
                     const SizedBox(height: 8),
                     Text(

@@ -31,6 +31,8 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _isThinking = false;
   bool _didRestoreMessages = false;
 
+  static const int _messageLimit = 30;
+
   static const List<_AssistantQuickAction> _quickActions = [
     _AssistantQuickAction(
       mode: _AssistantMode.quickAnswer,
@@ -77,11 +79,11 @@ class _AiChatScreenState extends State<AiChatScreen>
     super.didChangeDependencies();
     if (_didRestoreMessages) return;
     _didRestoreMessages = true;
-    _messages.addAll(
-      AppStateScope.of(context)
-          .assistantChatMessages
-          .map(_ChatMessage.fromRecord),
-    );
+    _appendMessageRecords(AppStateScope.of(context).assistantChatMessages);
+    if (_messages.isNotEmpty) {
+      _showChat = true;
+      _scrollToBottom(animated: false);
+    }
   }
 
   AnimationController _ensureFlipController() {
@@ -141,8 +143,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       final videoMessage = store.addAssistantChatLectureVideoTask(task.id);
       setState(() {
         _activeMode = selectedMode;
-        _messages.add(_ChatMessage.fromRecord(userMessage));
-        _messages.add(_ChatMessage.fromRecord(videoMessage));
+        _appendMessageRecords([userMessage, videoMessage]);
         _controller.clear();
       });
       _scrollToBottom();
@@ -159,8 +160,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       final handoutMessage = store.addAssistantChatLectureHandoutTask(task.id);
       setState(() {
         _activeMode = selectedMode;
-        _messages.add(_ChatMessage.fromRecord(userMessage));
-        _messages.add(_ChatMessage.fromRecord(handoutMessage));
+        _appendMessageRecords([userMessage, handoutMessage]);
         _controller.clear();
       });
       _scrollToBottom();
@@ -170,7 +170,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     final userMessage = store.addAssistantChatUserMessage(text);
     setState(() {
       _activeMode = selectedMode;
-      _messages.add(_ChatMessage.fromRecord(userMessage));
+      _appendMessageRecords([userMessage]);
       _controller.clear();
       _isThinking = true;
     });
@@ -202,10 +202,22 @@ class _AiChatScreenState extends State<AiChatScreen>
     final assistantMessage = store.addAssistantChatAssistantReply(reply);
     if (!mounted) return;
     setState(() {
-      _messages.add(_ChatMessage.fromRecord(assistantMessage));
+      _appendMessageRecords([assistantMessage]);
       _isThinking = false;
     });
     _scrollToBottom();
+  }
+
+  void _appendMessageRecords(
+    Iterable<AssistantChatMessageRecord> records,
+  ) {
+    _messages.addAll(records.map(_ChatMessage.fromRecord));
+    _trimMessages();
+  }
+
+  void _trimMessages() {
+    if (_messages.length <= _messageLimit) return;
+    _messages.removeRange(0, _messages.length - _messageLimit);
   }
 
   Map<String, dynamic> _assistantContext(AppStore store) {
@@ -592,14 +604,19 @@ class _AiChatScreenState extends State<AiChatScreen>
     return const {};
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-      );
+      final target = _scrollController.position.maxScrollExtent;
+      if (animated) {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _scrollController.jumpTo(target);
+      }
     });
   }
 

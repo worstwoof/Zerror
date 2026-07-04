@@ -63,8 +63,73 @@ def render_manim_video(
     final_path = output_dir / f"{job_id}.mp4"
     if candidates[0] != final_path:
         final_path.write_bytes(candidates[0].read_bytes())
+    add_background_music(final_path, scene_spec=scene_spec)
     optimize_mp4_for_streaming(final_path)
     return final_path
+
+
+def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> bool:
+    """Add a quiet study-music bed to generated videos when ffmpeg is available."""
+
+    if scene_spec.get("background_music") is False:
+        return False
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg or not video_path.exists():
+        return False
+
+    temporary_path = video_path.with_name(
+        f"{video_path.stem}.music{video_path.suffix}"
+    )
+    try:
+        if temporary_path.exists():
+            temporary_path.unlink()
+        completed = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-f",
+                "lavfi",
+                "-i",
+                "aevalsrc=0.012*sin(2*PI*220*t)+0.008*sin(2*PI*330*t):s=44100",
+                "-filter_complex",
+                "[1:a]afade=t=in:st=0:d=1.2,volume=0.65[bed]",
+                "-map",
+                "0:v:0",
+                "-map",
+                "[bed]",
+                "-shortest",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                str(temporary_path),
+            ],
+            cwd=video_path.parent,
+            capture_output=True,
+            text=True,
+            timeout=160,
+            check=False,
+        )
+        if (
+            completed.returncode == 0
+            and temporary_path.exists()
+            and temporary_path.stat().st_size > 0
+        ):
+            temporary_path.replace(video_path)
+            return True
+        if temporary_path.exists():
+            temporary_path.unlink()
+    except Exception:
+        try:
+            if temporary_path.exists():
+                temporary_path.unlink()
+        except OSError:
+            pass
+    return False
 
 
 def optimize_mp4_for_streaming(video_path: Path) -> None:
@@ -182,7 +247,23 @@ def cjk_text(value, font_size=24, color=WHITE, **kwargs):
     return Text(text, font_size=font_size, color=color, **kwargs)
 
 
+def compact_text(value, limit=36):
+    cleaned = " ".join(str(value).replace("\\n", " ").split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: max(1, limit - 1)] + "…"
+
+
 class LearningScene(Scene):
+    TITLE_CENTER = UP * 3.35
+    VISUAL_CENTER = LEFT * 3.05 + DOWN * 0.45
+    TEXT_CENTER = RIGHT * 3.45 + DOWN * 0.15
+    CAPTION_CENTER = DOWN * 3.18
+    VISUAL_WIDTH = 6.35
+    VISUAL_HEIGHT = 4.55
+    TEXT_WIDTH = 5.35
+    TEXT_HEIGHT = 4.80
+
     def construct(self):
         spec = json.loads(SCENE_SPEC)
         scene_type = str(spec.get("scene_type") or "generic")
@@ -217,8 +298,10 @@ class LearningScene(Scene):
             return
 
         if spec.get("show_title"):
-            title = cjk_text(str(spec.get("title") or spec.get("fallback_text") or "题目讲解"), font_size=32)
-            title.to_edge(UP)
+            title = cjk_text(str(spec.get("title") or spec.get("fallback_text") or "题目讲解"), font_size=28)
+            if title.width > 11.4:
+                title.scale_to_fit_width(11.4)
+            title.move_to(self.TITLE_CENTER)
             self.play(FadeIn(title, shift=DOWN * 0.2))
 
         self._show_intro_panel(spec)
@@ -251,6 +334,51 @@ class LearningScene(Scene):
             self.wait(2.2)
             self.play(FadeOut(note))
         self.wait(1.8)
+
+    def _fit_to_zone(self, mob, *, width, height, center):
+        if mob.width > width:
+            mob.scale_to_fit_width(width)
+        if mob.height > height:
+            mob.scale_to_fit_height(height)
+        mob.move_to(center)
+        return mob
+
+    def _stage_panel(self, title, lines, *, accent=YELLOW, max_lines=4):
+        heading = cjk_text(compact_text(title, 18), font_size=21, color=accent)
+        cards = VGroup()
+        for index, line in enumerate(lines[:max_lines], start=1):
+            text = cjk_text(f"{{index}}. {{compact_text(line, 26)}}", font_size=17, color=WHITE)
+            card_box = RoundedRectangle(
+                width=5.16,
+                height=0.62,
+                corner_radius=0.08,
+                color=BLUE_E,
+                stroke_width=1.2,
+                fill_color=BLUE_E,
+                fill_opacity=0.20,
+            )
+            text.move_to(card_box.get_center())
+            if text.width > 4.78:
+                text.scale_to_fit_width(4.78)
+            cards.add(VGroup(card_box, text))
+        if len(cards) > 0:
+            cards.arrange(DOWN, aligned_edge=LEFT, buff=0.16)
+            body = VGroup(heading, cards).arrange(DOWN, aligned_edge=LEFT, buff=0.22)
+        else:
+            body = VGroup(heading)
+        backdrop = RoundedRectangle(
+            width=5.42,
+            height=max(1.0, body.height + 0.42),
+            corner_radius=0.10,
+            color=GREY_E,
+            stroke_width=1,
+            fill_color=BLACK,
+            fill_opacity=0.36,
+        )
+        body.move_to(backdrop.get_center())
+        panel = VGroup(backdrop, body)
+        self._fit_to_zone(panel, width=self.TEXT_WIDTH, height=self.TEXT_HEIGHT, center=self.TEXT_CENTER)
+        return panel
 
     def _draw_professional_physics_scene(self, spec):
         scene_type = self._professional_scene_type(spec)
@@ -2008,11 +2136,23 @@ class LearningScene(Scene):
 
     def _caption(self, text, color=WHITE):
         value = str(text).strip()
-        if len(value) > 62:
-            value = value[:59] + "..."
-        caption = cjk_text(value, font_size=21, color=color)
-        caption.to_edge(DOWN, buff=0.32)
-        return caption
+        value = compact_text(value, 48)
+        caption = cjk_text(value, font_size=18, color=color)
+        if caption.width > 10.8:
+            caption.scale_to_fit_width(10.8)
+        box = RoundedRectangle(
+            width=max(4.4, min(11.25, caption.width + 0.62)),
+            height=0.48,
+            corner_radius=0.08,
+            color=GREY_E,
+            stroke_width=0.8,
+            fill_color=BLACK,
+            fill_opacity=0.58,
+        )
+        group = VGroup(box, caption)
+        group.move_to(self.CAPTION_CENTER)
+        caption.move_to(box.get_center())
+        return group
 
     def _show_step_caption(self, text, color=WHITE, wait_time=1.35):
         caption = self._caption(text, color=color)
@@ -2024,25 +2164,17 @@ class LearningScene(Scene):
         steps = [str(item).strip() for item in spec.get("steps") or [] if str(item).strip()]
         if not steps:
             return
-        heading = cjk_text("按详解步骤复盘", font_size=27, color=YELLOW).to_edge(UP, buff=0.82)
-        self.play(FadeIn(heading), run_time=0.45)
         visible_steps = steps[:8]
         for group_start in range(0, len(visible_steps), 2):
-            rows = VGroup()
-            for local_index, step in enumerate(visible_steps[group_start:group_start + 2], start=group_start + 1):
-                text = str(local_index) + ". " + step[:58]
-                label = cjk_text(text, font_size=21, color=WHITE)
-                card = VGroup(
-                    RoundedRectangle(width=10.4, height=0.82, corner_radius=0.10, color=GREY_B, fill_color=BLACK, fill_opacity=0.46),
-                    label,
-                )
-                label.move_to(card[0].get_center())
-                rows.add(card)
-            rows.arrange(DOWN, buff=0.20).next_to(heading, DOWN, buff=0.46)
-            self.play(FadeIn(rows, shift=UP * 0.12), run_time=0.55)
+            panel = self._stage_panel(
+                "文字解析",
+                visible_steps[group_start:group_start + 2],
+                accent=YELLOW,
+                max_lines=2,
+            )
+            self.play(FadeIn(panel, shift=LEFT * 0.12), run_time=0.55)
             self.wait(3.2)
-            self.play(FadeOut(rows, shift=DOWN * 0.10), run_time=0.45)
-        self.play(FadeOut(heading), run_time=0.35)
+            self.play(FadeOut(panel, shift=RIGHT * 0.10), run_time=0.45)
 
     def _show_formula_review(self, spec):
         formulas = [str(item).strip() for item in spec.get("formula_steps") or [] if str(item).strip()]
@@ -2052,23 +2184,18 @@ class LearningScene(Scene):
             review_items = steps[-5:]
         if not review_items:
             return
-        heading = cjk_text("把动画对应回解题关系", font_size=26, color=YELLOW).to_edge(UP, buff=0.85)
-        cards = VGroup()
-        for index, item in enumerate(review_items, start=1):
-            label = cjk_text(f"{{index}}. {{item[:54]}}", font_size=22, color=WHITE)
-            card = VGroup(
-                RoundedRectangle(width=10.2, height=0.58, corner_radius=0.10, color=BLUE_E, fill_color=BLUE_E, fill_opacity=0.28),
-                label,
-            )
-            label.move_to(card[0].get_center())
-            cards.add(card)
-        cards.arrange(DOWN, buff=0.18).next_to(heading, DOWN, buff=0.34)
-        self.play(FadeIn(heading), run_time=0.4)
-        for card in cards:
-            self.play(FadeIn(card, shift=RIGHT * 0.12), run_time=0.45)
-            self.wait(0.8)
+        panel = self._stage_panel(
+            "公式复盘",
+            review_items[:5],
+            accent=YELLOW,
+            max_lines=5,
+        )
+        self.play(FadeIn(panel, shift=LEFT * 0.12), run_time=0.45)
+        for item in (panel[1][1] if len(panel[1]) > 1 else []):
+            self.play(Indicate(item, color=YELLOW, scale_factor=1.02), run_time=0.45)
+            self.wait(0.55)
         self.wait(1.8)
-        self.play(FadeOut(VGroup(heading, cards)), run_time=0.55)
+        self.play(FadeOut(panel, shift=RIGHT * 0.12), run_time=0.55)
 
     def _draw_board_block_scene(self, spec):
         steps = [str(item) for item in spec.get("steps") or [] if str(item).strip()]
@@ -2261,10 +2388,11 @@ class LearningScene(Scene):
         axes = Axes(
             x_range=[-5, 5, 1],
             y_range=[-3, 4, 1],
-            x_length=8.8,
-            y_length=5.2,
+            x_length=6.2,
+            y_length=4.25,
             tips=True,
-        ).shift(DOWN * 0.25)
+        )
+        axes.move_to(self.VISUAL_CENTER + DOWN * 0.08)
         x_label = cjk_text("x", font_size=20).next_to(axes.x_axis.get_end(), RIGHT, buff=0.08)
         y_label = cjk_text("y", font_size=20).next_to(axes.y_axis.get_end(), UP, buff=0.08)
         self._show_step_caption(steps[0] if steps else "先建立图形和坐标系，把题目条件放到图上", color=YELLOW, wait_time=1.4)
@@ -2315,10 +2443,11 @@ class LearningScene(Scene):
         axes = Axes(
             x_range=[-1, 10, 1],
             y_range=[-1, 6, 1],
-            x_length=8,
-            y_length=4.8,
+            x_length=6.15,
+            y_length=4.15,
             tips=True,
-        ).shift(DOWN * 0.2)
+        )
+        axes.move_to(self.VISUAL_CENTER + DOWN * 0.10)
         self._show_step_caption(steps[0] if steps else "先建立坐标或示意图，把条件放到图上", color=YELLOW, wait_time=1.4)
         self.play(Create(axes), run_time=1.0)
 
@@ -2337,7 +2466,7 @@ class LearningScene(Scene):
                 rendered_points[str(item.get("id") or item.get("label") or "")] = dot
             elif kind == "function":
                 expression = str(item.get("expression") or "x")
-                graph = axes.plot(lambda x: self._eval_function(expression, x), x_range=[-0.5, 7.5], color=YELLOW)
+                graph = axes.plot(lambda x: self._eval_function(expression, x), x_range=[-0.5, 7.2], color=YELLOW)
                 self.play(Create(graph), run_time=1)
 
         for relation in spec.get("relations") or []:

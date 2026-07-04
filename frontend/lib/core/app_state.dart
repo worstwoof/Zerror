@@ -964,7 +964,7 @@ class AssistantChatMessageRecord {
 
 class AppStore extends ChangeNotifier {
   static const Duration _analysisPollInterval = Duration(seconds: 3);
-  static const int _assistantChatMessageLimit = 80;
+  static const int _assistantChatMessageLimit = 30;
 
   AppStore.seeded({
     AppRepository? repository,

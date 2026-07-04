@@ -63,7 +63,7 @@ class LectureVideoService:
         topic = request.topic.strip() or "从用户输入判断"
         return f"""
 只返回 JSON，不要 Markdown，不要代码围栏。
-你是 Zerror 的知识点视频讲解导演。目标是把学生的一句话需求拆成 45-90 秒的黑板式 Manim 分镜。
+你是 Zerror 的知识点视频讲解导演。目标是把学生的一句话需求拆成 60-120 秒的黑板式 Manim 分镜。
 
 用户原话：{request.prompt}
 学科提示：{subject}
@@ -72,8 +72,12 @@ class LectureVideoService:
 要求：
 - 只规划讲解分镜，不要写 Python、HTML、JavaScript 或 Manim 代码。
 - 适合学生看懂一个知识点：先讲定义/图像/模型，再讲关键关系，最后讲易错点。
+- 每个阶段必须先规定画面分区：左侧/中左只放图像、坐标轴、运动对象；右侧只放文字解析和公式卡；底部只放当前阶段字幕。
+- 图像元素移动必须有目的：先定位关键对象，再高亮关系，再移动/变形展示变化过程，最后把变化对应到文字或公式。
+- 不要把长文字、公式卡、标题压在图像上；文字解析每条短而具体，不能空泛。
+- 分镜要饱满：每个阶段都要让学生学到一个明确结论、判定方法或易错边界。
 - 数学和物理可以给公式；其他学科公式数组留空。
-- steps 每条控制在 36 字以内，4 到 8 条。
+- steps 每条控制在 36 字以内，5 到 8 条。
 - formula_steps 每条只放纯公式或很短的数学/物理关系，不要放长中文。
 - summary 用一句话说明这个视频会讲什么。
 
@@ -85,7 +89,7 @@ class LectureVideoService:
   "scene_type": "generic/mechanics/electromagnetism/optics/wave/board_block",
   "summary": "一句话简介",
   "focus_points": ["核心点1", "核心点2", "核心点3"],
-  "steps": ["分镜步骤1", "分镜步骤2", "分镜步骤3", "分镜步骤4"],
+  "steps": ["分镜步骤1", "分镜步骤2", "分镜步骤3", "分镜步骤4", "分镜步骤5"],
   "formula_steps": ["公式1", "公式2"],
   "common_traps": ["易错点1", "易错点2"]
 }}
@@ -137,6 +141,18 @@ class LectureVideoService:
                 "solution_outline": steps,
                 "target_duration_seconds": 70,
             },
+            "layout": {
+                "title_region": "top",
+                "visual_region": "left",
+                "explanation_region": "right",
+                "caption_region": "bottom",
+            },
+            "audio": {
+                "background_music": True,
+                "voiceover": False,
+                "narration_outline": [summary, *steps[:6]],
+            },
+            "background_music": True,
             "formula_steps": formulas,
             "steps": steps,
             "render_targets": ["manim"],

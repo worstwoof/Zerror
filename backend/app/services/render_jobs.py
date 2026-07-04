@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 import threading
 import time
 import uuid
@@ -21,7 +22,7 @@ from backend.app.rendering.manim_renderer import (
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v4"
+MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v5"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -594,6 +595,7 @@ def _video_diagnostics(video_url: str) -> Dict[str, Any]:
         "output_path": str(path) if path else "",
         "file_size_bytes": size,
         "mp4_faststart": _mp4_faststart_ready(path) if path and exists else False,
+        "audio_stream_present": _has_audio_stream(path) if path and exists else False,
         "error_summary": "",
     }
 
@@ -616,6 +618,34 @@ def _mp4_faststart_ready(path: Path) -> bool:
     moov_offset = header.find(b"moov")
     mdat_offset = header.find(b"mdat")
     return moov_offset != -1 and (mdat_offset == -1 or moov_offset < mdat_offset)
+
+
+def _has_audio_stream(path: Path) -> bool:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return False
+    try:
+        completed = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=index",
+                "-of",
+                "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+    except Exception:
+        return False
+    return completed.returncode == 0 and bool(completed.stdout.strip())
 
 
 def _error_summary(exc: Exception) -> str:
