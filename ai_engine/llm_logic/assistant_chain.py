@@ -252,7 +252,7 @@ class AssistantService:
         errors: list[PracticePaperSourceError],
     ) -> list[dict[str, Any]]:
         source = []
-        for item in errors[:10]:
+        for item in errors[:16]:
             source.append(
                 {
                     "id": item.id,
@@ -349,12 +349,12 @@ class AssistantService:
 
     def _mode_instruction(self, mode: str) -> str:
         if mode == "error_memory":
-            return "- 先引用错题档案中的重复学科/知识点/错因。\n- 回答要体现“你之前在这些地方错过”。\n- 给 1 到 3 个可追问的问题。"
+            return "- 必须优先读取错题档案节选，先引用重复学科/知识点/错因。\n- 回答要体现“你之前在这些地方错过”。\n- 给 1 到 3 个可追问的问题。"
         if mode == "knowledge_link":
-            return "- 主动补出前置知识、相邻题型、混淆点。\n- 不只回答当前问题，要告诉学生还能连到哪里。\n- 关联知识点要短而准。"
+            return "- 必须围绕错题档案中的 topic、tags、错因做知识关联。\n- 主动补出前置知识、相邻题型、混淆点。\n- 不只回答当前问题，要告诉学生还能连到哪里。\n- 关联知识点要短而准。"
         if mode == "exam_sprint":
-            return "- 给分钟级短时复习计划。\n- 只保留考前最值钱的动作。\n- 必须说明先做什么、跳过什么、最后检查什么。"
-        return "- 用最短路径回答。\n- 先给结论，再给下一步。\n- 不确定时说明还缺什么条件。"
+            return "- 必须根据错题档案中的待复习错题和薄弱 topic 安排。\n- 给分钟级短时复习计划。\n- 只保留考前最值钱的动作。\n- 必须说明先做什么、跳过什么、最后检查什么。"
+        return "- 如果问题提到错题本/最该补什么/当前薄弱点，必须结合错题档案节选回答。\n- 用最短路径回答。\n- 先给结论，再给下一步。\n- 不确定时说明还缺什么条件。"
 
     def _parse_json(self, raw_output: str) -> dict[str, Any]:
         cleaned = raw_output.strip()

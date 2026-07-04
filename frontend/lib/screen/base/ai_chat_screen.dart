@@ -34,7 +34,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       mode: _AssistantMode.quickAnswer,
       title: '快问快答',
       note: '先给短结论',
-      prompt: '用 3 句话快速回答我现在最该补什么',
+      prompt: '按我的错题本，直接告诉我现在最该补什么',
       icon: Icons.flash_on_rounded,
       color: AppPalette.mint,
     ),
@@ -42,7 +42,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       mode: _AssistantMode.errorMemory,
       title: '错题记忆',
       note: '读取档案上下文',
-      prompt: '根据我的错题档案，找出最近反复犯的错',
+      prompt: '读取我的错题本，找出最近反复犯的错',
       icon: Icons.folder_special_rounded,
       color: AppPalette.peach,
     ),
@@ -50,7 +50,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       mode: _AssistantMode.knowledgeLink,
       title: '关联知识点',
       note: '主动连前后内容',
-      prompt: '帮我把这些错题关联到前后知识点',
+      prompt: '根据我的错题本，把错题关联到前后知识点',
       icon: Icons.hub_rounded,
       color: AppPalette.blush,
     ),
@@ -58,7 +58,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       mode: _AssistantMode.examSprint,
       title: '考前短复习',
       note: '10-45 分钟冲刺',
-      prompt: '我考前只有 30 分钟，帮我安排冲刺复习',
+      prompt: '按我的错题本，安排 30 分钟考前冲刺复习',
       icon: Icons.timer_rounded,
       color: AppPalette.leaf,
     ),
@@ -204,10 +204,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     AppStore store,
     _AssistantMode mode,
   ) {
-    final pool = <ErrorRecord>[
-      if (mode != _AssistantMode.quickAnswer) ...store.pendingReviewErrors,
-      ...store.errors,
-    ];
+    final pool = _assistantErrorPool(store, mode);
     final seen = <String>{};
     final result = <Map<String, dynamic>>[];
     for (final item in pool) {
@@ -226,6 +223,51 @@ class _AiChatScreenState extends State<AiChatScreen>
       if (result.length >= 10) break;
     }
     return result;
+  }
+
+  List<ErrorRecord> _assistantErrorPool(
+    AppStore store,
+    _AssistantMode mode,
+  ) {
+    final focusSubject = store.weakestSubject;
+    final focusTopic = store.weakestTopic;
+    final pool = <ErrorRecord>[];
+
+    void addWhere(
+        Iterable<ErrorRecord> source, bool Function(ErrorRecord) test) {
+      pool.addAll(source.where(test));
+    }
+
+    bool sameFocus(ErrorRecord item) {
+      final subjectMatched =
+          focusSubject != '暂无' && item.subject == focusSubject;
+      final topicMatched = focusTopic != '核心错题回收' && item.topic == focusTopic;
+      return subjectMatched || topicMatched;
+    }
+
+    switch (mode) {
+      case _AssistantMode.examSprint:
+        addWhere(store.pendingReviewErrors, sameFocus);
+        pool.addAll(store.pendingReviewErrors);
+        addWhere(store.errors, sameFocus);
+        break;
+      case _AssistantMode.errorMemory:
+        pool.addAll(store.pendingReviewErrors);
+        addWhere(store.errors, sameFocus);
+        break;
+      case _AssistantMode.knowledgeLink:
+        addWhere(store.errors, sameFocus);
+        addWhere(store.pendingReviewErrors, (item) => item.tags.isNotEmpty);
+        pool.addAll(store.pendingReviewErrors);
+        break;
+      case _AssistantMode.quickAnswer:
+        addWhere(store.pendingReviewErrors, sameFocus);
+        pool.addAll(store.pendingReviewErrors);
+        break;
+    }
+
+    pool.addAll(store.errors);
+    return pool;
   }
 
   AssistantChatReply _fallbackAssistantReply(
