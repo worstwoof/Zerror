@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -11,6 +12,7 @@ import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
 import '../capture/html_artifact_preview_screen.dart';
+import '../capture/manim_video_preview_screen.dart';
 import 'achievements_screen.dart';
 import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
@@ -971,6 +973,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final tasks = store.analysisTasks;
         final paperTasks = store.practicePaperTasks;
         final handoutTasks = store.lectureHandoutTasks;
+        final videoTasks = store.lectureVideoTasks;
         final taskCards = <Widget>[
           ...tasks.map(
             (task) => _buildAnalysisTaskTile(sheetContext, store, task),
@@ -980,6 +983,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ...handoutTasks.map(
             (task) => _buildLectureHandoutTaskTile(sheetContext, store, task),
+          ),
+          ...videoTasks.map(
+            (task) => _buildLectureVideoTaskTile(sheetContext, store, task),
           ),
         ];
         return Container(
@@ -1093,7 +1099,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (completed > 0) {
       return '$completed 个任务已完成，等你打开确认';
     }
-    return '拍题解析、智能组卷和讲义生成都会在这里排队';
+    return '拍题解析、智能组卷、讲义和视频讲解都会在这里排队';
   }
 
   Widget _buildAnalysisTaskTile(
@@ -1377,6 +1383,101 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLectureVideoTaskTile(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundLectureVideoTask task,
+  ) {
+    final status = _lectureVideoTaskStatus(task);
+    final queuePosition = store.lectureVideoTaskQueuePosition(task.id);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _lectureVideoTaskTap(sheetContext, task),
+        borderRadius: BorderRadius.circular(24),
+        child: AppPanel(
+          padding: const EdgeInsets.all(12),
+          color: _queueTaskSurface,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: AppPalette.moodBlue.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppPalette.moodBlue.withOpacity(0.16),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.movie_creation_outlined,
+                  color: AppPalette.moodBlue,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(status.icon, color: status.color, size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            color: status.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _formatTaskTime(task.createdAt),
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _lectureVideoTaskPreviewText(task, status.note),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildLectureVideoTaskActions(sheetContext, store, task),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   VoidCallback? _analysisTaskTap(
     BuildContext sheetContext,
     BackgroundAnalysisTask task,
@@ -1423,6 +1524,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return () {
         Navigator.pop(sheetContext);
         _openCompletedLectureHandoutTask(task);
+      };
+    }
+    return null;
+  }
+
+  VoidCallback? _lectureVideoTaskTap(
+    BuildContext sheetContext,
+    BackgroundLectureVideoTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.video != null) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openCompletedLectureVideoTask(task);
       };
     }
     return null;
@@ -1484,6 +1598,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (task.isCompleted && handout != null) {
       final title = handout.title.trim().isEmpty ? '知识讲义' : handout.title;
       final topic = handout.topic.trim().isEmpty ? task.topic : handout.topic;
+      return topic.trim().isEmpty ? title : '$title · $topic';
+    }
+    return task.errorMessage ?? task.statusMessage ?? fallback;
+  }
+
+  String _lectureVideoTaskPreviewText(
+    BackgroundLectureVideoTask task,
+    String fallback,
+  ) {
+    final video = task.video;
+    if (task.isCompleted && video != null) {
+      final title = video.title.trim().isEmpty ? '知识点视频讲解' : video.title;
+      final topic = video.topic.trim().isEmpty ? task.topic : video.topic;
       return topic.trim().isEmpty ? title : '$title · $topic';
     }
     return task.errorMessage ?? task.statusMessage ?? fallback;
@@ -1755,6 +1882,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLectureVideoTaskActions(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundLectureVideoTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.video != null) {
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openCompletedLectureVideoTask(task);
+            },
+            icon: const Icon(Icons.play_circle_outline_rounded, size: 17),
+            label: const Text('打开视频'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.moodBlue,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          TextButton(
+            onPressed: () => store.dismissLectureVideoTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    if (task.status == AnalysisTaskStatus.failed) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => store.retryLectureVideoTask(task.id),
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('重试'),
+            style: TextButton.styleFrom(
+              foregroundColor: _queueDanger,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissLectureVideoTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: task.progress > 0 ? task.progress / 100 : null,
+            strokeWidth: 2,
+            color: AppPalette.moodBlue,
+            backgroundColor: AppPalette.moodBlue.withOpacity(0.12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          '可以继续提问，视频生成好会留在这里',
+          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   ({IconData icon, Color color, String label, String note}) _analysisTaskStatus(
     BackgroundAnalysisTask task,
   ) {
@@ -1872,6 +2079,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  ({IconData icon, Color color, String label, String note})
+      _lectureVideoTaskStatus(
+    BackgroundLectureVideoTask task,
+  ) {
+    switch (task.status) {
+      case AnalysisTaskStatus.queued:
+        return (
+          icon: Icons.schedule_rounded,
+          color: AppPalette.textSecondary,
+          label: '等待生成',
+          note: '已收到视频讲解任务',
+        );
+      case AnalysisTaskStatus.analyzing:
+        return (
+          icon: Icons.movie_creation_outlined,
+          color: AppPalette.moodBlue,
+          label: '正在生成',
+          note: 'AI 正在生成知识点视频讲解',
+        );
+      case AnalysisTaskStatus.completed:
+        return (
+          icon: Icons.check_circle_rounded,
+          color: _queueSuccess,
+          label: '视频已生成',
+          note: '点击打开视频讲解',
+        );
+      case AnalysisTaskStatus.failed:
+        return (
+          icon: Icons.error_outline_rounded,
+          color: _queueDanger,
+          label: '生成失败',
+          note: '可以重试生成视频讲解',
+        );
+    }
+  }
+
   String _formatTaskTime(DateTime time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
@@ -1937,6 +2180,68 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  void _openCompletedLectureVideoTask(BackgroundLectureVideoTask task) {
+    final video = task.video;
+    if (video == null) return;
+    final artifact = video.artifact;
+    final content = _artifactContentMap(artifact['content']);
+    final videoUrl = (content['video_url'] ??
+            content['url'] ??
+            artifact['video_url'] ??
+            artifact['url'] ??
+            '')
+        .toString()
+        .trim();
+    final absoluteVideoUrl =
+        (content['absolute_video_url'] ?? artifact['absolute_video_url'] ?? '')
+            .toString()
+            .trim();
+    if (videoUrl.isEmpty && absoluteVideoUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前视频还没有可播放地址')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManimVideoPreviewScreen(
+          title: video.title.isEmpty ? '知识点视频讲解' : video.title,
+          videoUrl: videoUrl,
+          absoluteVideoUrl: absoluteVideoUrl,
+          jobId: (content['job_id'] ?? '').toString(),
+          jobStatus: (content['status'] ?? '').toString(),
+          progress: int.tryParse((content['progress'] ?? '').toString()),
+          message: (content['message'] ?? '').toString(),
+          error: (content['error'] ?? '').toString(),
+          diagnostics: _artifactContentMap(content['diagnostics']),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _artifactContentMap(dynamic content) {
+    if (content is Map<String, dynamic>) {
+      return content;
+    }
+    if (content is Map) {
+      return content.map((key, value) => MapEntry(key.toString(), value));
+    }
+    if (content is String) {
+      try {
+        final decoded = jsonDecode(content);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        if (decoded is Map) {
+          return decoded.map((key, value) => MapEntry(key.toString(), value));
+        }
+      } catch (_) {
+        return const {};
+      }
+    }
+    return const {};
   }
 
   void _openFailedAnalysisTask(BackgroundAnalysisTask task) {

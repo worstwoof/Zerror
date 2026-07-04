@@ -52,6 +52,12 @@ class AppConstants {
       '$lectureHandoutJobsEndpoint/${Uri.encodeComponent(jobId)}';
   static String lectureHandoutJobRetryEndpoint(String jobId) =>
       '${lectureHandoutJobEndpoint(jobId)}/retry';
+  static String get lectureVideoJobsEndpoint =>
+      '$apiBaseUrl/api/v1/analysis/lecture-video/jobs';
+  static String lectureVideoJobEndpoint(String jobId) =>
+      '$lectureVideoJobsEndpoint/${Uri.encodeComponent(jobId)}';
+  static String lectureVideoJobRetryEndpoint(String jobId) =>
+      '${lectureVideoJobEndpoint(jobId)}/retry';
   static String get assistantChatEndpoint =>
       '$apiBaseUrl/api/v1/assistant/chat';
   static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';

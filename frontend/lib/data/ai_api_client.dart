@@ -737,6 +737,94 @@ class LectureHandoutJob {
   }
 }
 
+class LectureVideoResult {
+  final String title;
+  final String subject;
+  final String topic;
+  final String summary;
+  final Map<String, dynamic> artifact;
+  final String rawModelOutput;
+
+  const LectureVideoResult({
+    required this.title,
+    required this.subject,
+    required this.topic,
+    required this.summary,
+    required this.artifact,
+    required this.rawModelOutput,
+  });
+
+  factory LectureVideoResult.fromJson(Map<String, dynamic> json) {
+    return LectureVideoResult(
+      title: (json['title'] ?? '知识点视频讲解').toString(),
+      subject: (json['subject'] ?? '').toString(),
+      topic: (json['topic'] ?? '').toString(),
+      summary: (json['summary'] ?? '').toString(),
+      artifact: _asStringMap(json['artifact']),
+      rawModelOutput: (json['raw_model_output'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'subject': subject,
+      'topic': topic,
+      'summary': summary,
+      'artifact': artifact,
+      'raw_model_output': rawModelOutput,
+    };
+  }
+}
+
+class LectureVideoJob {
+  final String jobId;
+  final String status;
+  final int progress;
+  final String message;
+  final String error;
+  final double? createdAt;
+  final double? updatedAt;
+  final LectureVideoResult? result;
+
+  const LectureVideoJob({
+    required this.jobId,
+    required this.status,
+    required this.progress,
+    required this.message,
+    required this.error,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.result,
+  });
+
+  bool get isCompleted => status == 'completed';
+  bool get isFailed => status == 'failed';
+  bool get isActive => status == 'pending' || status == 'processing';
+
+  factory LectureVideoJob.fromJson(Map<String, dynamic> json) {
+    final resultJson = json['result'];
+    return LectureVideoJob(
+      jobId: (json['job_id'] ?? '').toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      progress: int.tryParse((json['progress'] ?? '').toString()) ?? 0,
+      message: (json['message'] ?? '').toString(),
+      error: (json['error'] ?? '').toString(),
+      createdAt: double.tryParse((json['created_at'] ?? '').toString()),
+      updatedAt: double.tryParse((json['updated_at'] ?? '').toString()),
+      result: resultJson is Map<String, dynamic>
+          ? LectureVideoResult.fromJson(resultJson)
+          : resultJson is Map
+              ? LectureVideoResult.fromJson(
+                  resultJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+    );
+  }
+}
+
 class AssistantReplySection {
   final String title;
   final String body;
@@ -1176,6 +1264,94 @@ class AiApiClient {
       );
     }
     return LectureHandoutJob.fromJson(decoded);
+  }
+
+  Future<LectureVideoJob> createLectureVideoJob({
+    required String prompt,
+    required String subject,
+    required String topic,
+    String? clientJobId,
+  }) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse(AppConstants.lectureVideoJobsEndpoint),
+            headers: const {
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'prompt': prompt,
+              'subject': subject,
+              'topic': topic,
+              if (clientJobId != null && clientJobId.trim().isNotEmpty)
+                'client_job_id': clientJobId.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 35));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('视频讲解任务提交暂时较慢，请稍后重试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，视频讲解任务暂时无法提交。');
+    }
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 404) {
+        throw AiApiException(
+          '视频讲解接口未找到，请确认 App 连接的是已更新后端：${AppConstants.lectureVideoJobsEndpoint}',
+          statusCode: response.statusCode,
+        );
+      }
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+
+    return LectureVideoJob.fromJson(decoded);
+  }
+
+  Future<LectureVideoJob> fetchLectureVideoJob(String jobId) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse(AppConstants.lectureVideoJobEndpoint(jobId)))
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('视频讲解进度刷新暂时较慢，请稍后重试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，视频讲解进度暂时无法刷新。');
+    }
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+    return LectureVideoJob.fromJson(decoded);
+  }
+
+  Future<LectureVideoJob> retryLectureVideoJob(String jobId) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .post(Uri.parse(AppConstants.lectureVideoJobRetryEndpoint(jobId)))
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('视频讲解重试提交暂时较慢，请稍后再试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，视频讲解重试暂时无法提交。');
+    }
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+    return LectureVideoJob.fromJson(decoded);
   }
 
   Future<AssistantChatReply> askAssistant({

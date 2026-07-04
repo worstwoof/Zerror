@@ -76,10 +76,13 @@ class CloudBackedAppRepository implements AppRepository {
         local?.practicePaperTasks ?? const <Map<String, dynamic>>[];
     final localHandoutTasks =
         local?.lectureHandoutTasks ?? const <Map<String, dynamic>>[];
+    final localVideoTasks =
+        local?.lectureVideoTasks ?? const <Map<String, dynamic>>[];
     final localAssistantChatMessages =
         local?.assistantChatMessages ?? const <Map<String, dynamic>>[];
     if (localTasks.isEmpty &&
         localHandoutTasks.isEmpty &&
+        localVideoTasks.isEmpty &&
         localAssistantChatMessages.isEmpty) {
       return remote;
     }
@@ -93,6 +96,7 @@ class CloudBackedAppRepository implements AppRepository {
       errors: remote.errors,
       practicePaperTasks: localTasks,
       lectureHandoutTasks: localHandoutTasks,
+      lectureVideoTasks: localVideoTasks,
       assistantChatMessages: localAssistantChatMessages,
     );
   }
@@ -110,6 +114,7 @@ class CloudBackedAppRepository implements AppRepository {
       errors: snapshot.errors,
       practicePaperTasks: const [],
       lectureHandoutTasks: const [],
+      lectureVideoTasks: const [],
       assistantChatMessages: const [],
     );
   }

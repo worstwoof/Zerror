@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../core/app_ui.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
 import '../capture/html_artifact_preview_screen.dart';
+import '../capture/manim_video_preview_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -126,7 +128,26 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (text.isEmpty || _isThinking) return;
     final selectedMode = mode ?? _activeMode;
     final store = AppStateScope.of(context);
+    final videoIntent = _detectLectureVideoIntent(text);
     final lectureIntent = _detectLectureHandoutIntent(text);
+
+    if (videoIntent.shouldGenerate) {
+      final task = store.enqueueLectureVideoTask(
+        prompt: text,
+        subject: videoIntent.subject,
+        topic: videoIntent.topic,
+      );
+      final userMessage = store.addAssistantChatUserMessage(text);
+      final videoMessage = store.addAssistantChatLectureVideoTask(task.id);
+      setState(() {
+        _activeMode = selectedMode;
+        _messages.add(_ChatMessage.fromRecord(userMessage));
+        _messages.add(_ChatMessage.fromRecord(videoMessage));
+        _controller.clear();
+      });
+      _scrollToBottom();
+      return;
+    }
 
     if (lectureIntent.shouldGenerate) {
       final task = store.enqueueLectureHandoutTask(
@@ -374,6 +395,31 @@ class _AiChatScreenState extends State<AiChatScreen>
     return (shouldGenerate: true, subject: subject, topic: topic);
   }
 
+  ({bool shouldGenerate, String subject, String topic})
+      _detectLectureVideoIntent(String text) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), '');
+    final hasVideoKeyword = normalized.contains('视频讲解') ||
+        normalized.contains('视频讲一下') ||
+        normalized.contains('用视频讲') ||
+        normalized.contains('生成视频') ||
+        normalized.contains('动画讲解') ||
+        normalized.contains('manim') ||
+        normalized.contains('Manim');
+    final hasLearningKeyword = normalized.contains('知识点') ||
+        normalized.contains('讲一下') ||
+        normalized.contains('讲讲') ||
+        normalized.contains('解释') ||
+        normalized.contains('原理') ||
+        normalized.contains('模型') ||
+        normalized.contains('公式');
+    if (!(hasVideoKeyword && hasLearningKeyword)) {
+      return (shouldGenerate: false, subject: '', topic: '');
+    }
+    final subject = _extractSubject(text);
+    final topic = _extractLectureVideoTopic(text, subject);
+    return (shouldGenerate: true, subject: subject, topic: topic);
+  }
+
   String _extractSubject(String text) {
     const subjects = [
       '数学',
@@ -427,6 +473,39 @@ class _AiChatScreenState extends State<AiChatScreen>
     return topic.length > 32 ? topic.substring(0, 32) : topic;
   }
 
+  String _extractLectureVideoTopic(String text, String subject) {
+    var topic = text;
+    final removals = [
+      '帮我',
+      '请',
+      '用视频',
+      '视频讲解',
+      '视频讲一下',
+      '生成视频',
+      '做成视频',
+      '动画讲解',
+      'Manim',
+      'manim',
+      '讲一下',
+      '讲讲',
+      '解释一下',
+      '解释',
+      '知识点',
+      '这个',
+    ];
+    for (final removal in removals) {
+      topic = topic.replaceAll(removal, ' ');
+    }
+    if (subject.isNotEmpty) {
+      topic = topic.replaceAll(subject, ' ');
+    }
+    topic = topic.replaceAll(RegExp(r'[\s，。；;、]+'), ' ').trim();
+    if (topic.isEmpty) {
+      return subject.isEmpty ? '核心知识点' : '$subject核心知识点';
+    }
+    return topic.length > 32 ? topic.substring(0, 32) : topic;
+  }
+
   void _openLectureHandoutTask(BackgroundLectureHandoutTask task) {
     final handout = task.handout;
     if (handout == null) return;
@@ -449,6 +528,68 @@ class _AiChatScreenState extends State<AiChatScreen>
         ),
       ),
     );
+  }
+
+  void _openLectureVideoTask(BackgroundLectureVideoTask task) {
+    final video = task.video;
+    if (video == null) return;
+    final artifact = video.artifact;
+    final content = _artifactContentMap(artifact['content']);
+    final videoUrl = (content['video_url'] ??
+            content['url'] ??
+            artifact['video_url'] ??
+            artifact['url'] ??
+            '')
+        .toString()
+        .trim();
+    final absoluteVideoUrl =
+        (content['absolute_video_url'] ?? artifact['absolute_video_url'] ?? '')
+            .toString()
+            .trim();
+    if (videoUrl.isEmpty && absoluteVideoUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前视频还没有可播放地址')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManimVideoPreviewScreen(
+          title: video.title.isEmpty ? '知识点视频讲解' : video.title,
+          videoUrl: videoUrl,
+          absoluteVideoUrl: absoluteVideoUrl,
+          jobId: (content['job_id'] ?? '').toString(),
+          jobStatus: (content['status'] ?? '').toString(),
+          progress: int.tryParse((content['progress'] ?? '').toString()),
+          message: (content['message'] ?? '').toString(),
+          error: (content['error'] ?? '').toString(),
+          diagnostics: _artifactContentMap(content['diagnostics']),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _artifactContentMap(dynamic content) {
+    if (content is Map<String, dynamic>) {
+      return content;
+    }
+    if (content is Map) {
+      return content.map((key, value) => MapEntry(key.toString(), value));
+    }
+    if (content is String) {
+      try {
+        final decoded = jsonDecode(content);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        if (decoded is Map) {
+          return decoded.map((key, value) => MapEntry(key.toString(), value));
+        }
+      } catch (_) {
+        return const {};
+      }
+    }
+    return const {};
   }
 
   void _scrollToBottom() {
@@ -597,10 +738,18 @@ class _AiChatScreenState extends State<AiChatScreen>
                               onOpen: _openLectureHandoutTask,
                               onRetry: store.retryLectureHandoutTask,
                             )
-                          : AppChatBubble(
-                              text: _assistantBubbleText(message.reply!),
-                              isUser: false,
-                            ),
+                          : message.lectureVideoTaskId != null
+                              ? _LectureVideoChatTaskCard(
+                                  task: store.lectureVideoTaskById(
+                                    message.lectureVideoTaskId!,
+                                  ),
+                                  onOpen: _openLectureVideoTask,
+                                  onRetry: store.retryLectureVideoTask,
+                                )
+                              : AppChatBubble(
+                                  text: _assistantBubbleText(message.reply!),
+                                  isUser: false,
+                                ),
                 ),
               ),
               if (_isThinking)
@@ -1122,6 +1271,176 @@ class _LectureHandoutChatTaskCard extends StatelessWidget {
   }
 }
 
+class _LectureVideoChatTaskCard extends StatelessWidget {
+  const _LectureVideoChatTaskCard({
+    required this.task,
+    required this.onOpen,
+    required this.onRetry,
+  });
+
+  final BackgroundLectureVideoTask? task;
+  final ValueChanged<BackgroundLectureVideoTask> onOpen;
+  final ValueChanged<String> onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = task;
+    if (current == null) {
+      return const AppPanel(
+        padding: EdgeInsets.all(16),
+        child: Text(
+          '视频讲解任务已从队列移除',
+          style: TextStyle(
+            color: AppPalette.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    final status = _status(current);
+    return AppPanel(
+      padding: const EdgeInsets.all(16),
+      color: Colors.white.withOpacity(0.76),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppPalette.moodBlue.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  status.icon,
+                  color: status.color,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      status.title,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _subtitle(current),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (current.isActive) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 7,
+                value: current.progress > 0 ? current.progress / 100 : null,
+                color: AppPalette.moodBlue,
+                backgroundColor: AppPalette.moodBlue.withOpacity(0.12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              current.statusMessage ?? 'AI 正在生成视频讲解，你可以继续问其他问题',
+              style: const TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (current.isCompleted && current.video != null) ...[
+            TextButton.icon(
+              onPressed: () => onOpen(current),
+              icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+              label: const Text('打开视频讲解'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.moodBlue,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ] else if (current.isFailed) ...[
+            Text(
+              current.errorMessage ?? '视频讲解生成失败，请稍后重试。',
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 12.5,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => onRetry(current.id),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('重试生成'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.warmAccentText,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  ({IconData icon, Color color, String title}) _status(
+    BackgroundLectureVideoTask task,
+  ) {
+    if (task.isCompleted) {
+      return (
+        icon: Icons.check_circle_rounded,
+        color: AppPalette.moodBlue,
+        title: '视频讲解已生成',
+      );
+    }
+    if (task.isFailed) {
+      return (
+        icon: Icons.error_outline_rounded,
+        color: AppPalette.warmAccentText,
+        title: '视频讲解生成失败',
+      );
+    }
+    return (
+      icon: Icons.movie_creation_outlined,
+      color: AppPalette.moodBlue,
+      title: '正在生成视频讲解',
+    );
+  }
+
+  String _subtitle(BackgroundLectureVideoTask task) {
+    final video = task.video;
+    if (video != null) {
+      final topic = video.topic.trim().isEmpty ? task.topic : video.topic;
+      return topic.trim().isEmpty ? video.title : '${video.title} · $topic';
+    }
+    final topic = task.topic.trim().isEmpty ? task.prompt : task.topic;
+    return topic.length > 44 ? '${topic.substring(0, 43)}…' : topic;
+  }
+}
+
 class _FloatingSlimeOrb extends StatefulWidget {
   const _FloatingSlimeOrb({
     required this.size,
@@ -1333,17 +1652,26 @@ class _ChatMessage {
   const _ChatMessage.user(this.text)
       : isUser = true,
         reply = null,
-        lectureHandoutTaskId = null;
+        lectureHandoutTaskId = null,
+        lectureVideoTaskId = null;
 
   const _ChatMessage.assistant(this.reply)
       : text = '',
         isUser = false,
-        lectureHandoutTaskId = null;
+        lectureHandoutTaskId = null,
+        lectureVideoTaskId = null;
 
   const _ChatMessage.lectureHandout(this.lectureHandoutTaskId)
       : text = '',
         isUser = false,
-        reply = null;
+        reply = null,
+        lectureVideoTaskId = null;
+
+  const _ChatMessage.lectureVideo(this.lectureVideoTaskId)
+      : text = '',
+        isUser = false,
+        reply = null,
+        lectureHandoutTaskId = null;
 
   factory _ChatMessage.fromRecord(AssistantChatMessageRecord record) {
     if (record.isUser) {
@@ -1351,6 +1679,9 @@ class _ChatMessage {
     }
     if (record.isLectureHandout) {
       return _ChatMessage.lectureHandout(record.lectureHandoutTaskId ?? '');
+    }
+    if (record.isLectureVideo) {
+      return _ChatMessage.lectureVideo(record.lectureVideoTaskId ?? '');
     }
     final reply = record.reply;
     if (reply != null) {
@@ -1363,6 +1694,7 @@ class _ChatMessage {
   final bool isUser;
   final AssistantChatReply? reply;
   final String? lectureHandoutTaskId;
+  final String? lectureVideoTaskId;
 }
 
 enum _AssistantMode { quickAnswer, errorMemory, knowledgeLink, examSprint }

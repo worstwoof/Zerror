@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from ai_engine.llm_logic.assistant_chain import AssistantService
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_handout_chain import LectureHandoutService
+from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
 from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
 from ai_engine.llm_logic.practice_paper_chain import PracticePaperService
 from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
@@ -21,6 +22,8 @@ from backend.app.schemas.card_schema import (
     ImageAnalysisResponse,
     LectureHandoutJobResponse,
     LectureHandoutRequest,
+    LectureVideoJobResponse,
+    LectureVideoRequest,
     OCRResponse,
     PhysicsAnimationRequest,
     PhysicsAnimationResponse,
@@ -38,6 +41,11 @@ from backend.app.services.lecture_handout_jobs import (
     get_lecture_handout_job,
     retry_lecture_handout_job,
 )
+from backend.app.services.lecture_video_jobs import (
+    create_lecture_video_job,
+    get_lecture_video_job,
+    retry_lecture_video_job,
+)
 
 
 router = APIRouter(prefix="/api/v1", tags=["ai"])
@@ -46,6 +54,7 @@ diagnostic_service = DiagnosticService(vivo_client)
 practice_paper_service = PracticePaperService(vivo_client)
 assistant_service = AssistantService(vivo_client)
 lecture_handout_service = LectureHandoutService(vivo_client)
+lecture_video_service = LectureVideoService(vivo_client)
 logger = logging.getLogger(__name__)
 
 
@@ -359,6 +368,39 @@ def retry_analysis_lecture_handout_job(job_id: str) -> LectureHandoutJobResponse
     )
     if job is None:
         raise HTTPException(status_code=404, detail="讲义任务不存在。")
+    return job
+
+
+@router.post("/analysis/lecture-video/jobs", response_model=LectureVideoJobResponse)
+def create_analysis_lecture_video_job(
+    request: LectureVideoRequest,
+) -> LectureVideoJobResponse:
+    _ensure_credentials()
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="请告诉我需要讲解的知识点。")
+    return create_lecture_video_job(
+        request=request,
+        service=lecture_video_service,
+    )
+
+
+@router.get("/analysis/lecture-video/jobs/{job_id}", response_model=LectureVideoJobResponse)
+def get_analysis_lecture_video_job(job_id: str) -> LectureVideoJobResponse:
+    job = get_lecture_video_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="视频讲解任务不存在。")
+    return job
+
+
+@router.post("/analysis/lecture-video/jobs/{job_id}/retry", response_model=LectureVideoJobResponse)
+def retry_analysis_lecture_video_job(job_id: str) -> LectureVideoJobResponse:
+    _ensure_credentials()
+    job = retry_lecture_video_job(
+        job_id=job_id,
+        service=lecture_video_service,
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="视频讲解任务不存在。")
     return job
 
 

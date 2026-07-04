@@ -260,6 +260,36 @@ class LectureHandoutJobResponse(BaseModel):
     result: Optional[LectureHandoutResponse] = None
 
 
+class LectureVideoRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    subject: str = ""
+    topic: str = ""
+    client_job_id: str = ""
+
+
+class LectureVideoResponse(BaseModel):
+    title: str
+    subject: str = ""
+    topic: str = ""
+    summary: str = ""
+    artifact: RichArtifact
+    raw_model_output: str = ""
+
+
+LectureVideoJobStatus = Literal["pending", "processing", "completed", "failed"]
+
+
+class LectureVideoJobResponse(BaseModel):
+    job_id: str
+    status: LectureVideoJobStatus
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = ""
+    error: str = ""
+    created_at: float
+    updated_at: float
+    result: Optional[LectureVideoResponse] = None
+
+
 AssistantMode = Literal[
     "quick_answer",
     "error_memory",

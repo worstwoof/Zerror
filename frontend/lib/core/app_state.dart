@@ -720,6 +720,137 @@ class BackgroundLectureHandoutTask {
   }
 }
 
+class BackgroundLectureVideoTask {
+  const BackgroundLectureVideoTask({
+    required this.id,
+    required this.createdAt,
+    required this.status,
+    required this.prompt,
+    required this.subject,
+    required this.topic,
+    this.serverJobId,
+    this.serverJobCreated = false,
+    this.progress = 0,
+    this.statusMessage,
+    this.video,
+    this.errorMessage,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final AnalysisTaskStatus status;
+  final String prompt;
+  final String subject;
+  final String topic;
+  final String? serverJobId;
+  final bool serverJobCreated;
+  final int progress;
+  final String? statusMessage;
+  final LectureVideoResult? video;
+  final String? errorMessage;
+
+  bool get isActive =>
+      status == AnalysisTaskStatus.queued ||
+      status == AnalysisTaskStatus.analyzing;
+  bool get isCompleted => status == AnalysisTaskStatus.completed;
+  bool get isFailed => status == AnalysisTaskStatus.failed;
+
+  BackgroundLectureVideoTask copyWith({
+    AnalysisTaskStatus? status,
+    String? serverJobId,
+    bool? serverJobCreated,
+    int? progress,
+    String? statusMessage,
+    LectureVideoResult? video,
+    String? errorMessage,
+    bool clearStatusMessage = false,
+    bool clearVideo = false,
+    bool clearErrorMessage = false,
+  }) {
+    return BackgroundLectureVideoTask(
+      id: id,
+      createdAt: createdAt,
+      status: status ?? this.status,
+      prompt: prompt,
+      subject: subject,
+      topic: topic,
+      serverJobId: serverJobId ?? this.serverJobId,
+      serverJobCreated: serverJobCreated ?? this.serverJobCreated,
+      progress: progress ?? this.progress,
+      statusMessage:
+          clearStatusMessage ? null : statusMessage ?? this.statusMessage,
+      video: clearVideo ? null : video ?? this.video,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'created_at': createdAt.toIso8601String(),
+      'status': status.name,
+      'prompt': prompt,
+      'subject': subject,
+      'topic': topic,
+      'server_job_id': serverJobId,
+      'server_job_created': serverJobCreated,
+      'progress': progress,
+      'status_message': statusMessage,
+      'video': video?.toJson(),
+      'error_message': errorMessage,
+    };
+  }
+
+  factory BackgroundLectureVideoTask.fromJson(Map<String, dynamic> json) {
+    final restoredStatus = _taskStatusFromJson(json['status']);
+    final normalizedStatus = restoredStatus == AnalysisTaskStatus.queued ||
+            restoredStatus == AnalysisTaskStatus.analyzing
+        ? AnalysisTaskStatus.failed
+        : restoredStatus;
+    final videoJson = json['video'];
+    return BackgroundLectureVideoTask(
+      id: (json['id'] ?? 'lecture-video-restored').toString(),
+      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+          DateTime.now(),
+      status: normalizedStatus,
+      prompt: (json['prompt'] ?? '').toString(),
+      subject: (json['subject'] ?? '').toString(),
+      topic: (json['topic'] ?? '').toString(),
+      serverJobId: json['server_job_id']?.toString(),
+      serverJobCreated: json['server_job_created'] == true,
+      progress: normalizedStatus == restoredStatus
+          ? int.tryParse((json['progress'] ?? '').toString()) ?? 0
+          : 0,
+      statusMessage: normalizedStatus == restoredStatus
+          ? json['status_message']?.toString()
+          : '上次视频生成被中断，可点击重试',
+      video: videoJson is Map<String, dynamic>
+          ? LectureVideoResult.fromJson(videoJson)
+          : videoJson is Map
+              ? LectureVideoResult.fromJson(
+                  videoJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+      errorMessage: normalizedStatus == restoredStatus
+          ? json['error_message']?.toString()
+          : 'App 退出或被系统回收后，当前版本无法继续原来的视频生成请求，请重试生成。',
+    );
+  }
+
+  static AnalysisTaskStatus _taskStatusFromJson(dynamic value) {
+    final raw = value?.toString();
+    for (final status in AnalysisTaskStatus.values) {
+      if (status.name == raw) {
+        return status;
+      }
+    }
+    return AnalysisTaskStatus.failed;
+  }
+}
+
 class AssistantChatMessageRecord {
   const AssistantChatMessageRecord({
     required this.id,
@@ -728,6 +859,7 @@ class AssistantChatMessageRecord {
     this.text = '',
     this.reply,
     this.lectureHandoutTaskId,
+    this.lectureVideoTaskId,
   });
 
   factory AssistantChatMessageRecord.user({
@@ -769,16 +901,31 @@ class AssistantChatMessageRecord {
     );
   }
 
+  factory AssistantChatMessageRecord.lectureVideo({
+    required String id,
+    required DateTime createdAt,
+    required String lectureVideoTaskId,
+  }) {
+    return AssistantChatMessageRecord(
+      id: id,
+      createdAt: createdAt,
+      kind: 'lecture_video',
+      lectureVideoTaskId: lectureVideoTaskId,
+    );
+  }
+
   final String id;
   final DateTime createdAt;
   final String kind;
   final String text;
   final AssistantChatReply? reply;
   final String? lectureHandoutTaskId;
+  final String? lectureVideoTaskId;
 
   bool get isUser => kind == 'user';
   bool get isAssistant => kind == 'assistant';
   bool get isLectureHandout => kind == 'lecture_handout';
+  bool get isLectureVideo => kind == 'lecture_video';
 
   Map<String, dynamic> toJson() {
     return {
@@ -788,6 +935,7 @@ class AssistantChatMessageRecord {
       'text': text,
       'reply': reply?.toJson(includeRawModelOutput: false),
       'lecture_handout_task_id': lectureHandoutTaskId,
+      'lecture_video_task_id': lectureVideoTaskId,
     };
   }
 
@@ -809,6 +957,7 @@ class AssistantChatMessageRecord {
                 )
               : null,
       lectureHandoutTaskId: json['lecture_handout_task_id']?.toString(),
+      lectureVideoTaskId: json['lecture_video_task_id']?.toString(),
     );
   }
 }
@@ -846,6 +995,7 @@ class AppStore extends ChangeNotifier {
             : _defaultDevices(session) {
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
     _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
+    _lectureVideoTasks.addAll(_restoreLectureVideoTasks(snapshot));
     _assistantChatMessages.addAll(_restoreAssistantChatMessages(snapshot));
   }
 
@@ -871,12 +1021,15 @@ class AppStore extends ChangeNotifier {
       <BackgroundPracticePaperTask>[];
   final List<BackgroundLectureHandoutTask> _lectureHandoutTasks =
       <BackgroundLectureHandoutTask>[];
+  final List<BackgroundLectureVideoTask> _lectureVideoTasks =
+      <BackgroundLectureVideoTask>[];
   final List<AssistantChatMessageRecord> _assistantChatMessages =
       <AssistantChatMessageRecord>[];
   final Set<String> _backgroundedAnalysisTaskIds = <String>{};
   final Set<String> _notifiedCompletedAnalysisTaskIds = <String>{};
   final Set<String> _runningPracticePaperTaskIds = <String>{};
   final Set<String> _runningLectureHandoutTaskIds = <String>{};
+  final Set<String> _runningLectureVideoTaskIds = <String>{};
   AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
@@ -972,6 +1125,17 @@ class AppStore extends ChangeNotifier {
         .toList(growable: true);
   }
 
+  static List<BackgroundLectureVideoTask> _restoreLectureVideoTasks(
+    AppPersistenceSnapshot? snapshot,
+  ) {
+    if (snapshot == null || snapshot.lectureVideoTasks.isEmpty) {
+      return <BackgroundLectureVideoTask>[];
+    }
+    return snapshot.lectureVideoTasks
+        .map(BackgroundLectureVideoTask.fromJson)
+        .toList(growable: true);
+  }
+
   static List<AssistantChatMessageRecord> _restoreAssistantChatMessages(
     AppPersistenceSnapshot? snapshot,
   ) {
@@ -985,7 +1149,9 @@ class AppStore extends ChangeNotifier {
               item.isUser ||
               (item.isAssistant && item.reply != null) ||
               (item.isLectureHandout &&
-                  (item.lectureHandoutTaskId ?? '').isNotEmpty),
+                  (item.lectureHandoutTaskId ?? '').isNotEmpty) ||
+              (item.isLectureVideo &&
+                  (item.lectureVideoTaskId ?? '').isNotEmpty),
         )
         .toList(growable: true);
     if (restored.length <= _assistantChatMessageLimit) {
@@ -1011,6 +1177,9 @@ class AppStore extends ChangeNotifier {
           _lectureHandoutTasks.map((item) => item.toJson()).toList(
                 growable: false,
               ),
+      lectureVideoTasks: _lectureVideoTasks.map((item) => item.toJson()).toList(
+            growable: false,
+          ),
       assistantChatMessages:
           _assistantChatMessages.map((item) => item.toJson()).toList(
                 growable: false,
@@ -1086,6 +1255,8 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_practicePaperTasks);
   UnmodifiableListView<BackgroundLectureHandoutTask> get lectureHandoutTasks =>
       UnmodifiableListView(_lectureHandoutTasks);
+  UnmodifiableListView<BackgroundLectureVideoTask> get lectureVideoTasks =>
+      UnmodifiableListView(_lectureVideoTasks);
   UnmodifiableListView<AssistantChatMessageRecord> get assistantChatMessages =>
       UnmodifiableListView(_assistantChatMessages);
 
@@ -1144,22 +1315,33 @@ class AppStore extends ChangeNotifier {
   int get failedLectureHandoutTaskCount =>
       _lectureHandoutTasks.where((item) => item.isFailed).length;
   bool get hasLectureHandoutTasks => _lectureHandoutTasks.isNotEmpty;
+  int get activeLectureVideoTaskCount =>
+      _lectureVideoTasks.where((item) => item.isActive).length;
+  int get completedLectureVideoTaskCount =>
+      _lectureVideoTasks.where((item) => item.isCompleted).length;
+  int get failedLectureVideoTaskCount =>
+      _lectureVideoTasks.where((item) => item.isFailed).length;
+  bool get hasLectureVideoTasks => _lectureVideoTasks.isNotEmpty;
   int get activeBackgroundTaskCount =>
       activeAnalysisTaskCount +
       activePracticePaperTaskCount +
-      activeLectureHandoutTaskCount;
+      activeLectureHandoutTaskCount +
+      activeLectureVideoTaskCount;
   int get completedBackgroundTaskCount =>
       completedAnalysisTaskCount +
       completedPracticePaperTaskCount +
-      completedLectureHandoutTaskCount;
+      completedLectureHandoutTaskCount +
+      completedLectureVideoTaskCount;
   int get failedBackgroundTaskCount =>
       failedAnalysisTaskCount +
       failedPracticePaperTaskCount +
-      failedLectureHandoutTaskCount;
+      failedLectureHandoutTaskCount +
+      failedLectureVideoTaskCount;
   int get totalBackgroundTaskCount =>
       _analysisTasks.length +
       _practicePaperTasks.length +
-      _lectureHandoutTasks.length;
+      _lectureHandoutTasks.length +
+      _lectureVideoTasks.length;
   bool get hasBackgroundTasks => totalBackgroundTaskCount > 0;
 
   int analysisTaskQueuePosition(String id) {
@@ -1192,10 +1374,26 @@ class AppStore extends ChangeNotifier {
     return index == -1 ? 0 : index + 1;
   }
 
+  int lectureVideoTaskQueuePosition(String id) {
+    final activeOldestFirst = _lectureVideoTasks
+        .where((item) => item.isActive)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+    final index = activeOldestFirst.indexWhere((item) => item.id == id);
+    return index == -1 ? 0 : index + 1;
+  }
+
   BackgroundLectureHandoutTask? lectureHandoutTaskById(String id) {
     final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
     if (index == -1) return null;
     return _lectureHandoutTasks[index];
+  }
+
+  BackgroundLectureVideoTask? lectureVideoTaskById(String id) {
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return null;
+    return _lectureVideoTasks[index];
   }
 
   AssistantChatMessageRecord addAssistantChatUserMessage(String text) {
@@ -1228,6 +1426,17 @@ class AppStore extends ChangeNotifier {
       id: _assistantChatMessageId('handout', now),
       createdAt: now,
       lectureHandoutTaskId: taskId,
+    );
+    _appendAssistantChatMessage(message);
+    return message;
+  }
+
+  AssistantChatMessageRecord addAssistantChatLectureVideoTask(String taskId) {
+    final now = DateTime.now();
+    final message = AssistantChatMessageRecord.lectureVideo(
+      id: _assistantChatMessageId('video', now),
+      createdAt: now,
+      lectureVideoTaskId: taskId,
     );
     _appendAssistantChatMessage(message);
     return message;
@@ -1582,6 +1791,49 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  BackgroundLectureVideoTask enqueueLectureVideoTask({
+    required String prompt,
+    required String subject,
+    required String topic,
+  }) {
+    final now = DateTime.now();
+    final task = BackgroundLectureVideoTask(
+      id: 'lecture-video-${now.microsecondsSinceEpoch}-${_lectureVideoTasks.length}',
+      createdAt: now,
+      status: AnalysisTaskStatus.queued,
+      prompt: prompt,
+      subject: subject,
+      topic: topic,
+      statusMessage: '已加入后台视频讲解队列',
+    );
+    _lectureVideoTasks.insert(0, task);
+    _commit();
+    unawaited(_runLectureVideoTask(task.id));
+    return task;
+  }
+
+  void retryLectureVideoTask(String id) {
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _lectureVideoTasks[index] = _lectureVideoTasks[index].copyWith(
+      status: AnalysisTaskStatus.queued,
+      progress: 0,
+      statusMessage: '正在重新提交视频讲解任务',
+      clearVideo: true,
+      clearErrorMessage: true,
+    );
+    _commit();
+    unawaited(_runLectureVideoTask(id, forceRetry: true));
+  }
+
+  void dismissLectureVideoTask(String id) {
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _runningLectureVideoTaskIds.remove(id);
+    _lectureVideoTasks.removeAt(index);
+    _commit();
+  }
+
   List<ErrorRecord> addErrorRecords(Iterable<NewErrorDraft> drafts) {
     final created = drafts.map(addErrorRecord).toList(growable: false);
     return created;
@@ -1727,10 +1979,12 @@ class AppStore extends ChangeNotifier {
     _analysisTasks.clear();
     _practicePaperTasks.clear();
     _lectureHandoutTasks.clear();
+    _lectureVideoTasks.clear();
     _backgroundedAnalysisTaskIds.clear();
     _notifiedCompletedAnalysisTaskIds.clear();
     _runningPracticePaperTaskIds.clear();
     _runningLectureHandoutTaskIds.clear();
+    _runningLectureVideoTaskIds.clear();
     notifyListeners();
     unawaited(_persist());
   }
@@ -1782,6 +2036,7 @@ class AppStore extends ChangeNotifier {
       resumeAnalysisQueue();
       resumePracticePaperTasks();
       resumeLectureHandoutTasks();
+      resumeLectureVideoTasks();
     }
   }
 
@@ -1800,6 +2055,12 @@ class AppStore extends ChangeNotifier {
   void resumeLectureHandoutTasks() {
     for (final task in _lectureHandoutTasks.where((item) => item.isActive)) {
       unawaited(_runLectureHandoutTask(task.id));
+    }
+  }
+
+  void resumeLectureVideoTasks() {
+    for (final task in _lectureVideoTasks.where((item) => item.isActive)) {
+      unawaited(_runLectureVideoTask(task.id));
     }
   }
 
@@ -2045,6 +2306,165 @@ class AppStore extends ChangeNotifier {
   }
 
   String _freshHandoutServerJobId(String id) {
+    final safeId = id.replaceAll(RegExp(r'[^A-Za-z0-9_.:-]'), '-');
+    return '$safeId-${DateTime.now().microsecondsSinceEpoch}';
+  }
+
+  Future<void> _runLectureVideoTask(
+    String id, {
+    bool forceRetry = false,
+  }) async {
+    if (_runningLectureVideoTaskIds.contains(id)) return;
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1 || !_lectureVideoTasks[index].isActive) return;
+
+    _runningLectureVideoTaskIds.add(id);
+    try {
+      _replaceLectureVideoTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.analyzing,
+          progress: task.progress == 0 ? 8 : task.progress,
+          statusMessage: '正在准备视频讲解任务',
+          clearErrorMessage: true,
+        ),
+      );
+
+      var task = _lectureVideoTaskById(id);
+      if (task == null || !task.isActive) return;
+
+      LectureVideoJob job;
+      final existingServerJobId = task.serverJobId?.trim() ?? '';
+      if (forceRetry &&
+          existingServerJobId.isNotEmpty &&
+          task.serverJobCreated) {
+        try {
+          job = await _aiApiClient.retryLectureVideoJob(existingServerJobId);
+        } on AiApiException catch (error) {
+          if (error.statusCode != 404) {
+            rethrow;
+          }
+          job = await _createLectureVideoJob(task,
+              clientJobId: _freshLectureVideoServerJobId(id));
+        }
+      } else if (task.serverJobCreated && existingServerJobId.isNotEmpty) {
+        try {
+          job = await _aiApiClient.fetchLectureVideoJob(existingServerJobId);
+        } on AiApiException catch (error) {
+          if (error.statusCode != 404) {
+            rethrow;
+          }
+          job = await _createLectureVideoJob(task,
+              clientJobId: _freshLectureVideoServerJobId(id));
+        }
+      } else {
+        final clientJobId = existingServerJobId.isNotEmpty
+            ? existingServerJobId
+            : _freshLectureVideoServerJobId(id);
+        job = await _createLectureVideoJob(task, clientJobId: clientJobId);
+      }
+
+      _applyLectureVideoJob(id, job);
+      while (true) {
+        await Future<void>.delayed(_analysisPollInterval);
+        task = _lectureVideoTaskById(id);
+        if (task == null || !task.isActive) return;
+
+        final serverJobId = task.serverJobId?.trim() ?? job.jobId;
+        if (serverJobId.isEmpty) {
+          throw const AiApiException('视频讲解任务没有返回服务器任务号，请重试。');
+        }
+        job = await _aiApiClient.fetchLectureVideoJob(serverJobId);
+        _applyLectureVideoJob(id, job);
+        if (job.isCompleted || job.isFailed) {
+          return;
+        }
+      }
+    } on AiApiException catch (error) {
+      _replaceLectureVideoTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '视频讲解生成失败',
+          errorMessage: error.message,
+        ),
+      );
+    } catch (error) {
+      _replaceLectureVideoTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '视频讲解生成失败',
+          errorMessage: '生成失败：$error',
+        ),
+      );
+    } finally {
+      _runningLectureVideoTaskIds.remove(id);
+    }
+  }
+
+  Future<LectureVideoJob> _createLectureVideoJob(
+    BackgroundLectureVideoTask task, {
+    required String clientJobId,
+  }) {
+    return _aiApiClient.createLectureVideoJob(
+      prompt: task.prompt,
+      subject: task.subject,
+      topic: task.topic,
+      clientJobId: clientJobId,
+    );
+  }
+
+  void _applyLectureVideoJob(String id, LectureVideoJob job) {
+    if (job.isCompleted && job.result != null) {
+      _replaceLectureVideoTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.completed,
+          serverJobId: job.jobId,
+          serverJobCreated: true,
+          progress: 100,
+          statusMessage: job.message.isEmpty ? '视频讲解已生成' : job.message,
+          video: job.result,
+          clearErrorMessage: true,
+        ),
+      );
+      return;
+    }
+
+    if (job.isFailed) {
+      _replaceLectureVideoTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          serverJobId: job.jobId,
+          serverJobCreated: true,
+          progress: 0,
+          statusMessage: job.message.isEmpty ? '视频讲解生成失败' : job.message,
+          video: job.result,
+          errorMessage: job.error.isEmpty ? '视频讲解生成失败，请稍后重试。' : job.error,
+        ),
+      );
+      return;
+    }
+
+    _replaceLectureVideoTask(
+      id,
+      (task) => task.copyWith(
+        status: AnalysisTaskStatus.analyzing,
+        serverJobId: job.jobId,
+        serverJobCreated: true,
+        progress: job.progress.clamp(1, 99).toInt(),
+        statusMessage: job.message.isEmpty ? 'AI 正在生成视频讲解' : job.message,
+        video: job.result,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  String _freshLectureVideoServerJobId(String id) {
     final safeId = id.replaceAll(RegExp(r'[^A-Za-z0-9_.:-]'), '-');
     return '$safeId-${DateTime.now().microsecondsSinceEpoch}';
   }
@@ -2478,6 +2898,22 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  BackgroundLectureVideoTask? _lectureVideoTaskById(String id) {
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return null;
+    return _lectureVideoTasks[index];
+  }
+
+  void _replaceLectureVideoTask(
+    String id,
+    BackgroundLectureVideoTask Function(BackgroundLectureVideoTask task) update,
+  ) {
+    final index = _lectureVideoTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _lectureVideoTasks[index] = update(_lectureVideoTasks[index]);
+    _commit();
+  }
+
   Future<void> _reloadForCurrentSession() async {
     AppPersistenceSnapshot? loadedSnapshot;
     final repository = _repository;
@@ -2506,11 +2942,14 @@ class AppStore extends ChangeNotifier {
     _analysisTasks.clear();
     _practicePaperTasks.clear();
     _lectureHandoutTasks.clear();
+    _lectureVideoTasks.clear();
     _assistantChatMessages.clear();
     _runningPracticePaperTaskIds.clear();
     _runningLectureHandoutTaskIds.clear();
+    _runningLectureVideoTaskIds.clear();
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
     _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
+    _lectureVideoTasks.addAll(_restoreLectureVideoTasks(snapshot));
     _assistantChatMessages.addAll(_restoreAssistantChatMessages(snapshot));
     _profile =
         snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
