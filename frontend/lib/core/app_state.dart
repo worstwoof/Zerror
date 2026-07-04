@@ -18,6 +18,11 @@ class ErrorRecord {
     required this.reason,
     required this.dateLabel,
     required this.tags,
+    this.questionFormat = '',
+    this.typeTags = const [],
+    this.modelTags = const [],
+    this.difficulty = '',
+    this.classificationConfidence = 0,
     required this.myAnswer,
     required this.aiAnalysis,
     this.richArtifacts = const [],
@@ -33,6 +38,11 @@ class ErrorRecord {
   final String reason;
   final String dateLabel;
   final List<String> tags;
+  final String questionFormat;
+  final List<String> typeTags;
+  final List<String> modelTags;
+  final String difficulty;
+  final double classificationConfidence;
   final String myAnswer;
   final String aiAnalysis;
   final List<Map<String, dynamic>> richArtifacts;
@@ -53,6 +63,11 @@ class ErrorRecord {
       reason: reason,
       dateLabel: dateLabel,
       tags: tags,
+      questionFormat: questionFormat,
+      typeTags: typeTags,
+      modelTags: modelTags,
+      difficulty: difficulty,
+      classificationConfidence: classificationConfidence,
       myAnswer: myAnswer,
       aiAnalysis: aiAnalysis,
       richArtifacts: richArtifacts,
@@ -71,6 +86,11 @@ class ErrorRecord {
       'reason': reason,
       'date_label': dateLabel,
       'tags': tags,
+      'question_format': questionFormat,
+      'type_tags': typeTags,
+      'model_tags': modelTags,
+      'difficulty': difficulty,
+      'classification_confidence': classificationConfidence,
       'my_answer': myAnswer,
       'ai_analysis': aiAnalysis,
       'rich_artifacts': richArtifacts,
@@ -82,24 +102,70 @@ class ErrorRecord {
 
   factory ErrorRecord.fromJson(Map<String, dynamic> json) {
     final rawTags = json['tags'];
+    final subject = json['subject'] as String? ?? 'General';
+    final topic = json['topic'] as String? ?? 'Review';
+    final tags = rawTags is List
+        ? rawTags.whereType<String>().toList(growable: false)
+        : const <String>[];
+    final question = json['question'] as String? ?? '';
+    final reason = json['reason'] as String? ?? '';
+    final aiAnalysis = json['ai_analysis'] as String? ?? '';
+    final typeTags = _stringList(json['type_tags']);
     return ErrorRecord(
       id: json['id'] as String? ?? 'error-record',
-      subject: json['subject'] as String? ?? 'General',
-      topic: json['topic'] as String? ?? 'Review',
-      question: json['question'] as String? ?? '',
-      reason: json['reason'] as String? ?? '',
+      subject: subject,
+      topic: topic,
+      question: question,
+      reason: reason,
       dateLabel: json['date_label'] as String? ?? '',
-      tags: rawTags is List
-          ? rawTags.whereType<String>().toList(growable: false)
-          : const [],
+      tags: tags,
+      questionFormat: (json['question_format'] ?? '').toString().trim().isEmpty
+          ? _inferQuestionFormat(question)
+          : (json['question_format'] ?? '').toString(),
+      typeTags: typeTags.isEmpty
+          ? _fallbackTypeTags(
+              subject: subject,
+              topic: topic,
+              question: question,
+              reason: reason,
+              tags: tags,
+              aiAnalysis: aiAnalysis,
+            )
+          : typeTags,
+      modelTags: _stringList(json['model_tags']),
+      difficulty: (json['difficulty'] ?? '').toString().trim().isEmpty
+          ? _inferDifficulty('$question $reason $aiAnalysis ${tags.join(' ')}')
+          : (json['difficulty'] ?? '').toString(),
+      classificationConfidence: double.tryParse(
+            (json['classification_confidence'] ?? '0').toString(),
+          ) ??
+          0,
       myAnswer: json['my_answer'] as String? ?? '',
-      aiAnalysis: json['ai_analysis'] as String? ?? '',
+      aiAnalysis: aiAnalysis,
       richArtifacts: _mapList(json['rich_artifacts']),
       imageUrl: json['image_url'] as String?,
       isMastered: json['is_mastered'] as bool? ?? false,
       isFavorite: json['is_favorite'] as bool? ?? false,
     );
   }
+
+  List<String> get effectiveTypeTags => typeTags.isNotEmpty
+      ? typeTags
+      : _fallbackTypeTags(
+          subject: subject,
+          topic: topic,
+          question: question,
+          reason: reason,
+          tags: tags,
+          aiAnalysis: aiAnalysis,
+        );
+
+  String get primaryTypeTag =>
+      effectiveTypeTags.isNotEmpty ? effectiveTypeTags.first : questionFormat;
+
+  String get effectiveQuestionFormat => questionFormat.trim().isEmpty
+      ? _inferQuestionFormat(question)
+      : questionFormat;
 }
 
 List<Map<String, dynamic>> _mapList(dynamic value) {
@@ -111,6 +177,97 @@ List<Map<String, dynamic>> _mapList(dynamic value) {
       .map((item) =>
           item.map((key, mapValue) => MapEntry(key.toString(), mapValue)))
       .toList(growable: false);
+}
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) {
+    return const [];
+  }
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+}
+
+String _inferQuestionFormat(String text) {
+  final content = text.trim();
+  if (RegExp(r'[A-D][\.、．]|（[A-D]）|\([A-D]\)').hasMatch(content)) {
+    return '选择题';
+  }
+  if (content.contains('填空') || content.contains('______')) {
+    return '填空题';
+  }
+  if (content.contains('实验') || content.contains('探究')) {
+    return '实验题';
+  }
+  if (content.contains('阅读') || content.contains('文章')) {
+    return '阅读题';
+  }
+  if (content.contains('证明') || content.contains('求证')) {
+    return '证明题';
+  }
+  if (content.contains('解答') ||
+      content.contains('计算') ||
+      content.contains('求')) {
+    return '解答题';
+  }
+  return '综合题';
+}
+
+List<String> _fallbackTypeTags({
+  required String subject,
+  required String topic,
+  required String question,
+  required String reason,
+  required List<String> tags,
+  required String aiAnalysis,
+}) {
+  final blocked = {
+    subject,
+    topic,
+    '新录入',
+    '粗心大意',
+    '概念模糊',
+    '公式遗忘',
+    '思路中断',
+    '计算错误',
+  };
+  final result = <String>[];
+  void add(String value) {
+    final text = value.trim();
+    if (text.isEmpty || blocked.contains(text) || result.contains(text)) {
+      return;
+    }
+    result.add(text);
+  }
+
+  for (final tag in tags) {
+    add(tag);
+  }
+  final combined = '$subject $topic $question $reason $aiAnalysis';
+  if (combined.contains('函数') && combined.contains('图')) add('函数图像题');
+  if (combined.contains('参数') || combined.contains('含参')) add('含参分类讨论');
+  if (combined.contains('单调')) add('单调性判断');
+  if (combined.contains('零点')) add('零点问题');
+  if (combined.contains('几何') || combined.contains('证明')) add('几何证明');
+  if (combined.contains('受力')) add('受力分析');
+  if (combined.contains('电路')) add('电路分析');
+  if (combined.contains('实验')) add('实验探究');
+  if (combined.contains('主旨')) add('主旨大意题');
+  if (combined.contains('推断')) add('推断题');
+  if (result.isEmpty && topic.trim().isNotEmpty) add('$topic 题型');
+  return result.take(3).toList(growable: false);
+}
+
+String _inferDifficulty(String text) {
+  if (text.contains('压轴') || text.contains('综合') || text.contains('提高')) {
+    return '提高';
+  }
+  if (text.contains('基础') || text.contains('概念') || text.contains('公式')) {
+    return '基础';
+  }
+  return '中等';
 }
 
 class LearningTask {
@@ -144,6 +301,11 @@ class NewErrorDraft {
     required this.question,
     required this.reason,
     required this.tags,
+    this.questionFormat = '',
+    this.typeTags = const [],
+    this.modelTags = const [],
+    this.difficulty = '',
+    this.classificationConfidence = 0,
     required this.myAnswer,
     required this.aiAnalysis,
     this.richArtifacts = const [],
@@ -158,6 +320,11 @@ class NewErrorDraft {
   final String question;
   final String reason;
   final List<String> tags;
+  final String questionFormat;
+  final List<String> typeTags;
+  final List<String> modelTags;
+  final String difficulty;
+  final double classificationConfidence;
   final String myAnswer;
   final String aiAnalysis;
   final List<Map<String, dynamic>> richArtifacts;
@@ -275,7 +442,10 @@ class BackgroundPracticePaperTask {
     required this.sourceErrors,
     required this.questionCount,
     required this.selectedSubjects,
+    this.selectedTopics = const [],
+    this.selectedTypeTags = const [],
     required this.strategyLabel,
+    this.generationMode = '同类强化卷',
     this.progress = 0,
     this.statusMessage,
     this.paper,
@@ -288,7 +458,10 @@ class BackgroundPracticePaperTask {
   final List<ErrorRecord> sourceErrors;
   final int questionCount;
   final List<String> selectedSubjects;
+  final List<String> selectedTopics;
+  final List<String> selectedTypeTags;
   final String strategyLabel;
+  final String generationMode;
   final int progress;
   final String? statusMessage;
   final PracticePaperResult? paper;
@@ -305,7 +478,10 @@ class BackgroundPracticePaperTask {
     List<ErrorRecord>? sourceErrors,
     int? questionCount,
     List<String>? selectedSubjects,
+    List<String>? selectedTopics,
+    List<String>? selectedTypeTags,
     String? strategyLabel,
+    String? generationMode,
     int? progress,
     String? statusMessage,
     PracticePaperResult? paper,
@@ -321,7 +497,10 @@ class BackgroundPracticePaperTask {
       sourceErrors: sourceErrors ?? this.sourceErrors,
       questionCount: questionCount ?? this.questionCount,
       selectedSubjects: selectedSubjects ?? this.selectedSubjects,
+      selectedTopics: selectedTopics ?? this.selectedTopics,
+      selectedTypeTags: selectedTypeTags ?? this.selectedTypeTags,
       strategyLabel: strategyLabel ?? this.strategyLabel,
+      generationMode: generationMode ?? this.generationMode,
       progress: progress ?? this.progress,
       statusMessage:
           clearStatusMessage ? null : statusMessage ?? this.statusMessage,
@@ -340,7 +519,10 @@ class BackgroundPracticePaperTask {
           sourceErrors.map((item) => item.toJson()).toList(growable: false),
       'question_count': questionCount,
       'selected_subjects': selectedSubjects,
+      'selected_topics': selectedTopics,
+      'selected_type_tags': selectedTypeTags,
       'strategy_label': strategyLabel,
+      'generation_mode': generationMode,
       'progress': progress,
       'status_message': statusMessage,
       'paper': paper?.toJson(),
@@ -371,7 +553,10 @@ class BackgroundPracticePaperTask {
               .map((item) => item.toString())
               .where((item) => item.trim().isNotEmpty)
               .toList(growable: false),
+      selectedTopics: _stringList(json['selected_topics']),
+      selectedTypeTags: _stringList(json['selected_type_tags']),
       strategyLabel: (json['strategy_label'] ?? '').toString(),
+      generationMode: (json['generation_mode'] ?? '同类强化卷').toString(),
       progress: normalizedStatus == restoredStatus
           ? int.tryParse((json['progress'] ?? '').toString()) ?? 0
           : 0,
@@ -1215,6 +1400,11 @@ class AppStore extends ChangeNotifier {
       reason: draft.reason,
       dateLabel: draft.dateLabel ?? _buildDateLabel(DateTime.now()),
       tags: draft.tags,
+      questionFormat: draft.questionFormat,
+      typeTags: draft.typeTags,
+      modelTags: draft.modelTags,
+      difficulty: draft.difficulty,
+      classificationConfidence: draft.classificationConfidence,
       myAnswer: draft.myAnswer,
       aiAnalysis: draft.aiAnalysis,
       richArtifacts: draft.richArtifacts,
@@ -1303,7 +1493,10 @@ class AppStore extends ChangeNotifier {
     required List<ErrorRecord> sourceErrors,
     required int questionCount,
     required List<String> selectedSubjects,
+    List<String> selectedTopics = const [],
+    List<String> selectedTypeTags = const [],
     required String strategyLabel,
+    String generationMode = '同类强化卷',
   }) {
     final task = BackgroundPracticePaperTask(
       id: 'paper-${DateTime.now().microsecondsSinceEpoch}-${_practicePaperTasks.length}',
@@ -1312,7 +1505,10 @@ class AppStore extends ChangeNotifier {
       sourceErrors: sourceErrors.toList(growable: false),
       questionCount: questionCount,
       selectedSubjects: selectedSubjects.toList(growable: false),
+      selectedTopics: selectedTopics.toList(growable: false),
+      selectedTypeTags: selectedTypeTags.toList(growable: false),
       strategyLabel: strategyLabel,
+      generationMode: generationMode,
       statusMessage: '已加入后台组卷队列',
     );
     _practicePaperTasks.insert(0, task);
@@ -1656,7 +1852,10 @@ class AppStore extends ChangeNotifier {
             .toList(growable: false),
         questionCount: task.questionCount,
         selectedSubjects: task.selectedSubjects,
+        selectedTopics: task.selectedTopics,
+        selectedTypeTags: task.selectedTypeTags,
         strategyLabel: task.strategyLabel,
+        generationMode: task.generationMode,
       );
       _replacePracticePaperTask(
         id,

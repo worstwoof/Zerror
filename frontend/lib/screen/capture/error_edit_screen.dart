@@ -71,8 +71,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
   String _sceneBrief = '';
   String _mistakeDiagnosis = '';
   String _reviewFocus = '';
+  String _questionFormat = '';
+  String _difficulty = '';
+  double _classificationConfidence = 0;
   List<int> _reviewSchedule = const [];
   List<String> _knowledgePoints = const [];
+  List<String> _typeTags = const [];
+  List<String> _modelTags = const [];
   List<String> _solutionSteps = const [];
   List<SimilarQuestionItem> _similarQuestions = const [];
   List<Map<String, dynamic>> _richArtifacts = const [];
@@ -158,6 +163,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     _subject = result.subject;
     _sceneBrief = result.sceneBrief;
     _knowledgePoints = result.knowledgePoints;
+    _questionFormat = result.questionFormat;
+    _typeTags = result.typeTags;
+    _modelTags = result.modelTags;
+    _difficulty = result.difficulty;
+    _classificationConfidence = result.classificationConfidence;
     _solutionSummary = result.solutionSummary;
     _solutionSteps = result.solutionSteps;
     _mistakeDiagnosis = result.mistakeDiagnosis;
@@ -174,6 +184,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       subject: _subject,
       sceneBrief: _sceneBrief,
       knowledgePoints: List<String>.from(_knowledgePoints),
+      questionFormat: _questionFormat,
+      typeTags: List<String>.from(_typeTags),
+      modelTags: List<String>.from(_modelTags),
+      difficulty: _difficulty,
+      classificationConfidence: _classificationConfidence,
       solutionSummary: _solutionSummary,
       solutionSteps: List<String>.from(_solutionSteps),
       mistakeDiagnosis: _mistakeDiagnosis,
@@ -605,6 +620,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       question: draft.question,
       reason: draft.reason,
       tags: draft.tags,
+      questionFormat: draft.questionFormat,
+      typeTags: draft.typeTags,
+      modelTags: draft.modelTags,
+      difficulty: draft.difficulty,
+      classificationConfidence: draft.classificationConfidence,
       myAnswer: draft.myAnswer,
       aiAnalysis: draft.aiAnalysis,
       richArtifacts: draft.richArtifacts,
@@ -639,6 +659,11 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       question: question,
       reason: reason,
       tags: _buildTags(subject, topic),
+      questionFormat: _questionFormat,
+      typeTags: List<String>.from(_typeTags),
+      modelTags: List<String>.from(_modelTags),
+      difficulty: _difficulty,
+      classificationConfidence: _classificationConfidence,
       myAnswer: reflection.isEmpty ? '这道题先加入错题档案，后续复习时继续补充。' : reflection,
       aiAnalysis: summaryParts.isEmpty
           ? _buildFallbackAnalysis(subject, topic)
@@ -718,9 +743,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return [
       subject,
       topic,
+      _questionFormat,
+      ..._typeTags,
+      ..._modelTags,
+      if (_difficulty.isNotEmpty) _difficulty,
       '新录入',
       if (_selectedErrorReason.isNotEmpty) _selectedErrorReason,
-    ];
+    ].where((item) => item.trim().isNotEmpty).toSet().toList();
   }
 
   String _buildFallbackAnalysis(String subject, String topic) {

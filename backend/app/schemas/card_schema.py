@@ -53,6 +53,11 @@ class AnalysisResponse(BaseModel):
     scene_brief: str = ""
     subject: str
     knowledge_points: List[str] = Field(default_factory=list)
+    question_format: str = ""
+    type_tags: List[str] = Field(default_factory=list)
+    model_tags: List[str] = Field(default_factory=list)
+    difficulty: str = ""
+    classification_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     solution_summary: str
     solution_steps: List[str] = Field(default_factory=list)
     mistake_diagnosis: str
@@ -119,15 +124,23 @@ class PracticePaperSourceError(BaseModel):
     question: str = ""
     reason: str = ""
     tags: List[str] = Field(default_factory=list)
+    question_format: str = ""
+    type_tags: List[str] = Field(default_factory=list)
+    model_tags: List[str] = Field(default_factory=list)
+    difficulty: str = ""
+    classification_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     my_answer: str = ""
     ai_analysis: str = ""
 
 
 class PracticePaperRequest(BaseModel):
     errors: List[PracticePaperSourceError] = Field(default_factory=list)
-    question_count: int = Field(default=10, ge=3, le=50)
+    question_count: int = Field(default=10, ge=1, le=50)
     selected_subjects: List[str] = Field(default_factory=list)
+    selected_topics: List[str] = Field(default_factory=list)
+    selected_type_tags: List[str] = Field(default_factory=list)
     strategy_label: str = "薄弱点突破"
+    generation_mode: str = "同类强化卷"
     include_answer_key: bool = True
 
 

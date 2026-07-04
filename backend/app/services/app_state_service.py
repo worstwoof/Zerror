@@ -131,6 +131,7 @@ def build_snapshot_from_structured(db: Session, user: User) -> dict[str, Any] | 
                 "reason": item.reason,
                 "date_label": item.date_label,
                 "tags": [tag.tag for tag in sorted(item.tags, key=lambda entry: (entry.sort_order, entry.id))],
+                **_decode_classification(item.classification_json),
                 "my_answer": item.my_answer,
                 "ai_analysis": item.ai_analysis,
                 "rich_artifacts": _decode_json_list(item.rich_artifacts_json),
@@ -349,6 +350,7 @@ def _upsert_error_records(
         record.my_answer = _normalize_text(payload.get("my_answer")) or ""
         record.ai_analysis = _normalize_text(payload.get("ai_analysis")) or ""
         record.rich_artifacts_json = _encode_json_list(payload.get("rich_artifacts"))
+        record.classification_json = _encode_classification(payload)
         record.image_url = _normalize_text(payload.get("image_url"))
         record.is_favorite = client_error_id in favorite_ids or _as_bool(payload.get("is_favorite"))
         record.is_mastered = client_error_id in mastered_ids or _as_bool(payload.get("is_mastered"))
@@ -485,6 +487,63 @@ def _encode_json_list(value: Any) -> str:
     if not items:
         return ""
     return json.dumps(items, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def _decode_classification(raw_value: Any) -> dict[str, Any]:
+    if not raw_value or not isinstance(raw_value, str):
+        return {
+            "question_format": "",
+            "type_tags": [],
+            "model_tags": [],
+            "difficulty": "",
+            "classification_confidence": 0.0,
+        }
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    return {
+        "question_format": _normalize_text(parsed.get("question_format")) or "",
+        "type_tags": _as_string_list(parsed.get("type_tags")),
+        "model_tags": _as_string_list(parsed.get("model_tags")),
+        "difficulty": _normalize_text(parsed.get("difficulty")) or "",
+        "classification_confidence": _bounded_float(
+            parsed.get("classification_confidence"),
+            default=0.0,
+        ),
+    }
+
+
+def _encode_classification(payload: dict[str, Any]) -> str:
+    data = {
+        "question_format": _normalize_text(payload.get("question_format")) or "",
+        "type_tags": _as_string_list(payload.get("type_tags")),
+        "model_tags": _as_string_list(payload.get("model_tags")),
+        "difficulty": _normalize_text(payload.get("difficulty")) or "",
+        "classification_confidence": _bounded_float(
+            payload.get("classification_confidence"),
+            default=0.0,
+        ),
+    }
+    if (
+        not data["question_format"]
+        and not data["type_tags"]
+        and not data["model_tags"]
+        and not data["difficulty"]
+        and data["classification_confidence"] == 0.0
+    ):
+        return ""
+    return json.dumps(data, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def _bounded_float(value: Any, *, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(1.0, parsed))
 
 
 def _normalize_text(value: Any) -> str | None:

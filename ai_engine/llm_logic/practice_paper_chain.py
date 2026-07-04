@@ -50,6 +50,9 @@ class PracticePaperService:
         self.client = client
 
     def generate_practice_paper(self, request: PracticePaperRequest) -> PracticePaperResponse:
+        if self._is_source_error_only_mode(request):
+            return self._build_source_error_response(request)
+
         prompt = self._build_prompt(request)
         try:
             raw_output = self.client.chat_completion(
@@ -177,6 +180,8 @@ class PracticePaperService:
             if item.strip() and item.strip() not in {"全部", "全部学科"}
         ]
         subject_hint = "、".join(subjects) if subjects else "从错题档案中自动判断"
+        topic_hint = "、".join(self._clean_filter_values(request.selected_topics)) or "从错题档案中自动判断"
+        type_hint = "、".join(self._clean_filter_values(request.selected_type_tags)) or "从错题档案中自动判断"
         source_json = json.dumps(source_errors, ensure_ascii=False, indent=2)
         question_count = self._target_question_count(request)
 
@@ -195,7 +200,10 @@ CRITICAL JSON CONTRACT:
 组卷要求：
 - 练习题题量：{question_count} 题。普通专题至少 3 道；如果错题集中是选择题、填空题、概念辨析、公式辨析等小知识点训练，至少生成 5 道选择/填空题。
 - 选定学科：{subject_hint}。
+- 选定知识点：{topic_hint}。
+- 选定题型：{type_hint}。
 - 策略：{request.strategy_label}。
+- 生成模式：{request.generation_mode}。
 - title 必须是居中大标题使用的“科目/章节/知识点名称”，优先写成“第 X 章 章节名称：知识点名称”或“学科 · 章节 · 知识点名称”，不要写泛泛的“专题讲义标题”。
 - subtitle 只写一行补充说明，可以为空；不要重复 title。
 - 讲义正文不要输出“知识点讲解/知识精讲/公式速查/易错提醒/内容提要”等前置讲解板块；只保留：标题、例题讲解与答案、习题。
@@ -203,6 +211,9 @@ CRITICAL JSON CONTRACT:
 - worked_examples 是第一部分“例题讲解与答案”，生成 1 到 2 条；每条必须按“例题：...；解答思路：...；步骤/计算过程：...；答案：...”组织。
 - questions 是第二部分“习题”，每道题只展示题目和作答区域；答案留在 JSON 的 answer/solution_steps 中，不在练习区直接展示。
 - 题目必须围绕错题暴露出的知识点、错因和相近专题生成，不要复刻原题。
+- 如果生成模式是“同类强化卷”，题目必须是同类新题，不要复刻原题。
+- 如果生成模式是“混合提升卷”，至少一半题目围绕选定题型做变式迁移，保留 source_error_ids 指向对应错题。
+- type 字段优先使用选定题型中的具体题型；topic 字段优先使用选定知识点。
 - 难度应包含基础回收、变式巩固、综合迁移，适合学生打印后手写完成。
 - 讲义不能只有习题，必须先给出例题，并给出例题讲解与答案。
 - 题目要完整清晰；选择题必须提供 4 个选项和 0-based answer_index；非选择题 answer_index 返回 null。
@@ -273,6 +284,8 @@ CRITICAL JSON CONTRACT:
             if item.strip() and item.strip() not in {"全部", "全部学科"}
         ]
         subject_hint = "、".join(subjects) if subjects else "从错题档案中自动判断"
+        topic_hint = "、".join(self._clean_filter_values(request.selected_topics)) or "自动判断"
+        type_hint = "、".join(self._clean_filter_values(request.selected_type_tags)) or "自动判断"
         source_json = json.dumps(source_errors, ensure_ascii=False, indent=2)
         question_count = min(max(1, self._target_question_count(request)), 15)
 
@@ -286,7 +299,7 @@ CRITICAL JSON CONTRACT:
 你是教辅命题老师。上一次完整讲义生成可能超时，请用轻量模式基于错题档案生成稳定可用的蓝白教辅风格专题讲义。
 
 要求：
-- 练习题题量：{question_count} 题，选定学科：{subject_hint}，策略：{request.strategy_label}。
+- 练习题题量：{question_count} 题，选定学科：{subject_hint}，选定知识点：{topic_hint}，选定题型：{type_hint}，策略：{request.strategy_label}，生成模式：{request.generation_mode}。
 - title 写成“科目/章节/知识点名称”，优先使用“第 X 章 章节名称：知识点名称”。
 - 讲义不要输出知识点讲解、知识精讲、公式速查、易错提醒、内容提要等前置讲解板块；只保留标题、例题讲解与答案、习题。
 - handout_overview、concept_review、formula_cards、method_models、common_traps 返回空字符串或空数组即可。
@@ -345,20 +358,7 @@ CRITICAL JSON CONTRACT:
 """.strip()
 
     def _source_errors_for_prompt(self, request: PracticePaperRequest) -> list[dict[str, Any]]:
-        selected_subjects = {
-            item.strip()
-            for item in request.selected_subjects
-            if item.strip() and item.strip() not in {"全部", "全部学科"}
-        }
-        errors = request.errors
-        if selected_subjects:
-            filtered = [
-                item
-                for item in errors
-                if item.subject.strip() in selected_subjects
-            ]
-            if filtered:
-                errors = filtered
+        errors = self._filtered_errors(request)
 
         source = []
         for item in errors[:8]:
@@ -370,11 +370,134 @@ CRITICAL JSON CONTRACT:
                     "question": self._clip(item.question, 260),
                     "reason": self._clip(item.reason, 120),
                     "tags": item.tags[:6],
+                    "question_format": item.question_format,
+                    "type_tags": item.type_tags[:5],
+                    "model_tags": item.model_tags[:5],
+                    "difficulty": item.difficulty,
+                    "classification_confidence": item.classification_confidence,
                     "my_answer": self._clip(item.my_answer, 160),
                     "ai_analysis": self._clip(item.ai_analysis, 180),
                 }
             )
         return source
+
+    def _filtered_errors(self, request: PracticePaperRequest) -> list[Any]:
+        selected_subjects = set(self._clean_filter_values(request.selected_subjects))
+        selected_subjects.discard("全部")
+        selected_subjects.discard("全部学科")
+        selected_topics = set(self._clean_filter_values(request.selected_topics))
+        selected_type_tags = set(self._clean_filter_values(request.selected_type_tags))
+
+        errors = list(request.errors)
+        if selected_subjects:
+            filtered = [item for item in errors if item.subject.strip() in selected_subjects]
+            if filtered:
+                errors = filtered
+        if selected_topics:
+            filtered = [item for item in errors if item.topic.strip() in selected_topics]
+            if filtered:
+                errors = filtered
+        if selected_type_tags:
+            filtered = [
+                item
+                for item in errors
+                if selected_type_tags.intersection(self._source_error_type_labels(item))
+            ]
+            if filtered:
+                errors = filtered
+        return errors
+
+    def _source_error_type_labels(self, item: Any) -> set[str]:
+        labels = {
+            str(label).strip()
+            for label in [
+                item.question_format,
+                item.difficulty,
+                *item.type_tags,
+                *item.model_tags,
+                *item.tags,
+            ]
+            if str(label).strip()
+        }
+        return labels
+
+    def _clean_filter_values(self, values: list[str]) -> list[str]:
+        cleaned = []
+        for item in values:
+            text = str(item).strip()
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    def _is_source_error_only_mode(self, request: PracticePaperRequest) -> bool:
+        mode = request.generation_mode.strip() or request.strategy_label.strip()
+        return any(marker in mode for marker in ("错题回炉", "只整理", "原错题", "自己的错题"))
+
+    def _build_source_error_response(self, request: PracticePaperRequest) -> PracticePaperResponse:
+        source_errors = self._filtered_errors(request) or list(request.errors)
+        if not source_errors:
+            return self._build_response(request=request, parsed={}, raw_output="local source-error fallback")
+
+        target_count = max(1, min(request.question_count, len(source_errors)))
+        selected = source_errors[:target_count]
+        questions = [
+            self._question_from_source_error(index, source)
+            for index, source in enumerate(selected)
+        ]
+        subject_focus = self._most_common([item.subject for item in selected], limit=3)
+        topic_focus = self._most_common([item.topic for item in selected], limit=5)
+        answer_key = [
+            f"{index + 1}. {question.answer}。{question.solution_outline}".strip()
+            for index, question in enumerate(questions)
+        ]
+        response = PracticePaperResponse(
+            title=self._default_title(request, topic_focus),
+            subtitle=f"{request.strategy_label or '错题回炉卷'} · {len(questions)} 道原错题整理",
+            subject_focus=subject_focus,
+            topic_focus=topic_focus,
+            strategy_label=request.strategy_label or request.generation_mode or "错题回炉卷",
+            estimated_minutes=sum(q.estimated_minutes for q in questions) or len(questions) * 4,
+            handout_overview="这份试卷只使用你筛选出的原错题，适合考前回炉、重做和复盘。",
+            learning_targets=["重新完成原错题", "对照解析复盘错因", "确认同一题型的稳定入口"],
+            warmup_notes=[],
+            concept_review=[],
+            formula_cards=[],
+            method_models=[],
+            worked_examples=[],
+            common_traps=[],
+            questions=questions,
+            answer_key=answer_key,
+            raw_model_output="local source-error-only paper",
+        )
+        return response.model_copy(
+            update={"printable_html": self._build_printable_html(response)}
+        )
+
+    def _question_from_source_error(self, index: int, source: Any) -> PracticeQuestion:
+        subject = source.subject or "综合"
+        topic = source.topic or subject or "错题回收"
+        question_type = source.type_tags[0] if source.type_tags else source.question_format or "错题回炉"
+        answer = source.ai_analysis.strip() or source.my_answer.strip() or "请按原题解析重新完成，并在订正区写出正确思路。"
+        reason = source.reason.strip() or "原错题回炉复盘"
+        return PracticeQuestion(
+            id=f"source-{source.id or index + 1}",
+            type=question_type,
+            subject=subject,
+            topic=topic,
+            stem=source.question.strip() or f"请重新完成「{topic}」中的第 {index + 1} 道错题。",
+            options=[],
+            answer=answer,
+            answer_index=None,
+            solution_outline=reason,
+            solution_steps=[
+                "先独立重做原题，不看答案，把关键条件和第一步入口写出来。",
+                "再对照错因与解析，标出本次是否还卡在同一题型入口。",
+            ],
+            reason_hint=reason,
+            difficulty=source.difficulty or "中等",
+            estimated_minutes=5,
+            source_error_ids=[source.id] if source.id else [],
+        )
 
     def _build_response(
         self,
@@ -386,11 +509,12 @@ CRITICAL JSON CONTRACT:
         questions = self._build_questions(request, parsed)
         subject_focus = self._string_list(parsed.get("subject_focus"))
         topic_focus = self._string_list(parsed.get("topic_focus"))
+        filtered_errors = self._filtered_errors(request)
 
         if not subject_focus:
-            subject_focus = self._most_common([item.subject for item in request.errors], limit=3)
+            subject_focus = self._most_common([item.subject for item in filtered_errors], limit=3)
         if not topic_focus:
-            topic_focus = self._most_common([item.topic for item in request.errors], limit=5)
+            topic_focus = self._most_common([item.topic for item in filtered_errors], limit=5)
 
         answer_key = self._string_list(parsed.get("answer_key"))
         if len(answer_key) < len(questions):
@@ -483,7 +607,7 @@ CRITICAL JSON CONTRACT:
             questions.append(self._with_fallback_diagram(question))
 
         if questions:
-            source_errors = request.errors or []
+            source_errors = self._filtered_errors(request) or request.errors or []
             small_item_practice = self._looks_like_small_item_practice(request)
             while len(questions) < target_count and source_errors:
                 source = source_errors[len(questions) % len(source_errors)]
@@ -504,6 +628,7 @@ CRITICAL JSON CONTRACT:
 
     def _looks_like_small_item_practice(self, request: PracticePaperRequest) -> bool:
         markers = ("选择", "单选", "多选", "填空", "判断", "概念", "辨析", "性质", "公式")
+        errors = self._filtered_errors(request) or request.errors
         source_text = " ".join(
             " ".join(
                 [
@@ -512,15 +637,18 @@ CRITICAL JSON CONTRACT:
                     item.question,
                     item.reason,
                     " ".join(item.tags),
+                    item.question_format,
+                    " ".join(item.type_tags),
+                    " ".join(item.model_tags),
                     item.ai_analysis,
                 ]
             )
-            for item in request.errors[:8]
+            for item in errors[:8]
         )
         return any(marker in source_text for marker in markers)
 
     def _fallback_questions(self, request: PracticePaperRequest) -> list[PracticeQuestion]:
-        source_errors = request.errors or []
+        source_errors = self._filtered_errors(request) or request.errors or []
         if not source_errors:
             return [
                 PracticeQuestion(

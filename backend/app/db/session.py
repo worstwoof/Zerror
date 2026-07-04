@@ -48,12 +48,18 @@ def _ensure_runtime_schema() -> None:
         column["name"]
         for column in inspector.get_columns("error_records")
     }
-    if "rich_artifacts_json" in existing_columns:
-        return
     with engine.begin() as connection:
-        connection.execute(
-            text(
-                "ALTER TABLE error_records "
-                "ADD COLUMN rich_artifacts_json TEXT NOT NULL DEFAULT ''"
+        if "rich_artifacts_json" not in existing_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE error_records "
+                    "ADD COLUMN rich_artifacts_json TEXT NOT NULL DEFAULT ''"
+                )
             )
-        )
+        if "classification_json" not in existing_columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE error_records "
+                    "ADD COLUMN classification_json TEXT NOT NULL DEFAULT ''"
+                )
+            )

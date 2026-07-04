@@ -56,6 +56,11 @@ class AnalysisResult {
   final String subject;
   final String sceneBrief;
   final List<String> knowledgePoints;
+  final String questionFormat;
+  final List<String> typeTags;
+  final List<String> modelTags;
+  final String difficulty;
+  final double classificationConfidence;
   final String solutionSummary;
   final List<String> solutionSteps;
   final String mistakeDiagnosis;
@@ -68,6 +73,11 @@ class AnalysisResult {
     required this.subject,
     required this.sceneBrief,
     required this.knowledgePoints,
+    required this.questionFormat,
+    required this.typeTags,
+    required this.modelTags,
+    required this.difficulty,
+    required this.classificationConfidence,
     required this.solutionSummary,
     required this.solutionSteps,
     required this.mistakeDiagnosis,
@@ -81,6 +91,11 @@ class AnalysisResult {
     String? subject,
     String? sceneBrief,
     List<String>? knowledgePoints,
+    String? questionFormat,
+    List<String>? typeTags,
+    List<String>? modelTags,
+    String? difficulty,
+    double? classificationConfidence,
     String? solutionSummary,
     List<String>? solutionSteps,
     String? mistakeDiagnosis,
@@ -93,6 +108,12 @@ class AnalysisResult {
       subject: subject ?? this.subject,
       sceneBrief: sceneBrief ?? this.sceneBrief,
       knowledgePoints: knowledgePoints ?? this.knowledgePoints,
+      questionFormat: questionFormat ?? this.questionFormat,
+      typeTags: typeTags ?? this.typeTags,
+      modelTags: modelTags ?? this.modelTags,
+      difficulty: difficulty ?? this.difficulty,
+      classificationConfidence:
+          classificationConfidence ?? this.classificationConfidence,
       solutionSummary: solutionSummary ?? this.solutionSummary,
       solutionSteps: solutionSteps ?? this.solutionSteps,
       mistakeDiagnosis: mistakeDiagnosis ?? this.mistakeDiagnosis,
@@ -118,6 +139,14 @@ class AnalysisResult {
           .map((item) => item.toString())
           .where((item) => item.trim().isNotEmpty)
           .toList(),
+      questionFormat: (json['question_format'] ?? '').toString(),
+      typeTags: _asStringList(json['type_tags']),
+      modelTags: _asStringList(json['model_tags']),
+      difficulty: (json['difficulty'] ?? '').toString(),
+      classificationConfidence: double.tryParse(
+            (json['classification_confidence'] ?? '0').toString(),
+          ) ??
+          0,
       solutionSummary: (json['solution_summary'] ?? '').toString(),
       solutionSteps: (json['solution_steps'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
@@ -1022,7 +1051,10 @@ class AiApiClient {
     required List<Map<String, dynamic>> errors,
     required int questionCount,
     required List<String> selectedSubjects,
+    required List<String> selectedTopics,
+    required List<String> selectedTypeTags,
     required String strategyLabel,
+    required String generationMode,
   }) async {
     final response = await http.post(
       Uri.parse(AppConstants.practicePaperEndpoint),
@@ -1033,7 +1065,10 @@ class AiApiClient {
         'errors': errors,
         'question_count': questionCount,
         'selected_subjects': selectedSubjects,
+        'selected_topics': selectedTopics,
+        'selected_type_tags': selectedTypeTags,
         'strategy_label': strategyLabel,
+        'generation_mode': generationMode,
         'include_answer_key': true,
       }),
     );

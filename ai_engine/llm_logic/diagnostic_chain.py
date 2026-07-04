@@ -136,6 +136,14 @@ class DiagnosticService:
         cleaned_question = str(parsed.get("cleaned_question") or default_cleaned_question)
         scene_brief = str(parsed.get("scene_brief", "")).strip()
         knowledge_points = [str(item) for item in parsed.get("knowledge_points", []) if str(item).strip()]
+        question_format = str(parsed.get("question_format", "")).strip()
+        type_tags = [str(item).strip() for item in parsed.get("type_tags", []) if str(item).strip()]
+        model_tags = [str(item).strip() for item in parsed.get("model_tags", []) if str(item).strip()]
+        difficulty = str(parsed.get("difficulty", "")).strip()
+        classification_confidence = self._bounded_float(
+            parsed.get("classification_confidence"),
+            default=0.0,
+        )
         solution_steps = [str(item) for item in parsed.get("solution_steps", []) if str(item).strip()]
         solution_summary = str(parsed.get("solution_summary", "请结合详细步骤继续完善解析。"))
         model_scene_spec = parsed.get("scene_spec") if isinstance(parsed.get("scene_spec"), dict) else None
@@ -224,6 +232,11 @@ class DiagnosticService:
             scene_brief=scene_brief,
             subject=subject,
             knowledge_points=knowledge_points,
+            question_format=question_format,
+            type_tags=type_tags,
+            model_tags=model_tags,
+            difficulty=difficulty,
+            classification_confidence=classification_confidence,
             solution_summary=solution_summary,
             solution_steps=solution_steps,
             mistake_diagnosis=str(parsed.get("mistake_diagnosis", "当前未能稳定识别错因，请结合用户答题过程补充。")),
@@ -2033,6 +2046,11 @@ class DiagnosticService:
   "cleaned_question": "清洗后的题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
+  "question_format": "选择题/填空题/解答题/实验题/阅读题/作文题/综合题",
+  "type_tags": ["本题所属的学科题型，如含参分类讨论、函数图像识别、受力分析、主旨题"],
+  "model_tags": ["本题用到的解题模型，如分类讨论、数形结合、守恒法、语境推断"],
+  "difficulty": "基础/中等/提高/压轴",
+  "classification_confidence": 0.85,
   "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
   "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
   "scene_spec": {{
@@ -2061,23 +2079,25 @@ class DiagnosticService:
 
 要求：
 1. 所有字段必须返回，没有内容时返回空数组或空字符串。
-2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
-3. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
-4. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-5. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
-6. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
-7. similar_questions 最多返回 1 个。
-8. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-9. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
-10. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-11. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-12. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
-13. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
-14. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
-15. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
-16. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-17. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-18. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
+2. question_format 是题目外形；type_tags 是“学科 + 知识点”下的具体题型，不能用全局固定题型替代。每题给 1-3 个 type_tags，优先短语化、可用于组卷筛选。
+3. model_tags 是解题模型或方法标签，给 0-3 个；classification_confidence 按 0 到 1 估计，低于 0.6 时仍给最可能分类。
+4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+5. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
+6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+7. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+8. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+9. similar_questions 最多返回 1 个。
+10. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+11. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+12. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+13. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+14. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
+15. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+16. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+17. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+18. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+19. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+20. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
 """.strip()
 
     def _build_vision_prompt(self, request: AnalysisRequest, cleaned_ocr_draft: str) -> str:
@@ -2116,6 +2136,11 @@ class DiagnosticService:
   "cleaned_question": "根据图片纠正后的完整题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
+  "question_format": "选择题/填空题/解答题/实验题/阅读题/作文题/综合题",
+  "type_tags": ["本题所属的学科题型，如含参分类讨论、函数图像识别、受力分析、主旨题"],
+  "model_tags": ["本题用到的解题模型，如分类讨论、数形结合、守恒法、语境推断"],
+  "difficulty": "基础/中等/提高/压轴",
+  "classification_confidence": 0.85,
   "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
   "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
   "mistake_diagnosis": "",
@@ -2137,22 +2162,24 @@ class DiagnosticService:
 1. 只输出 JSON，不要加 Markdown 代码块。
 2. cleaned_question 必须尽量还原图片里的原题；如果仍有局部不确定，可保守表达但不要照搬明显错误的 OCR。
 3. 如果是数学、物理、化学题，优先纠正公式、符号、单位和结构。
-4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
-5. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
-6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
-7. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
-8. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
-9. similar_questions 最多返回 1 个。
-10. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
-11. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
-12. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-13. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-14. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
-15. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
-16. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
-17. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
-18. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
-19. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
+4. question_format 是题目外形；type_tags 是“学科 + 知识点”下的具体题型，不能用全局固定题型替代。每题给 1-3 个 type_tags，优先短语化、可用于组卷筛选。
+5. model_tags 是解题模型或方法标签，给 0-3 个；classification_confidence 按 0 到 1 估计，低于 0.6 时仍给最可能分类。
+6. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+7. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
+8. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+9. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+10. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+11. similar_questions 最多返回 1 个。
+12. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+13. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+14. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+15. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+16. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+17. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+18. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+19. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+20. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+21. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
 """.strip()
 
     def _parse_json(self, raw_output: str) -> dict:
@@ -2178,9 +2205,9 @@ class DiagnosticService:
 要求：
 1. 只输出 JSON，不要 Markdown 代码块，不要解释。
 2. 保留原有解题内容、公式和字段含义，不要重新解题，不要缩写。
-3. 缺失字段用合理空值补齐：knowledge_points、solution_steps、similar_questions、rich_artifacts 用数组，mistake_diagnosis 用空字符串。
+3. 缺失字段用合理空值补齐：knowledge_points、type_tags、model_tags、solution_steps、similar_questions、rich_artifacts 用数组，question_format、difficulty、mistake_diagnosis 用空字符串，classification_confidence 用 0。
 4. 字符串里的反斜杠、换行和英文双引号必须正确转义。
-5. 顶层字段至少包含 cleaned_question、scene_brief、subject、knowledge_points、solution_summary、solution_steps、mistake_diagnosis、review_plan、similar_questions、rich_artifacts。
+5. 顶层字段至少包含 cleaned_question、scene_brief、subject、knowledge_points、question_format、type_tags、model_tags、difficulty、classification_confidence、solution_summary、solution_steps、mistake_diagnosis、review_plan、similar_questions、rich_artifacts。
 6. review_plan 必须包含 next_review_in_days、focus、schedule。
 
 原始输出：
@@ -5185,6 +5212,13 @@ class DiagnosticService:
         if len(preview) > limit:
             return preview[: limit - 1] + "…"
         return preview
+
+    def _bounded_float(self, value: Any, *, default: float = 0.0) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return default
+        return max(0.0, min(1.0, parsed))
 
     def _normalize_math_fields(self, parsed: dict) -> dict:
         normalized = dict(parsed)
