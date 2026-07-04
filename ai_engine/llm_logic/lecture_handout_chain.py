@@ -277,235 +277,230 @@ JSON 字段：
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
-      background: #eef3f8;
-      color: #2b3037;
-      font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
-      line-height: 1.78;
+      background: #eaf2f8;
+      color: #202631;
+      font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+      line-height: 1.72;
     }}
     .sheet {{
       width: 210mm;
       min-height: 297mm;
       margin: 0 auto;
-      padding: 16mm 17mm 18mm;
+      padding: 18mm 17mm 19mm;
       background: #fff;
     }}
     header {{
       text-align: center;
-      padding-bottom: 18px;
-      margin-bottom: 18px;
+      padding-bottom: 20px;
+      margin-bottom: 22px;
     }}
     h1 {{
       margin: 0;
       color: #3f78aa;
-      font-size: 25px;
+      font-size: 34px;
       font-weight: 700;
-      line-height: 1.3;
+      line-height: 1.24;
       letter-spacing: 0;
     }}
     .subtitle {{
-      margin-top: 7px;
+      margin-top: 12px;
       color: #6a7f95;
-      font-size: 13px;
+      font-size: 16px;
+      font-weight: 700;
     }}
     .digest {{
-      position: relative;
-      margin: 10px 0 24px;
-      padding: 23px 18px 16px;
-      border-top: 2px solid #92b1cc;
-      border-bottom: 2px solid #92b1cc;
-      background: #e9f2fa;
-      font-size: 13.5px;
+      margin: 12px 0 26px;
+      padding: 13px 18px 14px 20px;
+      border-left: 5px solid #4b7fb3;
+      background: #fbfdff;
+      font-size: 16px;
       break-inside: avoid;
     }}
-    .digest-badge {{
-      position: absolute;
-      top: -14px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 5px 18px;
-      border-radius: 5px;
-      background: #3f78aa;
-      color: #fff;
+    .digest h2 {{
+      margin: 0 0 8px;
+      color: #3f78aa;
+      font-size: 20px;
       font-weight: 700;
-      font-size: 14px;
     }}
     .digest-grid {{
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
+      gap: 20px;
     }}
     .digest p {{ margin: 0; text-align: justify; }}
-    .digest strong {{ color: #2e638f; }}
+    .digest strong {{ color: #2e638f; font-weight: 700; }}
     .knowledge-map, .conclusion-band, .examples-section, .tables-section {{
-      margin: 20px 0 0;
+      margin: 24px 0 0;
     }}
     .knowledge-map h2, .conclusion-band h2, .examples-section h2, .tables-section h2 {{
-      margin: 0 0 10px;
+      margin: 0 0 13px;
       color: #4a83b2;
-      font-size: 18px;
+      font-size: 23px;
+      font-weight: 700;
     }}
     .map-list {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 1px solid #b7cde1;
+      border-bottom: 0;
     }}
     .chip {{
-      display: inline-block;
-      padding: 4px 9px;
-      border: 1px solid #bdd2e4;
-      border-radius: 999px;
-      background: #f7fbff;
+      display: block;
+      padding: 8px 10px;
+      border-bottom: 1px solid #b7cde1;
+      background: #fff;
       color: #355d7e;
-      font-size: 12.5px;
+      font-size: 15px;
     }}
     .part {{
-      margin: 22px 0 0;
+      margin: 28px 0 0;
       break-inside: auto;
     }}
     .part-title {{
-      margin: 0 0 9px;
+      margin: 0 0 15px;
       color: #4a83b2;
-      font-size: 20px;
+      font-size: 25px;
       font-weight: 700;
-      line-height: 1.35;
+      line-height: 1.34;
     }}
     .body {{
-      margin: 0 0 7px;
-      font-size: 13.5px;
-      color: #202722;
+      margin: 0 0 10px;
+      font-size: 17px;
+      color: #202631;
       white-space: pre-wrap;
     }}
     .model-card {{
-      margin: 24px 0 0;
+      margin: 30px 0 0;
       break-inside: auto;
     }}
     .model-title {{
-      margin: 0 0 12px;
+      margin: 0 0 15px;
+      color: #4a83b2;
+      font-size: 25px;
+      font-weight: 700;
+    }}
+    .model-block {{
+      margin: 12px 0;
+      padding: 13px 17px;
+      border-left: 5px solid #4b7fb3;
+      background: #fbfdff;
+      break-inside: avoid;
+    }}
+    .model-block h3 {{
+      margin: 0 0 7px;
+      color: #2f6ea5;
+      font-size: 18px;
+      font-weight: 700;
+    }}
+    .model-block p {{ margin: 0; font-size: 17px; }}
+    .procedure {{
+      margin: 7px 0 0 25px;
+      padding: 0;
+    }}
+    .procedure li {{ margin: 6px 0; }}
+    .conclusion-band {{
+      padding: 15px 18px;
+      border: 1px solid #b7cde1;
+      background: #fff;
+      break-inside: avoid;
+    }}
+    .conclusion-band ol, .conclusion-list {{
+      margin: 6px 0 0 25px;
+      padding: 0;
+    }}
+    .conclusion-list li, .conclusion-band li {{
+      margin: 6px 0;
+    }}
+    .example {{
+      margin: 14px 0;
+      padding: 16px 18px;
+      border: 1px solid #cbdbe9;
+      background: #fff;
+      break-inside: auto;
+    }}
+    .example-title {{
+      color: #2f6ea5;
+      font-weight: 700;
+      margin-bottom: 7px;
+      font-size: 18px;
+    }}
+    .source {{
+      color: #6a7f95;
+      font-weight: 700;
+    }}
+    .label {{
+      color: #2f6ea5;
+      font-weight: 700;
+    }}
+    .answer {{
+      color: #202631;
+      font-weight: 700;
+    }}
+    .note-list li::marker {{
+      color: #4a83b2;
+    }}
+    table {{
+      width: auto;
+      min-width: 48%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      break-inside: avoid;
+      font-size: 16px;
+    }}
+    th, td {{
+      border: 1px solid #8fb0cf;
+      padding: 8px 12px;
+      vertical-align: top;
+    }}
+    th {{
+      background: #e8f2fb;
+      color: #2f6ea5;
+      font-weight: 700;
+    }}
+    .table-title {{
+      margin: 16px 0 8px;
       color: #4a83b2;
       font-size: 20px;
       font-weight: 700;
     }}
-    .model-block {{
-      margin: 10px 0;
-      padding: 10px 12px;
-      border-left: 4px solid #79a8cf;
-      background: #f6faff;
-      break-inside: avoid;
-    }}
-    .model-block h3 {{
-      margin: 0 0 5px;
-      color: #32809f;
-      font-size: 14.5px;
-      font-weight: 700;
-    }}
-    .model-block p {{ margin: 0; font-size: 13.5px; }}
-    .procedure {{
-      margin: 7px 0 0 20px;
-      padding: 0;
-    }}
-    .procedure li {{ margin: 4px 0; }}
-    .conclusion-band {{
-      padding: 12px 14px;
-      border: 1px solid #bdd2e4;
-      background: #f7fbff;
-      break-inside: avoid;
-    }}
-    .conclusion-band ol, .conclusion-list {{
-      margin: 6px 0 0 22px;
-      padding: 0;
-    }}
-    .conclusion-list li, .conclusion-band li {{
-      margin: 4px 0;
-    }}
-    .example {{
-      margin: 13px 0;
-      padding: 12px 14px;
-      border-top: 1px solid #c7d9e8;
-      border-bottom: 1px solid #c7d9e8;
-      break-inside: auto;
-    }}
-    .example-title {{
-      color: #1f9b78;
-      font-weight: 700;
-      margin-bottom: 5px;
-    }}
-    .source {{
-      color: #f08a24;
-      font-weight: 700;
-    }}
-    .label {{
-      color: #111;
-      font-weight: 700;
-    }}
-    .answer {{
-      color: #1b8b68;
-      font-weight: 700;
-    }}
-    .note-list li::marker {{
-      color: #f08a24;
-    }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0 14px;
-      break-inside: avoid;
-      font-size: 13px;
-    }}
-    th, td {{
-      border: 1px solid #8c98a3;
-      padding: 7px 8px;
-      vertical-align: top;
-    }}
-    th {{
-      background: #eef6fd;
-      color: #345f83;
-      font-weight: 700;
-    }}
-    .table-title {{
-      margin: 12px 0 4px;
-      color: #4a83b2;
-      font-size: 15px;
-      font-weight: 700;
-    }}
     .panel-grid {{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 11px;
-      margin-top: 16px;
+      display: block;
+      margin-top: 26px;
     }}
     .panel {{
       break-inside: avoid;
-      border: 1px solid #c7d9e8;
-      background: #fbfdff;
-      padding: 10px 12px;
-      min-height: 34mm;
+      border: 1px solid #b7cde1;
+      background: #fff;
+      padding: 15px 18px;
+      margin: 14px 0;
     }}
     .panel h2 {{
-      margin: 0 0 7px;
+      margin: 0 0 8px;
       color: #4a83b2;
-      font-size: 15px;
+      font-size: 20px;
       font-weight: 700;
     }}
-    ul {{ margin: 6px 0 0 20px; padding: 0; }}
-    li {{ margin: 3px 0; }}
+    ul {{ margin: 7px 0 0 25px; padding: 0; }}
+    li {{ margin: 6px 0; }}
     .checklist {{
-      margin-top: 18px;
-      border-top: 1px dashed #a9c3d8;
-      padding-top: 12px;
+      margin-top: 24px;
+      border-top: 1px solid #cbdbe9;
+      padding-top: 14px;
       break-inside: avoid;
     }}
     .checklist h2 {{
-      margin: 0 0 8px;
+      margin: 0 0 10px;
       color: #4a83b2;
-      font-size: 16px;
+      font-size: 21px;
     }}
     .checklist li {{
       list-style: none;
-      margin-left: -18px;
+      margin-left: -22px;
     }}
     .checklist li::before {{
       content: "□";
-      margin-right: 7px;
+      margin-right: 8px;
       color: #4a83b2;
     }}
     mjx-container {{
@@ -525,7 +520,7 @@ JSON 字段：
       <div class="subtitle">{html.escape(response.subtitle)}</div>
     </header>
     <section class="digest">
-      <div class="digest-badge">内容提要</div>
+      <h2>内容提要</h2>
       <div class="digest-grid">
         <p><strong>讲义定位：</strong>{self._math_text_html(response.overview)}</p>
         <p><strong>考情/应用：</strong>{self._math_text_html(response.exam_analysis or "围绕本主题的概念、模型、方法和易错边界进行系统梳理。")}</p>
@@ -557,7 +552,7 @@ JSON 字段：
             bullets = f"<ul>{self._list_items_html(section.bullets)}</ul>"
         return f"""
 <section class="part">
-  <h2 class="part-title">{index + 1}. {self._math_text_html(section.title)}</h2>
+  <h2 class="part-title">{index + 1} {self._math_text_html(section.title)}</h2>
   <p class="body">{self._math_text_html(section.body)}</p>
   {bullets}
 </section>"""
@@ -593,7 +588,7 @@ JSON 字段：
         traps = self._model_list_block_html("易错雷区", card.traps)
         return f"""
 <section class="model-card">
-  <h2 class="model-title">{index + 1}. {self._math_text_html(card.title)}</h2>
+  <h2 class="model-title">{index + 1} {self._math_text_html(card.title)}</h2>
   {feature}
   {logic}
   {procedure}
