@@ -63,6 +63,11 @@ class Settings:
     vivo_quality_text_reasoning_effort: str
     vivo_quality_timeout_seconds: int
     vivo_quality_max_tokens: int
+    vivo_handout_model: str
+    vivo_handout_thinking_mode: str
+    vivo_handout_reasoning_effort: str
+    vivo_handout_timeout_seconds: int
+    vivo_handout_max_tokens: int
     vivo_animation_model: str
     vivo_animation_thinking_mode: str
     vivo_animation_reasoning_effort: str
@@ -147,6 +152,27 @@ def get_settings() -> Settings:
                 file_values,
                 _get_setting("VIVO_MAX_TOKENS", file_values, "4096"),
             )
+        ),
+        vivo_handout_model=_get_setting(
+            "VIVO_HANDOUT_MODEL",
+            file_values,
+            "Doubao-Seed-2.0-pro",
+        ),
+        vivo_handout_thinking_mode=_get_setting(
+            "VIVO_HANDOUT_THINKING_MODE",
+            file_values,
+            _get_setting("VIVO_TEXT_THINKING_MODE", file_values, "auto"),
+        ),
+        vivo_handout_reasoning_effort=_get_setting(
+            "VIVO_HANDOUT_REASONING_EFFORT",
+            file_values,
+            "medium",
+        ),
+        vivo_handout_timeout_seconds=int(
+            _get_setting("VIVO_HANDOUT_TIMEOUT_SECONDS", file_values, "240")
+        ),
+        vivo_handout_max_tokens=int(
+            _get_setting("VIVO_HANDOUT_MAX_TOKENS", file_values, "8192")
         ),
         vivo_animation_model=_get_setting(
             "VIVO_ANIMATION_MODEL",

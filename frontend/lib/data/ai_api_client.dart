@@ -557,6 +557,157 @@ class PracticePaperResult {
   }
 }
 
+class LectureHandoutSectionResult {
+  final String title;
+  final String body;
+  final List<String> bullets;
+
+  const LectureHandoutSectionResult({
+    required this.title,
+    required this.body,
+    required this.bullets,
+  });
+
+  factory LectureHandoutSectionResult.fromJson(Map<String, dynamic> json) {
+    return LectureHandoutSectionResult(
+      title: (json['title'] ?? '知识梳理').toString(),
+      body: (json['body'] ?? '').toString(),
+      bullets: _asStringList(json['bullets']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'body': body,
+      'bullets': bullets,
+    };
+  }
+}
+
+class LectureHandoutResult {
+  final String title;
+  final String subtitle;
+  final String subject;
+  final String topic;
+  final String overview;
+  final List<LectureHandoutSectionResult> sections;
+  final List<String> keyPoints;
+  final List<String> formulaCards;
+  final List<String> methodNotes;
+  final List<String> commonTraps;
+  final List<String> recapChecklist;
+  final String printableHtml;
+  final String rawModelOutput;
+
+  const LectureHandoutResult({
+    required this.title,
+    required this.subtitle,
+    required this.subject,
+    required this.topic,
+    required this.overview,
+    required this.sections,
+    required this.keyPoints,
+    required this.formulaCards,
+    required this.methodNotes,
+    required this.commonTraps,
+    required this.recapChecklist,
+    required this.printableHtml,
+    required this.rawModelOutput,
+  });
+
+  factory LectureHandoutResult.fromJson(Map<String, dynamic> json) {
+    return LectureHandoutResult(
+      title: (json['title'] ?? '知识讲义').toString(),
+      subtitle: (json['subtitle'] ?? '').toString(),
+      subject: (json['subject'] ?? '').toString(),
+      topic: (json['topic'] ?? '').toString(),
+      overview: (json['overview'] ?? '').toString(),
+      sections: (json['sections'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => LectureHandoutSectionResult.fromJson(
+              item.map((key, value) => MapEntry(key.toString(), value)),
+            ),
+          )
+          .toList(growable: false),
+      keyPoints: _asStringList(json['key_points']),
+      formulaCards: _asStringList(json['formula_cards']),
+      methodNotes: _asStringList(json['method_notes']),
+      commonTraps: _asStringList(json['common_traps']),
+      recapChecklist: _asStringList(json['recap_checklist']),
+      printableHtml: (json['printable_html'] ?? '').toString(),
+      rawModelOutput: (json['raw_model_output'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'subtitle': subtitle,
+      'subject': subject,
+      'topic': topic,
+      'overview': overview,
+      'sections': sections.map((item) => item.toJson()).toList(),
+      'key_points': keyPoints,
+      'formula_cards': formulaCards,
+      'method_notes': methodNotes,
+      'common_traps': commonTraps,
+      'recap_checklist': recapChecklist,
+      'printable_html': printableHtml,
+      'raw_model_output': rawModelOutput,
+    };
+  }
+}
+
+class LectureHandoutJob {
+  final String jobId;
+  final String status;
+  final int progress;
+  final String message;
+  final String error;
+  final double? createdAt;
+  final double? updatedAt;
+  final LectureHandoutResult? result;
+
+  const LectureHandoutJob({
+    required this.jobId,
+    required this.status,
+    required this.progress,
+    required this.message,
+    required this.error,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.result,
+  });
+
+  bool get isCompleted => status == 'completed';
+  bool get isFailed => status == 'failed';
+  bool get isActive => status == 'pending' || status == 'processing';
+
+  factory LectureHandoutJob.fromJson(Map<String, dynamic> json) {
+    final resultJson = json['result'];
+    return LectureHandoutJob(
+      jobId: (json['job_id'] ?? '').toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      progress: int.tryParse((json['progress'] ?? '').toString()) ?? 0,
+      message: (json['message'] ?? '').toString(),
+      error: (json['error'] ?? '').toString(),
+      createdAt: double.tryParse((json['created_at'] ?? '').toString()),
+      updatedAt: double.tryParse((json['updated_at'] ?? '').toString()),
+      result: resultJson is Map<String, dynamic>
+          ? LectureHandoutResult.fromJson(resultJson)
+          : resultJson is Map
+              ? LectureHandoutResult.fromJson(
+                  resultJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+    );
+  }
+}
+
 class AssistantReplySection {
   final String title;
   final String body;
@@ -880,6 +1031,94 @@ class AiApiClient {
     }
 
     return PracticePaperResult.fromJson(decoded);
+  }
+
+  Future<LectureHandoutJob> createLectureHandoutJob({
+    required String prompt,
+    required String subject,
+    required String topic,
+    String? clientJobId,
+  }) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse(AppConstants.lectureHandoutJobsEndpoint),
+            headers: const {
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'prompt': prompt,
+              'subject': subject,
+              'topic': topic,
+              if (clientJobId != null && clientJobId.trim().isNotEmpty)
+                'client_job_id': clientJobId.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 35));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('讲义任务提交暂时较慢，请稍后重试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，讲义任务暂时无法提交。');
+    }
+
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 404) {
+        throw AiApiException(
+          '讲义生成接口未找到，请确认 App 连接的是已更新后端：${AppConstants.lectureHandoutJobsEndpoint}',
+          statusCode: response.statusCode,
+        );
+      }
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+
+    return LectureHandoutJob.fromJson(decoded);
+  }
+
+  Future<LectureHandoutJob> fetchLectureHandoutJob(String jobId) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse(AppConstants.lectureHandoutJobEndpoint(jobId)))
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('讲义进度刷新暂时较慢，请稍后重试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，讲义进度暂时无法刷新。');
+    }
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+    return LectureHandoutJob.fromJson(decoded);
+  }
+
+  Future<LectureHandoutJob> retryLectureHandoutJob(String jobId) async {
+    late final http.Response response;
+    try {
+      response = await http
+          .post(Uri.parse(AppConstants.lectureHandoutJobRetryEndpoint(jobId)))
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException catch (_) {
+      throw const AiApiException('讲义重试提交暂时较慢，请稍后再试。');
+    } on http.ClientException catch (_) {
+      throw const AiApiException('网络连接中断，讲义重试暂时无法提交。');
+    }
+    final decoded = _decodeJson(response);
+    if (response.statusCode >= 400) {
+      throw AiApiException(
+        _extractErrorMessage(decoded),
+        statusCode: response.statusCode,
+      );
+    }
+    return LectureHandoutJob.fromJson(decoded);
   }
 
   Future<AssistantChatReply> askAssistant({

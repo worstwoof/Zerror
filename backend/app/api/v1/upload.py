@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ai_engine.llm_logic.assistant_chain import AssistantService
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
+from ai_engine.llm_logic.lecture_handout_chain import LectureHandoutService
 from ai_engine.llm_logic.ocr_parser import normalize_ocr_text
 from ai_engine.llm_logic.practice_paper_chain import PracticePaperService
 from ai_engine.llm_logic.vivo_client import VivoAPIError, VivoLMClient
@@ -18,6 +19,8 @@ from backend.app.schemas.card_schema import (
     AssistantChatResponse,
     ImageAnalysisJobResponse,
     ImageAnalysisResponse,
+    LectureHandoutJobResponse,
+    LectureHandoutRequest,
     OCRResponse,
     PhysicsAnimationRequest,
     PhysicsAnimationResponse,
@@ -30,6 +33,11 @@ from backend.app.services.analysis_jobs import (
     get_image_analysis_job,
     retry_image_analysis_job,
 )
+from backend.app.services.lecture_handout_jobs import (
+    create_lecture_handout_job,
+    get_lecture_handout_job,
+    retry_lecture_handout_job,
+)
 
 
 router = APIRouter(prefix="/api/v1", tags=["ai"])
@@ -37,6 +45,7 @@ vivo_client = VivoLMClient(settings)
 diagnostic_service = DiagnosticService(vivo_client)
 practice_paper_service = PracticePaperService(vivo_client)
 assistant_service = AssistantService(vivo_client)
+lecture_handout_service = LectureHandoutService(vivo_client)
 logger = logging.getLogger(__name__)
 
 
@@ -318,6 +327,39 @@ def generate_practice_paper(request: PracticePaperRequest) -> PracticePaperRespo
         return response
     except VivoAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/analysis/lecture-handout/jobs", response_model=LectureHandoutJobResponse)
+def create_analysis_lecture_handout_job(
+    request: LectureHandoutRequest,
+) -> LectureHandoutJobResponse:
+    _ensure_credentials()
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="请告诉我需要整理的学科或知识点。")
+    return create_lecture_handout_job(
+        request=request,
+        service=lecture_handout_service,
+    )
+
+
+@router.get("/analysis/lecture-handout/jobs/{job_id}", response_model=LectureHandoutJobResponse)
+def get_analysis_lecture_handout_job(job_id: str) -> LectureHandoutJobResponse:
+    job = get_lecture_handout_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="讲义任务不存在。")
+    return job
+
+
+@router.post("/analysis/lecture-handout/jobs/{job_id}/retry", response_model=LectureHandoutJobResponse)
+def retry_analysis_lecture_handout_job(job_id: str) -> LectureHandoutJobResponse:
+    _ensure_credentials()
+    job = retry_lecture_handout_job(
+        job_id=job_id,
+        service=lecture_handout_service,
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="讲义任务不存在。")
+    return job
 
 
 @router.post("/assistant/chat", response_model=AssistantChatResponse)

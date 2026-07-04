@@ -7,6 +7,7 @@ import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/theme.dart';
 import '../../data/ai_api_client.dart';
+import '../capture/html_artifact_preview_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -139,6 +140,23 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (text.isEmpty || _isThinking) return;
     final selectedMode = mode ?? _activeMode;
     final store = AppStateScope.of(context);
+    final lectureIntent = _detectLectureHandoutIntent(text);
+
+    if (lectureIntent.shouldGenerate) {
+      final task = store.enqueueLectureHandoutTask(
+        prompt: text,
+        subject: lectureIntent.subject,
+        topic: lectureIntent.topic,
+      );
+      setState(() {
+        _activeMode = selectedMode;
+        _messages.add(_ChatMessage.user(text));
+        _messages.add(_ChatMessage.lectureHandout(task.id));
+        _controller.clear();
+      });
+      _scrollToBottom();
+      return;
+    }
 
     setState(() {
       _activeMode = selectedMode;
@@ -302,6 +320,105 @@ class _AiChatScreenState extends State<AiChatScreen>
     return '${normalized.substring(0, limit - 1)}…';
   }
 
+  ({bool shouldGenerate, String subject, String topic})
+      _detectLectureHandoutIntent(String text) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), '');
+    final hasDirectHandout = normalized.contains('讲义');
+    final hasKnowledgeKeyword = normalized.contains('知识点') ||
+        normalized.contains('知识梳理') ||
+        normalized.contains('考点梳理');
+    final hasOrganizeKeyword = normalized.contains('帮我整理') ||
+        normalized.contains('整理一下') ||
+        normalized.contains('梳理一下') ||
+        normalized.contains('总结一下') ||
+        normalized.contains('整理');
+    final shouldGenerate =
+        hasDirectHandout || (hasKnowledgeKeyword && hasOrganizeKeyword);
+    if (!shouldGenerate) {
+      return (shouldGenerate: false, subject: '', topic: '');
+    }
+    final subject = _extractSubject(text);
+    final topic = _extractLectureTopic(text, subject);
+    return (shouldGenerate: true, subject: subject, topic: topic);
+  }
+
+  String _extractSubject(String text) {
+    const subjects = [
+      '数学',
+      '语文',
+      '英语',
+      '物理',
+      '化学',
+      '生物',
+      '历史',
+      '地理',
+      '政治',
+    ];
+    for (final subject in subjects) {
+      if (text.contains(subject)) {
+        return subject;
+      }
+    }
+    return '';
+  }
+
+  String _extractLectureTopic(String text, String subject) {
+    var topic = text;
+    final removals = [
+      '帮我',
+      '请',
+      '整理一下',
+      '帮我整理',
+      '梳理一下',
+      '总结一下',
+      '整理',
+      '生成',
+      '一份',
+      '知识讲义',
+      '讲义',
+      '知识点',
+      '知识梳理',
+      '考点梳理',
+      '可以下载',
+      '下载',
+    ];
+    for (final removal in removals) {
+      topic = topic.replaceAll(removal, ' ');
+    }
+    if (subject.isNotEmpty) {
+      topic = topic.replaceAll(subject, ' ');
+    }
+    topic = topic.replaceAll(RegExp(r'[\s，。；;、]+'), ' ').trim();
+    if (topic.isEmpty) {
+      return subject.isEmpty ? '核心知识点' : '$subject核心知识点';
+    }
+    return topic.length > 32 ? topic.substring(0, 32) : topic;
+  }
+
+  void _openLectureHandoutTask(BackgroundLectureHandoutTask task) {
+    final handout = task.handout;
+    if (handout == null) return;
+    final html = handout.printableHtml.trim();
+    if (html.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前讲义没有可预览的打印内容')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HtmlArtifactPreviewScreen(
+          title: handout.title.isEmpty ? '知识讲义' : handout.title,
+          htmlContent: html,
+          infoTitle: 'A4 知识讲义预览',
+          infoNote: '这份讲义已在后台生成，可用右上角 PDF 按钮导出。',
+          scrollable: true,
+          exportable: true,
+        ),
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -414,10 +531,18 @@ class _AiChatScreenState extends State<AiChatScreen>
                           isUser: true,
                           label: '你',
                         )
-                      : _AssistantAnswerCard(
-                          reply: message.reply!,
-                          onPrompt: (prompt) => _send(preset: prompt),
-                        ),
+                      : message.lectureHandoutTaskId != null
+                          ? _LectureHandoutChatTaskCard(
+                              task: store.lectureHandoutTaskById(
+                                message.lectureHandoutTaskId!,
+                              ),
+                              onOpen: _openLectureHandoutTask,
+                              onRetry: store.retryLectureHandoutTask,
+                            )
+                          : _AssistantAnswerCard(
+                              reply: message.reply!,
+                              onPrompt: (prompt) => _send(preset: prompt),
+                            ),
                 ),
               ),
               if (_isThinking)
@@ -997,6 +1122,176 @@ class _AssistantThinkingCard extends StatelessWidget {
   }
 }
 
+class _LectureHandoutChatTaskCard extends StatelessWidget {
+  const _LectureHandoutChatTaskCard({
+    required this.task,
+    required this.onOpen,
+    required this.onRetry,
+  });
+
+  final BackgroundLectureHandoutTask? task;
+  final ValueChanged<BackgroundLectureHandoutTask> onOpen;
+  final ValueChanged<String> onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = task;
+    if (current == null) {
+      return const AppPanel(
+        padding: EdgeInsets.all(16),
+        child: Text(
+          '讲义任务已从队列移除',
+          style: TextStyle(
+            color: AppPalette.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    final status = _status(current);
+    return AppPanel(
+      padding: const EdgeInsets.all(16),
+      color: Colors.white.withOpacity(0.76),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppPalette.leaf.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  status.icon,
+                  color: status.color,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      status.title,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _subtitle(current),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (current.isActive) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 7,
+                value: current.progress > 0 ? current.progress / 100 : null,
+                color: AppPalette.leaf,
+                backgroundColor: AppPalette.leaf.withOpacity(0.12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              current.statusMessage ?? 'AI 正在整理讲义，你可以继续问其他问题',
+              style: const TextStyle(
+                color: AppPalette.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (current.isCompleted && current.handout != null) ...[
+            TextButton.icon(
+              onPressed: () => onOpen(current),
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+              label: const Text('打开讲义并导出 PDF'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.leaf,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ] else if (current.isFailed) ...[
+            Text(
+              current.errorMessage ?? '讲义生成失败，请稍后重试。',
+              style: const TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 12.5,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => onRetry(current.id),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('重试生成'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.warmAccentText,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  ({IconData icon, Color color, String title}) _status(
+    BackgroundLectureHandoutTask task,
+  ) {
+    if (task.isCompleted) {
+      return (
+        icon: Icons.check_circle_rounded,
+        color: AppPalette.leaf,
+        title: '讲义已生成',
+      );
+    }
+    if (task.isFailed) {
+      return (
+        icon: Icons.error_outline_rounded,
+        color: AppPalette.warmAccentText,
+        title: '讲义生成失败',
+      );
+    }
+    return (
+      icon: Icons.auto_awesome_rounded,
+      color: AppPalette.leaf,
+      title: '正在生成讲义',
+    );
+  }
+
+  String _subtitle(BackgroundLectureHandoutTask task) {
+    final handout = task.handout;
+    if (handout != null) {
+      final topic = handout.topic.trim().isEmpty ? task.topic : handout.topic;
+      return topic.trim().isEmpty ? handout.title : '${handout.title} · $topic';
+    }
+    final topic = task.topic.trim().isEmpty ? task.prompt : task.topic;
+    return topic.length > 44 ? '${topic.substring(0, 43)}…' : topic;
+  }
+}
+
 class _AnswerSection extends StatelessWidget {
   const _AnswerSection({
     required this.section,
@@ -1337,15 +1632,23 @@ class _OrbGroundShadowPainter extends CustomPainter {
 class _ChatMessage {
   const _ChatMessage.user(this.text)
       : isUser = true,
-        reply = null;
+        reply = null,
+        lectureHandoutTaskId = null;
 
   const _ChatMessage.assistant(this.reply)
       : text = '',
-        isUser = false;
+        isUser = false,
+        lectureHandoutTaskId = null;
+
+  const _ChatMessage.lectureHandout(this.lectureHandoutTaskId)
+      : text = '',
+        isUser = false,
+        reply = null;
 
   final String text;
   final bool isUser;
   final AssistantChatReply? reply;
+  final String? lectureHandoutTaskId;
 }
 
 enum _AssistantMode { quickAnswer, errorMemory, knowledgeLink, examSprint }

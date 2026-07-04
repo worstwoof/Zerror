@@ -1,9 +1,10 @@
 import uuid
 import base64
+import os
 import requests
 
 # 配置参数
-AppKey = "sk-xuanji-2026209917-VVB5SXd0TGxlYUZiZ2Rocw=="  # 请替换为你自己的 AppKey
+AppKey = os.getenv("VIVO_API_KEY", "your_vivo_api_key")
 BASE_URL = "https://api-ai.vivo.com.cn/v1"
 MODEL_NAME = "Doubao-Seed-2.0-pro"
 

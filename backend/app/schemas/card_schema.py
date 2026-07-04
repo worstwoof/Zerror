@@ -171,6 +171,49 @@ class PracticePaperResponse(BaseModel):
     raw_model_output: str = ""
 
 
+class LectureHandoutRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    subject: str = ""
+    topic: str = ""
+    client_job_id: str = ""
+
+
+class LectureHandoutSection(BaseModel):
+    title: str
+    body: str = ""
+    bullets: List[str] = Field(default_factory=list)
+
+
+class LectureHandoutResponse(BaseModel):
+    title: str
+    subtitle: str = ""
+    subject: str = ""
+    topic: str = ""
+    overview: str = ""
+    sections: List[LectureHandoutSection] = Field(default_factory=list)
+    key_points: List[str] = Field(default_factory=list)
+    formula_cards: List[str] = Field(default_factory=list)
+    method_notes: List[str] = Field(default_factory=list)
+    common_traps: List[str] = Field(default_factory=list)
+    recap_checklist: List[str] = Field(default_factory=list)
+    printable_html: str = ""
+    raw_model_output: str = ""
+
+
+LectureHandoutJobStatus = Literal["pending", "processing", "completed", "failed"]
+
+
+class LectureHandoutJobResponse(BaseModel):
+    job_id: str
+    status: LectureHandoutJobStatus
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = ""
+    error: str = ""
+    created_at: float
+    updated_at: float
+    result: Optional[LectureHandoutResponse] = None
+
+
 AssistantMode = Literal[
     "quick_answer",
     "error_memory",

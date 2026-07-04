@@ -360,19 +360,17 @@ class BackgroundPracticePaperTask {
     final paperJson = json['paper'];
     return BackgroundPracticePaperTask(
       id: (json['id'] ?? 'paper-restored').toString(),
-      createdAt:
-          DateTime.tryParse((json['created_at'] ?? '').toString()) ??
-              DateTime.now(),
+      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+          DateTime.now(),
       status: normalizedStatus,
       sourceErrors: sourceErrors,
-      questionCount:
-          int.tryParse((json['question_count'] ?? '').toString()) ??
-              sourceErrors.length,
-      selectedSubjects: (json['selected_subjects'] as List<dynamic>? ??
-              const [])
-          .map((item) => item.toString())
-          .where((item) => item.trim().isNotEmpty)
-          .toList(growable: false),
+      questionCount: int.tryParse((json['question_count'] ?? '').toString()) ??
+          sourceErrors.length,
+      selectedSubjects:
+          (json['selected_subjects'] as List<dynamic>? ?? const [])
+              .map((item) => item.toString())
+              .where((item) => item.trim().isNotEmpty)
+              .toList(growable: false),
       strategyLabel: (json['strategy_label'] ?? '').toString(),
       progress: normalizedStatus == restoredStatus
           ? int.tryParse((json['progress'] ?? '').toString()) ?? 0
@@ -392,6 +390,137 @@ class BackgroundPracticePaperTask {
       errorMessage: normalizedStatus == restoredStatus
           ? json['error_message']?.toString()
           : 'App 退出或被系统回收后，当前版本无法继续原来的组卷请求，请重试生成。',
+    );
+  }
+
+  static AnalysisTaskStatus _taskStatusFromJson(dynamic value) {
+    final raw = value?.toString();
+    for (final status in AnalysisTaskStatus.values) {
+      if (status.name == raw) {
+        return status;
+      }
+    }
+    return AnalysisTaskStatus.failed;
+  }
+}
+
+class BackgroundLectureHandoutTask {
+  const BackgroundLectureHandoutTask({
+    required this.id,
+    required this.createdAt,
+    required this.status,
+    required this.prompt,
+    required this.subject,
+    required this.topic,
+    this.serverJobId,
+    this.serverJobCreated = false,
+    this.progress = 0,
+    this.statusMessage,
+    this.handout,
+    this.errorMessage,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final AnalysisTaskStatus status;
+  final String prompt;
+  final String subject;
+  final String topic;
+  final String? serverJobId;
+  final bool serverJobCreated;
+  final int progress;
+  final String? statusMessage;
+  final LectureHandoutResult? handout;
+  final String? errorMessage;
+
+  bool get isActive =>
+      status == AnalysisTaskStatus.queued ||
+      status == AnalysisTaskStatus.analyzing;
+  bool get isCompleted => status == AnalysisTaskStatus.completed;
+  bool get isFailed => status == AnalysisTaskStatus.failed;
+
+  BackgroundLectureHandoutTask copyWith({
+    AnalysisTaskStatus? status,
+    String? serverJobId,
+    bool? serverJobCreated,
+    int? progress,
+    String? statusMessage,
+    LectureHandoutResult? handout,
+    String? errorMessage,
+    bool clearStatusMessage = false,
+    bool clearHandout = false,
+    bool clearErrorMessage = false,
+  }) {
+    return BackgroundLectureHandoutTask(
+      id: id,
+      createdAt: createdAt,
+      status: status ?? this.status,
+      prompt: prompt,
+      subject: subject,
+      topic: topic,
+      serverJobId: serverJobId ?? this.serverJobId,
+      serverJobCreated: serverJobCreated ?? this.serverJobCreated,
+      progress: progress ?? this.progress,
+      statusMessage:
+          clearStatusMessage ? null : statusMessage ?? this.statusMessage,
+      handout: clearHandout ? null : handout ?? this.handout,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'created_at': createdAt.toIso8601String(),
+      'status': status.name,
+      'prompt': prompt,
+      'subject': subject,
+      'topic': topic,
+      'server_job_id': serverJobId,
+      'server_job_created': serverJobCreated,
+      'progress': progress,
+      'status_message': statusMessage,
+      'handout': handout?.toJson(),
+      'error_message': errorMessage,
+    };
+  }
+
+  factory BackgroundLectureHandoutTask.fromJson(Map<String, dynamic> json) {
+    final restoredStatus = _taskStatusFromJson(json['status']);
+    final normalizedStatus = restoredStatus == AnalysisTaskStatus.queued ||
+            restoredStatus == AnalysisTaskStatus.analyzing
+        ? AnalysisTaskStatus.failed
+        : restoredStatus;
+    final handoutJson = json['handout'];
+    return BackgroundLectureHandoutTask(
+      id: (json['id'] ?? 'handout-restored').toString(),
+      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
+          DateTime.now(),
+      status: normalizedStatus,
+      prompt: (json['prompt'] ?? '').toString(),
+      subject: (json['subject'] ?? '').toString(),
+      topic: (json['topic'] ?? '').toString(),
+      serverJobId: json['server_job_id']?.toString(),
+      serverJobCreated: json['server_job_created'] == true,
+      progress: normalizedStatus == restoredStatus
+          ? int.tryParse((json['progress'] ?? '').toString()) ?? 0
+          : 0,
+      statusMessage: normalizedStatus == restoredStatus
+          ? json['status_message']?.toString()
+          : '上次生成被中断，可点击重试',
+      handout: handoutJson is Map<String, dynamic>
+          ? LectureHandoutResult.fromJson(handoutJson)
+          : handoutJson is Map
+              ? LectureHandoutResult.fromJson(
+                  handoutJson.map(
+                    (key, value) => MapEntry(key.toString(), value),
+                  ),
+                )
+              : null,
+      errorMessage: normalizedStatus == restoredStatus
+          ? json['error_message']?.toString()
+          : 'App 退出或被系统回收后，当前版本无法继续原来的讲义请求，请重试生成。',
     );
   }
 
@@ -437,6 +566,7 @@ class AppStore extends ChangeNotifier {
             ? snapshot.devices.toList(growable: true)
             : _defaultDevices(session) {
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
+    _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
   }
 
   static const UserProfileData _defaultProfile = UserProfileData(
@@ -459,9 +589,12 @@ class AppStore extends ChangeNotifier {
       <BackgroundAnalysisTask>[];
   final List<BackgroundPracticePaperTask> _practicePaperTasks =
       <BackgroundPracticePaperTask>[];
+  final List<BackgroundLectureHandoutTask> _lectureHandoutTasks =
+      <BackgroundLectureHandoutTask>[];
   final Set<String> _backgroundedAnalysisTaskIds = <String>{};
   final Set<String> _notifiedCompletedAnalysisTaskIds = <String>{};
   final Set<String> _runningPracticePaperTaskIds = <String>{};
+  final Set<String> _runningLectureHandoutTaskIds = <String>{};
   AuthSession? _session;
   UserProfileData _profile;
   String? _avatarPath;
@@ -546,6 +679,17 @@ class AppStore extends ChangeNotifier {
         .toList(growable: true);
   }
 
+  static List<BackgroundLectureHandoutTask> _restoreLectureHandoutTasks(
+    AppPersistenceSnapshot? snapshot,
+  ) {
+    if (snapshot == null || snapshot.lectureHandoutTasks.isEmpty) {
+      return <BackgroundLectureHandoutTask>[];
+    }
+    return snapshot.lectureHandoutTasks
+        .map(BackgroundLectureHandoutTask.fromJson)
+        .toList(growable: true);
+  }
+
   AppPersistenceSnapshot get snapshot {
     return AppPersistenceSnapshot(
       favoriteIds: favorites.map((item) => item.id).toSet(),
@@ -557,6 +701,10 @@ class AppStore extends ChangeNotifier {
       errors: _errors.map((item) => item.toJson()).toList(growable: false),
       practicePaperTasks:
           _practicePaperTasks.map((item) => item.toJson()).toList(
+                growable: false,
+              ),
+      lectureHandoutTasks:
+          _lectureHandoutTasks.map((item) => item.toJson()).toList(
                 growable: false,
               ),
     );
@@ -628,6 +776,8 @@ class AppStore extends ChangeNotifier {
       UnmodifiableListView(_analysisTasks);
   UnmodifiableListView<BackgroundPracticePaperTask> get practicePaperTasks =>
       UnmodifiableListView(_practicePaperTasks);
+  UnmodifiableListView<BackgroundLectureHandoutTask> get lectureHandoutTasks =>
+      UnmodifiableListView(_lectureHandoutTasks);
 
   DeviceSession get currentDevice => _devices.firstWhere(
         (item) => item.isCurrent,
@@ -677,14 +827,29 @@ class AppStore extends ChangeNotifier {
   int get failedPracticePaperTaskCount =>
       _practicePaperTasks.where((item) => item.isFailed).length;
   bool get hasPracticePaperTasks => _practicePaperTasks.isNotEmpty;
+  int get activeLectureHandoutTaskCount =>
+      _lectureHandoutTasks.where((item) => item.isActive).length;
+  int get completedLectureHandoutTaskCount =>
+      _lectureHandoutTasks.where((item) => item.isCompleted).length;
+  int get failedLectureHandoutTaskCount =>
+      _lectureHandoutTasks.where((item) => item.isFailed).length;
+  bool get hasLectureHandoutTasks => _lectureHandoutTasks.isNotEmpty;
   int get activeBackgroundTaskCount =>
-      activeAnalysisTaskCount + activePracticePaperTaskCount;
+      activeAnalysisTaskCount +
+      activePracticePaperTaskCount +
+      activeLectureHandoutTaskCount;
   int get completedBackgroundTaskCount =>
-      completedAnalysisTaskCount + completedPracticePaperTaskCount;
+      completedAnalysisTaskCount +
+      completedPracticePaperTaskCount +
+      completedLectureHandoutTaskCount;
   int get failedBackgroundTaskCount =>
-      failedAnalysisTaskCount + failedPracticePaperTaskCount;
+      failedAnalysisTaskCount +
+      failedPracticePaperTaskCount +
+      failedLectureHandoutTaskCount;
   int get totalBackgroundTaskCount =>
-      _analysisTasks.length + _practicePaperTasks.length;
+      _analysisTasks.length +
+      _practicePaperTasks.length +
+      _lectureHandoutTasks.length;
   bool get hasBackgroundTasks => totalBackgroundTaskCount > 0;
 
   int analysisTaskQueuePosition(String id) {
@@ -705,6 +870,22 @@ class AppStore extends ChangeNotifier {
         .toList(growable: false);
     final index = activeOldestFirst.indexWhere((item) => item.id == id);
     return index == -1 ? 0 : index + 1;
+  }
+
+  int lectureHandoutTaskQueuePosition(String id) {
+    final activeOldestFirst = _lectureHandoutTasks
+        .where((item) => item.isActive)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+    final index = activeOldestFirst.indexWhere((item) => item.id == id);
+    return index == -1 ? 0 : index + 1;
+  }
+
+  BackgroundLectureHandoutTask? lectureHandoutTaskById(String id) {
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return null;
+    return _lectureHandoutTasks[index];
   }
 
   int get knowledgePointCount =>
@@ -996,6 +1177,49 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  BackgroundLectureHandoutTask enqueueLectureHandoutTask({
+    required String prompt,
+    required String subject,
+    required String topic,
+  }) {
+    final now = DateTime.now();
+    final task = BackgroundLectureHandoutTask(
+      id: 'handout-${now.microsecondsSinceEpoch}-${_lectureHandoutTasks.length}',
+      createdAt: now,
+      status: AnalysisTaskStatus.queued,
+      prompt: prompt,
+      subject: subject,
+      topic: topic,
+      statusMessage: '已加入后台讲义队列',
+    );
+    _lectureHandoutTasks.insert(0, task);
+    _commit();
+    unawaited(_runLectureHandoutTask(task.id));
+    return task;
+  }
+
+  void retryLectureHandoutTask(String id) {
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _lectureHandoutTasks[index] = _lectureHandoutTasks[index].copyWith(
+      status: AnalysisTaskStatus.queued,
+      progress: 0,
+      statusMessage: '正在重新提交讲义生成任务',
+      clearHandout: true,
+      clearErrorMessage: true,
+    );
+    _commit();
+    unawaited(_runLectureHandoutTask(id, forceRetry: true));
+  }
+
+  void dismissLectureHandoutTask(String id) {
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _runningLectureHandoutTaskIds.remove(id);
+    _lectureHandoutTasks.removeAt(index);
+    _commit();
+  }
+
   List<ErrorRecord> addErrorRecords(Iterable<NewErrorDraft> drafts) {
     final created = drafts.map(addErrorRecord).toList(growable: false);
     return created;
@@ -1140,9 +1364,11 @@ class AppStore extends ChangeNotifier {
     _applySnapshotState(null);
     _analysisTasks.clear();
     _practicePaperTasks.clear();
+    _lectureHandoutTasks.clear();
     _backgroundedAnalysisTaskIds.clear();
     _notifiedCompletedAnalysisTaskIds.clear();
     _runningPracticePaperTaskIds.clear();
+    _runningLectureHandoutTaskIds.clear();
     notifyListeners();
     unawaited(_persist());
   }
@@ -1193,6 +1419,7 @@ class AppStore extends ChangeNotifier {
     if (isForeground) {
       resumeAnalysisQueue();
       resumePracticePaperTasks();
+      resumeLectureHandoutTasks();
     }
   }
 
@@ -1205,6 +1432,12 @@ class AppStore extends ChangeNotifier {
   void resumePracticePaperTasks() {
     for (final task in _practicePaperTasks.where((item) => item.isActive)) {
       unawaited(_runPracticePaperTask(task.id));
+    }
+  }
+
+  void resumeLectureHandoutTasks() {
+    for (final task in _lectureHandoutTasks.where((item) => item.isActive)) {
+      unawaited(_runLectureHandoutTask(task.id));
     }
   }
 
@@ -1292,6 +1525,163 @@ class AppStore extends ChangeNotifier {
     } finally {
       _runningPracticePaperTaskIds.remove(id);
     }
+  }
+
+  Future<void> _runLectureHandoutTask(
+    String id, {
+    bool forceRetry = false,
+  }) async {
+    if (_runningLectureHandoutTaskIds.contains(id)) return;
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1 || !_lectureHandoutTasks[index].isActive) return;
+
+    _runningLectureHandoutTaskIds.add(id);
+    try {
+      _replaceLectureHandoutTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.analyzing,
+          progress: task.progress == 0 ? 8 : task.progress,
+          statusMessage: '正在准备讲义生成任务',
+          clearErrorMessage: true,
+        ),
+      );
+
+      var task = _lectureHandoutTaskById(id);
+      if (task == null || !task.isActive) return;
+
+      LectureHandoutJob job;
+      final existingServerJobId = task.serverJobId?.trim() ?? '';
+      if (forceRetry &&
+          existingServerJobId.isNotEmpty &&
+          task.serverJobCreated) {
+        try {
+          job = await _aiApiClient.retryLectureHandoutJob(existingServerJobId);
+        } on AiApiException catch (error) {
+          if (error.statusCode != 404) {
+            rethrow;
+          }
+          job = await _createLectureHandoutJob(task,
+              clientJobId: _freshHandoutServerJobId(id));
+        }
+      } else if (task.serverJobCreated && existingServerJobId.isNotEmpty) {
+        try {
+          job = await _aiApiClient.fetchLectureHandoutJob(existingServerJobId);
+        } on AiApiException catch (error) {
+          if (error.statusCode != 404) {
+            rethrow;
+          }
+          job = await _createLectureHandoutJob(task,
+              clientJobId: _freshHandoutServerJobId(id));
+        }
+      } else {
+        final clientJobId = existingServerJobId.isNotEmpty
+            ? existingServerJobId
+            : _freshHandoutServerJobId(id);
+        job = await _createLectureHandoutJob(task, clientJobId: clientJobId);
+      }
+
+      _applyLectureHandoutJob(id, job);
+      while (true) {
+        await Future<void>.delayed(_analysisPollInterval);
+        task = _lectureHandoutTaskById(id);
+        if (task == null || !task.isActive) return;
+
+        final serverJobId = task.serverJobId?.trim() ?? job.jobId;
+        if (serverJobId.isEmpty) {
+          throw const AiApiException('讲义任务没有返回服务器任务号，请重试。');
+        }
+        job = await _aiApiClient.fetchLectureHandoutJob(serverJobId);
+        _applyLectureHandoutJob(id, job);
+        if (job.isCompleted || job.isFailed) {
+          return;
+        }
+      }
+    } on AiApiException catch (error) {
+      _replaceLectureHandoutTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '讲义生成失败',
+          errorMessage: error.message,
+        ),
+      );
+    } catch (error) {
+      _replaceLectureHandoutTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          progress: 0,
+          statusMessage: '讲义生成失败',
+          errorMessage: '生成失败：$error',
+        ),
+      );
+    } finally {
+      _runningLectureHandoutTaskIds.remove(id);
+    }
+  }
+
+  Future<LectureHandoutJob> _createLectureHandoutJob(
+    BackgroundLectureHandoutTask task, {
+    required String clientJobId,
+  }) {
+    return _aiApiClient.createLectureHandoutJob(
+      prompt: task.prompt,
+      subject: task.subject,
+      topic: task.topic,
+      clientJobId: clientJobId,
+    );
+  }
+
+  void _applyLectureHandoutJob(String id, LectureHandoutJob job) {
+    if (job.isCompleted && job.result != null) {
+      _replaceLectureHandoutTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.completed,
+          serverJobId: job.jobId,
+          serverJobCreated: true,
+          progress: 100,
+          statusMessage: job.message.isEmpty ? '讲义已生成' : job.message,
+          handout: job.result,
+          clearErrorMessage: true,
+        ),
+      );
+      return;
+    }
+
+    if (job.isFailed) {
+      _replaceLectureHandoutTask(
+        id,
+        (task) => task.copyWith(
+          status: AnalysisTaskStatus.failed,
+          serverJobId: job.jobId,
+          serverJobCreated: true,
+          progress: 0,
+          statusMessage: job.message.isEmpty ? '讲义生成失败' : job.message,
+          errorMessage: job.error.isEmpty ? '讲义生成失败，请稍后重试。' : job.error,
+        ),
+      );
+      return;
+    }
+
+    _replaceLectureHandoutTask(
+      id,
+      (task) => task.copyWith(
+        status: AnalysisTaskStatus.analyzing,
+        serverJobId: job.jobId,
+        serverJobCreated: true,
+        progress: job.progress.clamp(1, 99).toInt(),
+        statusMessage: job.message.isEmpty ? 'AI 正在生成讲义' : job.message,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  String _freshHandoutServerJobId(String id) {
+    final safeId = id.replaceAll(RegExp(r'[^A-Za-z0-9_.:-]'), '-');
+    return '$safeId-${DateTime.now().microsecondsSinceEpoch}';
   }
 
   Future<void> _pumpAnalysisQueue() async {
@@ -1706,6 +2096,23 @@ class AppStore extends ChangeNotifier {
     _commit();
   }
 
+  BackgroundLectureHandoutTask? _lectureHandoutTaskById(String id) {
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return null;
+    return _lectureHandoutTasks[index];
+  }
+
+  void _replaceLectureHandoutTask(
+    String id,
+    BackgroundLectureHandoutTask Function(BackgroundLectureHandoutTask task)
+        update,
+  ) {
+    final index = _lectureHandoutTasks.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _lectureHandoutTasks[index] = update(_lectureHandoutTasks[index]);
+    _commit();
+  }
+
   Future<void> _reloadForCurrentSession() async {
     AppPersistenceSnapshot? loadedSnapshot;
     final repository = _repository;
@@ -1733,8 +2140,11 @@ class AppStore extends ChangeNotifier {
       ..addAll(_restoreErrors(snapshot));
     _analysisTasks.clear();
     _practicePaperTasks.clear();
+    _lectureHandoutTasks.clear();
     _runningPracticePaperTaskIds.clear();
+    _runningLectureHandoutTaskIds.clear();
     _practicePaperTasks.addAll(_restorePracticePaperTasks(snapshot));
+    _lectureHandoutTasks.addAll(_restoreLectureHandoutTasks(snapshot));
     _profile =
         snapshot?.profile ?? _profileFromSession(_session) ?? _defaultProfile;
     _avatarPath = snapshot?.avatarPath;

@@ -38,7 +38,7 @@ class CloudBackedAppRepository implements AppRepository {
       final remoteSnapshot = await _remote.loadSnapshot();
       if (remoteSnapshot != null) {
         localSnapshot = await _local.loadSnapshot();
-        final mergedSnapshot = _mergePracticePaperTasks(
+        final mergedSnapshot = _mergeLocalBackgroundTasks(
           remoteSnapshot,
           localSnapshot,
         );
@@ -54,7 +54,7 @@ class CloudBackedAppRepository implements AppRepository {
     localSnapshot ??= await _local.loadSnapshot();
     if (localSnapshot != null) {
       try {
-        await _remote.saveSnapshot(_stripPracticePaperTasks(localSnapshot));
+        await _remote.saveSnapshot(_stripLocalBackgroundTasks(localSnapshot));
       } catch (error) {
         debugPrint('Initial cloud sync from local cache failed: $error');
       }
@@ -65,16 +65,18 @@ class CloudBackedAppRepository implements AppRepository {
   @override
   Future<void> saveSnapshot(AppPersistenceSnapshot snapshot) async {
     await _local.saveSnapshot(snapshot);
-    await _remote.saveSnapshot(_stripPracticePaperTasks(snapshot));
+    await _remote.saveSnapshot(_stripLocalBackgroundTasks(snapshot));
   }
 
-  AppPersistenceSnapshot _mergePracticePaperTasks(
+  AppPersistenceSnapshot _mergeLocalBackgroundTasks(
     AppPersistenceSnapshot remote,
     AppPersistenceSnapshot? local,
   ) {
     final localTasks =
         local?.practicePaperTasks ?? const <Map<String, dynamic>>[];
-    if (localTasks.isEmpty) {
+    final localHandoutTasks =
+        local?.lectureHandoutTasks ?? const <Map<String, dynamic>>[];
+    if (localTasks.isEmpty && localHandoutTasks.isEmpty) {
       return remote;
     }
     return AppPersistenceSnapshot(
@@ -86,10 +88,11 @@ class CloudBackedAppRepository implements AppRepository {
       devices: remote.devices,
       errors: remote.errors,
       practicePaperTasks: localTasks,
+      lectureHandoutTasks: localHandoutTasks,
     );
   }
 
-  AppPersistenceSnapshot _stripPracticePaperTasks(
+  AppPersistenceSnapshot _stripLocalBackgroundTasks(
     AppPersistenceSnapshot snapshot,
   ) {
     return AppPersistenceSnapshot(
@@ -101,6 +104,7 @@ class CloudBackedAppRepository implements AppRepository {
       devices: snapshot.devices,
       errors: snapshot.errors,
       practicePaperTasks: const [],
+      lectureHandoutTasks: const [],
     );
   }
 }

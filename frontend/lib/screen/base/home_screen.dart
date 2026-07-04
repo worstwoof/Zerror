@@ -10,6 +10,7 @@ import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
+import '../capture/html_artifact_preview_screen.dart';
 import 'achievements_screen.dart';
 import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
@@ -969,12 +970,16 @@ class _HomeScreenState extends State<HomeScreen> {
         final store = AppStateScope.of(context);
         final tasks = store.analysisTasks;
         final paperTasks = store.practicePaperTasks;
+        final handoutTasks = store.lectureHandoutTasks;
         final taskCards = <Widget>[
           ...tasks.map(
             (task) => _buildAnalysisTaskTile(sheetContext, store, task),
           ),
           ...paperTasks.map(
             (task) => _buildPracticePaperTaskTile(sheetContext, store, task),
+          ),
+          ...handoutTasks.map(
+            (task) => _buildLectureHandoutTaskTile(sheetContext, store, task),
           ),
         ];
         return Container(
@@ -1088,7 +1093,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (completed > 0) {
       return '$completed 个任务已完成，等你打开确认';
     }
-    return '拍题解析和智能组卷都会在这里排队';
+    return '拍题解析、智能组卷和讲义生成都会在这里排队';
   }
 
   Widget _buildAnalysisTaskTile(
@@ -1277,6 +1282,101 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLectureHandoutTaskTile(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundLectureHandoutTask task,
+  ) {
+    final status = _lectureHandoutTaskStatus(task);
+    final queuePosition = store.lectureHandoutTaskQueuePosition(task.id);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _lectureHandoutTaskTap(sheetContext, task),
+        borderRadius: BorderRadius.circular(24),
+        child: AppPanel(
+          padding: const EdgeInsets.all(12),
+          color: _queueTaskSurface,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: AppPalette.leaf.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppPalette.leaf.withOpacity(0.16),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.menu_book_rounded,
+                  color: AppPalette.leaf,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(status.icon, color: status.color, size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            color: status.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _formatTaskTime(task.createdAt),
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _lectureHandoutTaskPreviewText(task, status.note),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildLectureHandoutTaskActions(sheetContext, store, task),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   VoidCallback? _analysisTaskTap(
     BuildContext sheetContext,
     BackgroundAnalysisTask task,
@@ -1310,6 +1410,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return () {
         Navigator.pop(sheetContext);
         _openCompletedPracticePaperTask(task);
+      };
+    }
+    return null;
+  }
+
+  VoidCallback? _lectureHandoutTaskTap(
+    BuildContext sheetContext,
+    BackgroundLectureHandoutTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.handout != null) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openCompletedLectureHandoutTask(task);
       };
     }
     return null;
@@ -1359,6 +1472,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (task.isCompleted && paper != null) {
       final title = paper.title.trim().isEmpty ? '专题针对性练习' : paper.title;
       return '$title · ${paper.questions.length} 题';
+    }
+    return task.errorMessage ?? task.statusMessage ?? fallback;
+  }
+
+  String _lectureHandoutTaskPreviewText(
+    BackgroundLectureHandoutTask task,
+    String fallback,
+  ) {
+    final handout = task.handout;
+    if (task.isCompleted && handout != null) {
+      final title = handout.title.trim().isEmpty ? '知识讲义' : handout.title;
+      final topic = handout.topic.trim().isEmpty ? task.topic : handout.topic;
+      return topic.trim().isEmpty ? title : '$title · $topic';
     }
     return task.errorMessage ?? task.statusMessage ?? fallback;
   }
@@ -1549,6 +1675,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLectureHandoutTaskActions(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundLectureHandoutTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.handout != null) {
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openCompletedLectureHandoutTask(task);
+            },
+            icon: const Icon(Icons.open_in_new_rounded, size: 17),
+            label: const Text('打开讲义'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.leaf,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          TextButton(
+            onPressed: () => store.dismissLectureHandoutTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    if (task.status == AnalysisTaskStatus.failed) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => store.retryLectureHandoutTask(task.id),
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('重试'),
+            style: TextButton.styleFrom(
+              foregroundColor: _queueDanger,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissLectureHandoutTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: task.progress > 0 ? task.progress / 100 : null,
+            strokeWidth: 2,
+            color: AppPalette.leaf,
+            backgroundColor: AppPalette.leaf.withOpacity(0.12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          '可以继续提问或学习其他内容',
+          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   ({IconData icon, Color color, String label, String note}) _analysisTaskStatus(
     BackgroundAnalysisTask task,
   ) {
@@ -1630,6 +1836,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  ({IconData icon, Color color, String label, String note})
+      _lectureHandoutTaskStatus(
+    BackgroundLectureHandoutTask task,
+  ) {
+    switch (task.status) {
+      case AnalysisTaskStatus.queued:
+        return (
+          icon: Icons.schedule_rounded,
+          color: AppPalette.textSecondary,
+          label: '等待生成',
+          note: '已收到讲义生成任务',
+        );
+      case AnalysisTaskStatus.analyzing:
+        return (
+          icon: Icons.auto_awesome_rounded,
+          color: AppPalette.leaf,
+          label: '正在生成',
+          note: 'AI 正在整理知识讲义和打印版式',
+        );
+      case AnalysisTaskStatus.completed:
+        return (
+          icon: Icons.check_circle_rounded,
+          color: _queueSuccess,
+          label: '讲义已生成',
+          note: '点击打开后可导出 PDF',
+        );
+      case AnalysisTaskStatus.failed:
+        return (
+          icon: Icons.error_outline_rounded,
+          color: _queueDanger,
+          label: '生成失败',
+          note: '可以重试生成知识讲义',
+        );
+    }
+  }
+
   String _formatTaskTime(DateTime time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
@@ -1668,6 +1910,30 @@ class _HomeScreenState extends State<HomeScreen> {
           strategyLabel: paper.strategyLabel.isEmpty
               ? task.strategyLabel
               : paper.strategyLabel,
+        ),
+      ),
+    );
+  }
+
+  void _openCompletedLectureHandoutTask(BackgroundLectureHandoutTask task) {
+    final handout = task.handout;
+    if (handout == null) return;
+    final html = handout.printableHtml.trim();
+    if (html.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前讲义没有可预览的打印内容')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HtmlArtifactPreviewScreen(
+          title: handout.title.isEmpty ? '知识讲义' : handout.title,
+          htmlContent: html,
+          infoTitle: 'A4 知识讲义预览',
+          infoNote: '这份讲义由 AI 助教后台生成，可用右上角 PDF 按钮导出。',
+          scrollable: true,
+          exportable: true,
         ),
       ),
     );

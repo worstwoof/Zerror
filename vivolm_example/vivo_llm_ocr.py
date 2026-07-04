@@ -1,10 +1,11 @@
 import requests
 import base64
+import os
 import uuid
 
 # 请注意替换AppId、AppKey、PIC_FILE
-AppId = '2026209917'
-AppKey = "sk-xuanji-2026209917-VVB5SXd0TGxlYUZiZ2Rocw=="
+AppId = os.getenv("VIVO_APP_ID", "your_vivo_app_id")
+AppKey = os.getenv("VIVO_API_KEY", "your_vivo_api_key")
 DOMAIN = 'api-ai.vivo.com.cn'
 URI = '/ocr/general_recognition'
 METHOD = 'POST'
