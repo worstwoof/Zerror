@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
@@ -3441,16 +3442,26 @@ class _AnalysisSelectionSheet extends StatelessWidget {
                           selection.isValid && !selection.isCollapsed
                               ? selection.textInside(value.text).trim()
                               : '';
+                      if (selectedText.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
                       final items = <ContextMenuButtonItem>[
-                        ...editableTextState.contextMenuButtonItems,
-                        if (selectedText.isNotEmpty)
-                          ContextMenuButtonItem(
-                            label: '问 AI',
-                            onPressed: () {
-                              ContextMenuController.removeAny();
-                              onAsk(selectedText);
-                            },
-                          ),
+                        ContextMenuButtonItem(
+                          label: '问 AI',
+                          onPressed: () {
+                            ContextMenuController.removeAny();
+                            onAsk(selectedText);
+                          },
+                        ),
+                        ContextMenuButtonItem(
+                          label: '复制',
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: selectedText),
+                            );
+                            ContextMenuController.removeAny();
+                          },
+                        ),
                       ];
                       return AdaptiveTextSelectionToolbar.buttonItems(
                         anchors: editableTextState.contextMenuAnchors,
