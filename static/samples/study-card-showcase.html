@@ -1,0 +1,1659 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zerror 互动错题学习卡 Showcase</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --ink-2: #334155;
+      --muted: #687385;
+      --paper: #fffdfa;
+      --paper-2: #f6f8fb;
+      --line: rgba(23, 32, 42, 0.13);
+      --blue: #2563eb;
+      --sky: #38bdf8;
+      --green: #10b981;
+      --orange: #f97316;
+      --red: #ef4444;
+      --yellow: #facc15;
+      --violet: #8b5cf6;
+      --shadow: 0 24px 70px rgba(22, 28, 36, 0.16);
+      --small-shadow: 0 12px 28px rgba(22, 28, 36, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", Arial, sans-serif;
+      background:
+        linear-gradient(120deg, rgba(37, 99, 235, 0.10), transparent 28%),
+        linear-gradient(240deg, rgba(16, 185, 129, 0.11), transparent 34%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 18px;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      min-height: 46px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 900;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.20), transparent),
+        #17202a;
+      box-shadow: 0 10px 20px rgba(23, 32, 42, 0.20);
+    }
+
+    .brand-text {
+      min-width: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-subtitle {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      border: 1px solid rgba(23, 32, 42, 0.11);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink-2);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(22, 28, 36, 0.06);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.12);
+    }
+
+    .player-wrap {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .player {
+      position: relative;
+      width: min(1480px, calc(100vw - 36px));
+      aspect-ratio: 16 / 9;
+      max-height: calc(100vh - 150px);
+      overflow: hidden;
+      border: 1px solid rgba(23, 32, 42, 0.14);
+      border-radius: 18px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+
+    .player::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(37, 99, 235, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+      background-size: 34px 34px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      grid-template-columns: minmax(0, 1fr);
+      padding: clamp(24px, 3vw, 46px);
+      z-index: 1;
+    }
+
+    .slide.active {
+      display: grid;
+      animation: slideIn 380ms cubic-bezier(.2, .8, .2, 1);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .slide-grid {
+      display: grid;
+      grid-template-columns: 1.02fr 0.98fr;
+      gap: clamp(20px, 3vw, 40px);
+      height: 100%;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .slide-grid.wide-left {
+      grid-template-columns: 1.18fr 0.82fr;
+    }
+
+    .slide-grid.wide-right {
+      grid-template-columns: 0.86fr 1.14fr;
+    }
+
+    .scene-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(22, 28, 36, 0.06);
+    }
+
+    .scene-label span {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--blue);
+      color: #fff;
+      font-size: 12px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    .hero-title {
+      margin-bottom: 16px;
+      font-size: clamp(40px, 5.3vw, 84px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero-title mark,
+    .slide-title mark {
+      color: var(--orange);
+      background: linear-gradient(180deg, transparent 58%, rgba(250, 204, 21, 0.50) 0);
+      padding: 0 0.04em;
+    }
+
+    .slide-title {
+      margin-bottom: 14px;
+      font-size: clamp(34px, 4.5vw, 64px);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 660px;
+      color: var(--ink-2);
+      font-size: clamp(17px, 1.45vw, 22px);
+      line-height: 1.65;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 26px;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 17px;
+      color: #fff;
+      background: var(--ink);
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(23, 32, 42, 0.18);
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(23, 32, 42, 0.22);
+    }
+
+    .button.blue {
+      background: var(--blue);
+    }
+
+    .button.green {
+      background: var(--green);
+    }
+
+    .button.orange {
+      background: var(--orange);
+    }
+
+    .button.light {
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 22px rgba(22, 28, 36, 0.08);
+    }
+
+    .media-stack {
+      position: relative;
+      height: min(530px, 80%);
+      min-height: 420px;
+    }
+
+    .paper-card {
+      position: absolute;
+      inset: 8% 4% auto 6%;
+      min-height: 56%;
+      border-radius: 18px;
+      padding: clamp(18px, 2vw, 26px);
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      box-shadow: var(--small-shadow);
+      transform: rotate(-2deg);
+    }
+
+    .paper-card.back {
+      inset: 18% 0 auto 18%;
+      min-height: 54%;
+      background: #eaf7ff;
+      transform: rotate(5deg);
+      z-index: -1;
+    }
+
+    .question-line {
+      height: 16px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      background: #e6edf5;
+    }
+
+    .question-line:nth-child(1) {
+      width: 88%;
+    }
+
+    .question-line:nth-child(2) {
+      width: 73%;
+    }
+
+    .question-line:nth-child(3) {
+      width: 62%;
+    }
+
+    .answer-path {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .answer-node {
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 86px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 18px rgba(22, 28, 36, 0.06);
+    }
+
+    .answer-node strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .answer-node span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .floating-formula {
+      position: absolute;
+      right: 8%;
+      bottom: 6%;
+      width: min(320px, 45%);
+      border-radius: 18px;
+      padding: 20px;
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent),
+        var(--ink);
+      box-shadow: 0 20px 44px rgba(23, 32, 42, 0.24);
+      animation: floatSoft 4s ease-in-out infinite;
+    }
+
+    @keyframes floatSoft {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    .floating-formula small {
+      display: block;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 800;
+    }
+
+    .floating-formula strong {
+      font-size: clamp(24px, 2.6vw, 38px);
+      line-height: 1.1;
+    }
+
+    .task-card {
+      border-radius: 18px;
+      padding: clamp(18px, 2.2vw, 28px);
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--line);
+      box-shadow: var(--small-shadow);
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-bottom: 18px;
+    }
+
+    .mini-pill {
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: #f1f5f9;
+      color: var(--ink-2);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .mini-pill.blue {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .mini-pill.green {
+      background: #dcfce7;
+      color: #047857;
+    }
+
+    .mini-pill.orange {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+
+    .question-big {
+      margin: 0;
+      font-size: clamp(23px, 2.7vw, 42px);
+      line-height: 1.45;
+      font-weight: 900;
+    }
+
+    .extract-board {
+      display: grid;
+      gap: 12px;
+    }
+
+    .extract-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      align-items: center;
+      gap: 12px;
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 16px rgba(22, 28, 36, 0.05);
+    }
+
+    .extract-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .extract-value {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      font-weight: 900;
+      font-size: 18px;
+    }
+
+    .extract-value b {
+      color: var(--orange);
+      font-size: 22px;
+    }
+
+    .mistake-alert {
+      margin-top: 14px;
+      border-radius: 16px;
+      padding: 16px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-weight: 800;
+      line-height: 1.6;
+    }
+
+    .concept-map {
+      position: relative;
+      min-height: 350px;
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(219, 234, 254, 0.9), rgba(220, 252, 231, 0.9));
+      border: 1px solid rgba(37, 99, 235, 0.18);
+      box-shadow: var(--small-shadow);
+      overflow: hidden;
+    }
+
+    .map-node {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      padding: 14px;
+      min-width: 124px;
+      min-height: 78px;
+      color: var(--ink);
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 24px rgba(22, 28, 36, 0.10);
+      font-weight: 900;
+    }
+
+    .map-node small {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .map-node.main {
+      left: 50%;
+      top: 50%;
+      width: 152px;
+      height: 102px;
+      color: #fff;
+      background: var(--ink);
+      transform: translate(-50%, -50%);
+    }
+
+    .map-node.n1 {
+      left: 7%;
+      top: 14%;
+    }
+
+    .map-node.n2 {
+      right: 7%;
+      top: 18%;
+    }
+
+    .map-node.n3 {
+      left: 12%;
+      bottom: 14%;
+    }
+
+    .map-node.n4 {
+      right: 10%;
+      bottom: 12%;
+    }
+
+    .map-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .map-lines path {
+      stroke: rgba(37, 99, 235, 0.45);
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-dasharray: 8 9;
+      fill: none;
+      animation: dashMove 5s linear infinite;
+    }
+
+    @keyframes dashMove {
+      to {
+        stroke-dashoffset: -90;
+      }
+    }
+
+    .lab {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 22px;
+      align-items: stretch;
+      height: 100%;
+    }
+
+    .lab-stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.95), rgba(245, 250, 255, 0.70) 42%, rgba(222, 239, 255, 0.78)),
+        linear-gradient(180deg, #f8fbff, #eef7f1);
+      border: 1px solid rgba(37, 99, 235, 0.16);
+      overflow: hidden;
+      box-shadow: var(--small-shadow);
+    }
+
+    .lab-stage::after {
+      content: "";
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      bottom: 9%;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(23, 32, 42, 0.12);
+      filter: blur(6px);
+    }
+
+    .cylinder-demo {
+      position: relative;
+      width: min(560px, 76%);
+      aspect-ratio: 1 / 0.84;
+      z-index: 2;
+    }
+
+    .cylinder-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      transition: transform 450ms ease;
+    }
+
+    .cut-mode .cylinder-svg {
+      transform: translateX(-54px) rotate(-3deg);
+    }
+
+    .slice {
+      opacity: 0;
+      transform: translate(54px, 30px) rotate(8deg);
+      transform-origin: center;
+      transition: opacity 420ms ease, transform 420ms ease;
+    }
+
+    .cut-mode .slice {
+      opacity: 1;
+      transform: translate(120px, 6px) rotate(8deg);
+    }
+
+    .formula-badge {
+      position: absolute;
+      right: 24px;
+      top: 24px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 18px 36px rgba(23, 32, 42, 0.22);
+      z-index: 4;
+    }
+
+    .formula-badge small {
+      display: block;
+      margin-bottom: 6px;
+      color: rgba(255, 255, 255, 0.68);
+      font-weight: 800;
+    }
+
+    .formula-badge strong {
+      font-size: 26px;
+    }
+
+    .lab-panel {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      padding: 18px;
+      box-shadow: var(--small-shadow);
+    }
+
+    .lab-panel h3 {
+      margin-bottom: 4px;
+      font-size: 22px;
+    }
+
+    .slider-box {
+      border-radius: 14px;
+      padding: 13px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+
+    .slider-box label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .slider-box b {
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .result-box {
+      border-radius: 16px;
+      padding: 16px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+    }
+
+    .result-box strong {
+      display: block;
+      margin-top: 5px;
+      color: #064e3b;
+      font-size: 25px;
+    }
+
+    .step-board {
+      display: grid;
+      grid-template-columns: 0.86fr 1.14fr;
+      gap: 22px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .step-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 15px 15px 15px 58px;
+      min-height: 88px;
+      box-shadow: 0 10px 20px rgba(22, 28, 36, 0.07);
+      cursor: pointer;
+    }
+
+    .step-card::before {
+      content: attr(data-index);
+      position: absolute;
+      left: 14px;
+      top: 16px;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 900;
+    }
+
+    .step-card.open {
+      border-color: rgba(16, 185, 129, 0.45);
+      background: #f5fffa;
+    }
+
+    .step-card h3 {
+      margin-bottom: 5px;
+      font-size: 18px;
+    }
+
+    .step-card p {
+      display: none;
+      margin: 8px 0 0;
+      color: var(--ink-2);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .step-card.open p {
+      display: block;
+    }
+
+    .chalkboard {
+      min-height: 430px;
+      border-radius: 22px;
+      padding: 28px;
+      color: #f8fafc;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.09), transparent),
+        #17202a;
+      border: 10px solid #caa36a;
+      box-shadow: var(--shadow);
+    }
+
+    .chalkboard h3 {
+      color: #fff;
+      font-size: 24px;
+      margin-bottom: 18px;
+    }
+
+    .chalk-line {
+      margin: 12px 0;
+      font-size: clamp(22px, 3vw, 42px);
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .chalk-line .yellow {
+      color: #fde68a;
+    }
+
+    .chalk-line .green {
+      color: #86efac;
+    }
+
+    .chalk-note {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.30);
+      color: rgba(255, 255, 255, 0.76);
+      line-height: 1.7;
+    }
+
+    .memory-layout {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 24px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .phone {
+      width: min(390px, 100%);
+      margin: 0 auto;
+      border-radius: 36px;
+      padding: 16px;
+      background: #17202a;
+      box-shadow: var(--shadow);
+    }
+
+    .phone-screen {
+      border-radius: 24px;
+      min-height: 540px;
+      padding: 18px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .chat-row {
+      display: flex;
+      margin-bottom: 12px;
+    }
+
+    .chat-row.user {
+      justify-content: flex-end;
+    }
+
+    .bubble {
+      max-width: 82%;
+      border-radius: 18px;
+      padding: 12px 13px;
+      line-height: 1.55;
+      color: var(--ink-2);
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 16px rgba(22, 28, 36, 0.06);
+      font-size: 14px;
+    }
+
+    .chat-row.user .bubble {
+      color: #fff;
+      background: var(--blue);
+      border-color: transparent;
+    }
+
+    .memory-cards {
+      display: grid;
+      gap: 12px;
+    }
+
+    .memory-card {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: start;
+      border-radius: 18px;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 20px rgba(22, 28, 36, 0.06);
+    }
+
+    .memory-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      color: #fff;
+      font-weight: 900;
+      background: var(--orange);
+    }
+
+    .memory-card:nth-child(2) .memory-icon {
+      background: var(--green);
+    }
+
+    .memory-card:nth-child(3) .memory-icon {
+      background: var(--violet);
+    }
+
+    .memory-card h3 {
+      margin-bottom: 5px;
+      font-size: 17px;
+    }
+
+    .memory-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .quiz-layout {
+      display: grid;
+      grid-template-columns: 0.92fr 1.08fr;
+      gap: 24px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .quiz-card {
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 26px;
+      box-shadow: var(--small-shadow);
+    }
+
+    .quiz-card h3 {
+      font-size: clamp(26px, 3vw, 44px);
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+
+    .option-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .option {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 15px 16px;
+      background: #f8fafc;
+      text-align: left;
+      color: var(--ink);
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .option:hover {
+      transform: translateX(4px);
+      border-color: rgba(37, 99, 235, 0.45);
+      background: #eff6ff;
+    }
+
+    .option.correct {
+      border-color: rgba(16, 185, 129, 0.55);
+      background: #dcfce7;
+      color: #065f46;
+    }
+
+    .option.wrong {
+      border-color: rgba(239, 68, 68, 0.48);
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .feedback {
+      min-height: 220px;
+      border-radius: 24px;
+      padding: 24px;
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent),
+        var(--ink);
+      box-shadow: var(--shadow);
+    }
+
+    .feedback h3 {
+      margin-bottom: 12px;
+      font-size: clamp(28px, 3vw, 44px);
+    }
+
+    .feedback p {
+      color: rgba(255, 255, 255, 0.78);
+      line-height: 1.8;
+      font-size: 17px;
+    }
+
+    .wrapup-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .record-card {
+      border-radius: 24px;
+      padding: 28px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: var(--small-shadow);
+    }
+
+    .record-card h3 {
+      margin-bottom: 16px;
+      font-size: 30px;
+    }
+
+    .record-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .record-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-radius: 14px;
+      padding: 13px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .record-item strong {
+      color: var(--ink);
+    }
+
+    .recommend-card {
+      min-height: 420px;
+      border-radius: 24px;
+      padding: 28px;
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent),
+        #17202a;
+      box-shadow: var(--shadow);
+    }
+
+    .recommend-card h3 {
+      margin-bottom: 14px;
+      font-size: clamp(34px, 4vw, 58px);
+      line-height: 1.04;
+    }
+
+    .recommend-card p {
+      color: rgba(255, 255, 255, 0.78);
+      line-height: 1.75;
+      font-size: 18px;
+    }
+
+    .bottom-nav {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .nav-button {
+      width: 46px;
+      height: 46px;
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.84);
+      color: var(--ink);
+      font-size: 22px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(22, 28, 36, 0.08);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .timeline-button {
+      position: relative;
+      height: 46px;
+      border: 1px solid rgba(23, 32, 42, 0.10);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.70);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .timeline-button::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: rgba(37, 99, 235, 0.13);
+      transition: width 220ms ease;
+    }
+
+    .timeline-button.done::before,
+    .timeline-button.active::before {
+      width: 100%;
+    }
+
+    .timeline-button.active {
+      border-color: rgba(37, 99, 235, 0.42);
+      color: #1d4ed8;
+      background: #fff;
+    }
+
+    .timeline-button span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .slide-count {
+      min-width: 82px;
+      text-align: right;
+      color: var(--muted);
+      font-weight: 900;
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .app-shell {
+        min-height: 100vh;
+        height: auto;
+      }
+
+      .player {
+        width: calc(100vw - 28px);
+        aspect-ratio: auto;
+        max-height: none;
+        min-height: 760px;
+      }
+
+      .slide,
+      .slide.active {
+        position: relative;
+        min-height: 760px;
+      }
+
+      .slide-grid,
+      .slide-grid.wide-left,
+      .slide-grid.wide-right,
+      .lab,
+      .step-board,
+      .memory-layout,
+      .quiz-layout,
+      .wrapup-layout {
+        grid-template-columns: 1fr;
+        align-content: start;
+      }
+
+      .media-stack {
+        min-height: 440px;
+      }
+
+      .timeline {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .bottom-nav {
+        grid-template-columns: auto 1fr auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-shell {
+        padding: 10px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .player {
+        width: calc(100vw - 20px);
+        border-radius: 14px;
+      }
+
+      .slide {
+        padding: 20px;
+      }
+
+      .hero-title,
+      .slide-title {
+        font-size: 36px;
+      }
+
+      .answer-path {
+        grid-template-columns: 1fr;
+      }
+
+      .lab-panel,
+      .task-card,
+      .quiz-card,
+      .record-card,
+      .recommend-card {
+        border-radius: 16px;
+      }
+
+      .timeline {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">Z</div>
+        <div class="brand-text">
+          <h1 class="brand-title">Zerror 学生端互动学习卡</h1>
+          <p class="brand-subtitle">不是老师课件，是把学生自己的错题变成可操作的短时复习作品</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="pill"><span class="dot"></span>AI 已生成</span>
+        <span class="pill">错题档案：圆柱体积</span>
+        <span class="pill">预计 3 分钟</span>
+      </div>
+    </header>
+
+    <section class="player-wrap">
+      <div class="player" aria-live="polite">
+        <article class="slide active" data-name="封面">
+          <div class="slide-grid">
+            <div>
+              <div class="scene-label"><span>01</span>错题变成学习卡</div>
+              <h1 class="hero-title">每一道错题，都能变成 <mark>会动的复习卡</mark></h1>
+              <p class="lead">学生上传题目后，AI 助教不只给一段解析，而是生成一个能点开、能演示、能追问、能检测的 HTML 学习卡。</p>
+              <div class="hero-actions">
+                <button class="button blue" data-next>开始体验</button>
+                <button class="button light" data-jump="4">直接看检测</button>
+              </div>
+            </div>
+            <div class="media-stack">
+              <div class="paper-card back"></div>
+              <div class="paper-card">
+                <div class="question-line"></div>
+                <div class="question-line"></div>
+                <div class="question-line"></div>
+                <div class="answer-path">
+                  <div class="answer-node"><strong>拆题</strong><span>直径、高、求容积</span></div>
+                  <div class="answer-node"><strong>演示</strong><span>圆柱切开成近似长方体</span></div>
+                  <div class="answer-node"><strong>检测</strong><span>立刻做一道变式题</span></div>
+                </div>
+              </div>
+              <div class="floating-formula">
+                <small>本题核心模型</small>
+                <strong>V = πr²h</strong>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="拆题">
+          <div class="slide-grid wide-left">
+            <div>
+              <div class="scene-label"><span>02</span>AI 先帮学生抓重点</div>
+              <h2 class="slide-title">不急着看答案，先看这题 <mark>到底考什么</mark></h2>
+              <div class="task-card">
+                <div class="task-meta">
+                  <span class="mini-pill blue">六年级数学</span>
+                  <span class="mini-pill green">圆柱体积</span>
+                  <span class="mini-pill orange">高频错因：直径当半径</span>
+                </div>
+                <p class="question-big">一个圆柱形水杯，底面直径是 8cm，高是 10cm。这个水杯最多能装多少毫升水？</p>
+              </div>
+            </div>
+            <div>
+              <div class="extract-board">
+                <div class="extract-row">
+                  <span class="extract-label">已知</span>
+                  <span class="extract-value">底面直径 <b>8cm</b></span>
+                </div>
+                <div class="extract-row">
+                  <span class="extract-label">换算</span>
+                  <span class="extract-value">半径 r = <b>4cm</b></span>
+                </div>
+                <div class="extract-row">
+                  <span class="extract-label">已知</span>
+                  <span class="extract-value">高度 h = <b>10cm</b></span>
+                </div>
+                <div class="extract-row">
+                  <span class="extract-label">目标</span>
+                  <span class="extract-value">求容积，也就是体积</span>
+                </div>
+              </div>
+              <div class="mistake-alert">你的错题档案里已经出现过 2 次“直径和半径混用”，所以这一步会被重点提醒。</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="知识图">
+          <div class="slide-grid">
+            <div>
+              <div class="scene-label"><span>03</span>主动关联知识点</div>
+              <h2 class="slide-title">把这题放回 <mark>空间体积模型</mark> 里</h2>
+              <p class="lead">中学生自己用的时候，最有价值的不是“再讲一遍”，而是 AI 自动告诉他：这道题和哪些知识点连在一起。</p>
+            </div>
+            <div class="concept-map">
+              <svg class="map-lines" viewBox="0 0 600 420" preserveAspectRatio="none">
+                <path d="M300 210 C220 140 160 88 104 78"></path>
+                <path d="M300 210 C390 140 456 94 514 94"></path>
+                <path d="M300 210 C218 278 162 326 126 346"></path>
+                <path d="M300 210 C386 278 456 332 512 352"></path>
+              </svg>
+              <div class="map-node main">圆柱体积<small>V = Sh</small></div>
+              <div class="map-node n1">圆面积<small>πr²</small></div>
+              <div class="map-node n2">单位换算<small>cm³ = mL</small></div>
+              <div class="map-node n3">长方体体积<small>底面积 × 高</small></div>
+              <div class="map-node n4">圆锥体积<small>1/3Sh</small></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="演示">
+          <div class="lab">
+            <div class="lab-stage" id="labStage">
+              <div class="formula-badge">
+                <small>实时计算</small>
+                <strong id="formulaBadge">502.4cm³</strong>
+              </div>
+              <div class="cylinder-demo">
+                <svg class="cylinder-svg" viewBox="0 0 560 470" aria-label="圆柱体积演示">
+                  <defs>
+                    <linearGradient id="cylBody" x1="0" x2="1" y1="0" y2="1">
+                      <stop offset="0" stop-color="#dbeafe"></stop>
+                      <stop offset="0.55" stop-color="#bfdbfe"></stop>
+                      <stop offset="1" stop-color="#bbf7d0"></stop>
+                    </linearGradient>
+                    <linearGradient id="cylTop" x1="0" x2="1">
+                      <stop offset="0" stop-color="#ffffff"></stop>
+                      <stop offset="1" stop-color="#dbeafe"></stop>
+                    </linearGradient>
+                  </defs>
+                  <path d="M118 114 C118 75 190 43 280 43 C370 43 442 75 442 114 L442 308 C442 348 370 380 280 380 C190 380 118 348 118 308 Z" fill="url(#cylBody)" stroke="#2563eb" stroke-width="8"></path>
+                  <ellipse cx="280" cy="114" rx="162" ry="71" fill="url(#cylTop)" stroke="#2563eb" stroke-width="8"></ellipse>
+                  <ellipse cx="280" cy="308" rx="162" ry="71" fill="rgba(16,185,129,0.16)" stroke="#10b981" stroke-width="8"></ellipse>
+                  <line x1="280" y1="114" x2="280" y2="308" stroke="#f97316" stroke-width="8" stroke-dasharray="14 12"></line>
+                  <text x="298" y="220" fill="#c2410c" font-size="38" font-weight="900">h</text>
+                  <line x1="280" y1="114" x2="440" y2="114" stroke="#17202a" stroke-width="6"></line>
+                  <text x="344" y="92" fill="#17202a" font-size="34" font-weight="900">r</text>
+                  <g class="slice">
+                    <path d="M396 128 C430 150 458 180 470 226 L470 344 C450 378 414 396 374 404 L374 168 C380 152 386 139 396 128 Z" fill="#ffedd5" stroke="#f97316" stroke-width="7"></path>
+                    <text x="398" y="286" fill="#c2410c" font-size="28" font-weight="900">切片</text>
+                  </g>
+                </svg>
+              </div>
+            </div>
+            <div class="lab-panel">
+              <div class="scene-label"><span>04</span>公式可视化</div>
+              <h3>拖一下，公式会跟着变</h3>
+              <div class="slider-box">
+                <label><span>半径 r</span><b><span id="radiusValue">4</span>cm</b></label>
+                <input id="radiusRange" type="range" min="1" max="8" value="4">
+              </div>
+              <div class="slider-box">
+                <label><span>高度 h</span><b><span id="heightValue">10</span>cm</b></label>
+                <input id="heightRange" type="range" min="2" max="16" value="10">
+              </div>
+              <button class="button orange" id="cutButton">切开成近似长方体</button>
+              <div class="result-box">
+                计算式
+                <strong id="formulaText">3.14 × 4² × 10</strong>
+              </div>
+              <p style="color: var(--muted); line-height: 1.65; margin: 0;">这类组件可以固定写好，AI 只负责给参数和讲解内容，生成质量会稳定很多。</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="步骤">
+          <div class="step-board">
+            <div>
+              <div class="scene-label"><span>05</span>按步骤自己点开</div>
+              <h2 class="slide-title">解析不再是一大段，变成 <mark>可操作流程</mark></h2>
+              <p class="lead">每一步都能记录学习行为。学生在哪一步停住，下一次 AI 助教就知道该从哪里讲。</p>
+            </div>
+            <div class="chalkboard">
+              <h3>黑板推导</h3>
+              <div class="chalk-line">r = 8 ÷ 2 = <span class="yellow">4cm</span></div>
+              <div class="chalk-line">S = 3.14 × 4² = <span class="yellow">50.24cm²</span></div>
+              <div class="chalk-line">V = 50.24 × 10 = <span class="green">502.4mL</span></div>
+              <div class="chalk-note">点开下方步骤后，这些过程会写回学习记录，而不是只生成一次性页面。</div>
+            </div>
+          </div>
+          <div class="step-stack" style="position:absolute; left:46px; right:46px; bottom:32px; grid-template-columns:repeat(3,1fr);">
+            <div class="step-card" data-index="1">
+              <h3>直径转半径</h3>
+              <p>圆面积公式用半径，所以 8cm 必须先除以 2。</p>
+            </div>
+            <div class="step-card" data-index="2">
+              <h3>求底面积</h3>
+              <p>底面积 S = πr² = 3.14 × 4² = 50.24cm²。</p>
+            </div>
+            <div class="step-card" data-index="3">
+              <h3>乘高度</h3>
+              <p>体积 V = S × h = 502.4cm³，也就是 502.4mL。</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="助教">
+          <div class="memory-layout">
+            <div>
+              <div class="scene-label"><span>06</span>AI 助教不是孤立聊天</div>
+              <h2 class="slide-title">它知道你 <mark>刚刚看过什么</mark>，也知道你以前错过什么</h2>
+              <div class="memory-cards">
+                <div class="memory-card">
+                  <div class="memory-icon">错</div>
+                  <div><h3>历史错因</h3><p>直径、半径混用已经出现过 2 次，本次自动加强提醒。</p></div>
+                </div>
+                <div class="memory-card">
+                  <div class="memory-icon">链</div>
+                  <div><h3>知识关联</h3><p>自动关联圆面积、长方体体积、圆锥体积和单位换算。</p></div>
+                </div>
+                <div class="memory-card">
+                  <div class="memory-icon">练</div>
+                  <div><h3>复习闭环</h3><p>看完讲解后自动给一题变式，结果继续写回错题档案。</p></div>
+                </div>
+              </div>
+            </div>
+            <div class="phone">
+              <div class="phone-screen">
+                <div class="chat-row user"><div class="bubble">为什么不能直接用直径 8 去算？</div></div>
+                <div class="chat-row"><div class="bubble">因为圆面积公式里的 r 是半径，不是直径。直径 8cm 对应半径 4cm。</div></div>
+                <div class="chat-row"><div class="bubble">如果你把 8 当半径，底面积会变成 3.14 × 8²，是正确答案的 4 倍。</div></div>
+                <div class="chat-row user"><div class="bubble">那以后怎么避免？</div></div>
+                <div class="chat-row"><div class="bubble">看到“直径”先写 d，再写 r = d ÷ 2。你的错题档案里这类错误比较多，我会优先提醒。</div></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="检测">
+          <div class="quiz-layout">
+            <div class="quiz-card">
+              <div class="scene-label"><span>07</span>即时检测</div>
+              <h3>半径 3cm，高 12cm 的圆柱，体积是多少？</h3>
+              <div class="option-list">
+                <button class="option" data-correct="false">A. 113.04cm³</button>
+                <button class="option" data-correct="true">B. 339.12cm³</button>
+                <button class="option" data-correct="false">C. 36cm³</button>
+                <button class="option" data-correct="false">D. 678.24cm³</button>
+              </div>
+            </div>
+            <div class="feedback" id="feedback">
+              <h3>点一个答案</h3>
+              <p>系统会马上判断，并把这次结果记录到错题档案。答错时，可以直接跳回“公式可视化”或“逐步解题”。</p>
+              <button class="button light" data-jump="3">回到公式演示</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="slide" data-name="收束">
+          <div class="wrapup-layout">
+            <div class="record-card">
+              <div class="scene-label"><span>08</span>保存为学习记录</div>
+              <h3>这次不是看完就结束</h3>
+              <div class="record-list">
+                <div class="record-item"><span>已看页面</span><strong>拆题 / 演示 / 步骤 / 检测</strong></div>
+                <div class="record-item"><span>修正错因</span><strong>直径转半径</strong></div>
+                <div class="record-item"><span>掌握度</span><strong id="masteryValue">待检测</strong></div>
+                <div class="record-item"><span>下次推荐</span><strong>圆锥体积对比</strong></div>
+              </div>
+            </div>
+            <div class="recommend-card">
+              <h3>学生端真正的价值</h3>
+              <p>飞象像是在生成老师上课用的课件。Zerror 可以生成学生自己的错题复习卡：短、准、能追问、能检测，还能把行为写回档案。</p>
+              <div class="hero-actions">
+                <button class="button green">保存到错题档案</button>
+                <button class="button light" data-jump="0">再看一遍</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="bottom-nav">
+      <button class="nav-button" id="prevButton" aria-label="上一页">‹</button>
+      <div class="timeline" id="timeline"></div>
+      <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
+        <button class="nav-button" id="nextButton" aria-label="下一页">›</button>
+        <div class="slide-count" id="slideCount">01 / 08</div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const timeline = document.getElementById("timeline");
+    const slideCount = document.getElementById("slideCount");
+    const prevButton = document.getElementById("prevButton");
+    const nextButton = document.getElementById("nextButton");
+    const radiusRange = document.getElementById("radiusRange");
+    const heightRange = document.getElementById("heightRange");
+    const radiusValue = document.getElementById("radiusValue");
+    const heightValue = document.getElementById("heightValue");
+    const formulaBadge = document.getElementById("formulaBadge");
+    const formulaText = document.getElementById("formulaText");
+    const labStage = document.getElementById("labStage");
+    const feedback = document.getElementById("feedback");
+    const masteryValue = document.getElementById("masteryValue");
+    let current = 0;
+    let quizState = "待检测";
+
+    slides.forEach((slide, index) => {
+      const button = document.createElement("button");
+      button.className = "timeline-button";
+      button.innerHTML = `<span>${String(index + 1).padStart(2, "0")} ${slide.dataset.name}</span>`;
+      button.addEventListener("click", () => showSlide(index));
+      timeline.appendChild(button);
+    });
+
+    const timelineButtons = Array.from(document.querySelectorAll(".timeline-button"));
+
+    function showSlide(index) {
+      current = Math.max(0, Math.min(index, slides.length - 1));
+      slides.forEach((slide, slideIndex) => {
+        slide.classList.toggle("active", slideIndex === current);
+      });
+      timelineButtons.forEach((button, buttonIndex) => {
+        button.classList.toggle("active", buttonIndex === current);
+        button.classList.toggle("done", buttonIndex < current);
+      });
+      slideCount.textContent = `${String(current + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
+      prevButton.disabled = current === 0;
+      nextButton.disabled = current === slides.length - 1;
+    }
+
+    function updateFormula() {
+      const r = Number(radiusRange.value);
+      const h = Number(heightRange.value);
+      const volume = 3.14 * r * r * h;
+      radiusValue.textContent = r;
+      heightValue.textContent = h;
+      formulaText.textContent = `3.14 × ${r}² × ${h}`;
+      formulaBadge.textContent = `${volume.toFixed(2).replace(/\.00$/, "")}cm³`;
+    }
+
+    document.querySelectorAll("[data-next]").forEach((button) => {
+      button.addEventListener("click", () => showSlide(current + 1));
+    });
+
+    document.querySelectorAll("[data-jump]").forEach((button) => {
+      button.addEventListener("click", () => showSlide(Number(button.dataset.jump)));
+    });
+
+    prevButton.addEventListener("click", () => showSlide(current - 1));
+    nextButton.addEventListener("click", () => showSlide(current + 1));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") showSlide(current + 1);
+      if (event.key === "ArrowLeft") showSlide(current - 1);
+    });
+
+    document.getElementById("cutButton").addEventListener("click", () => {
+      labStage.classList.toggle("cut-mode");
+    });
+
+    document.querySelectorAll(".step-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        card.classList.toggle("open");
+      });
+    });
+
+    document.querySelectorAll(".option").forEach((option) => {
+      option.addEventListener("click", () => {
+        const correct = option.dataset.correct === "true";
+        document.querySelectorAll(".option").forEach((item) => {
+          item.classList.remove("correct", "wrong");
+          if (item.dataset.correct === "true") item.classList.add("correct");
+        });
+        if (!correct) option.classList.add("wrong");
+        quizState = correct ? "已掌握" : "需复习";
+        masteryValue.textContent = quizState;
+        feedback.innerHTML = correct
+          ? `<h3>答对了</h3><p>计算过程：3.14 × 3² × 12 = 3.14 × 9 × 12 = 339.12cm³。这说明你已经抓住了半径平方和乘高这两个关键点。</p><button class="button green" data-jump="7">保存记录</button>`
+          : `<h3>还差一步</h3><p>正确答案是 B。这里半径已经给出 3cm，不需要再除以 2，但一定要平方：3² = 9。</p><button class="button light" data-jump="3">回到公式演示</button>`;
+        feedback.querySelector("[data-jump]").addEventListener("click", (event) => {
+          showSlide(Number(event.currentTarget.dataset.jump));
+        });
+      });
+    });
+
+    radiusRange.addEventListener("input", updateFormula);
+    heightRange.addEventListener("input", updateFormula);
+    updateFormula();
+    showSlide(0);
+  </script>
+</body>
+</html>

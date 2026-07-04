@@ -1,0 +1,1162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zerror 错题互动卡样例</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-soft: #eef6ff;
+      --ink: #19212a;
+      --muted: #66717f;
+      --line: #d9e2ec;
+      --blue: #3478f6;
+      --blue-soft: #dfeaff;
+      --coral: #f06a4d;
+      --coral-soft: #ffe7df;
+      --mint: #20a779;
+      --mint-soft: #ddf7ee;
+      --amber: #f2b544;
+      --amber-soft: #fff1cf;
+      --violet: #7b61ff;
+      --shadow: 0 16px 44px rgba(25, 33, 42, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", Arial, sans-serif;
+      background:
+        linear-gradient(180deg, #f9fbff 0%, var(--bg) 52%, #f2f7f3 100%);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 36px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 28px);
+      line-height: 1.15;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .chip.blue {
+      border-color: #b9cdfb;
+      background: var(--blue-soft);
+      color: #184fa8;
+    }
+
+    .chip.mint {
+      border-color: #b9e8d8;
+      background: var(--mint-soft);
+      color: #116b52;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .rail,
+    .stage,
+    .assistant {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    .rail {
+      position: sticky;
+      top: 18px;
+      padding: 14px;
+    }
+
+    .rail-title {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      padding: 9px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .nav-btn:hover {
+      background: #f2f6fb;
+    }
+
+    .nav-btn.active {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .nav-index {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: #edf2f7;
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .nav-btn.active .nav-index {
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .nav-meta {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .nav-meta strong {
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .nav-meta span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .nav-btn.active .nav-meta span {
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .rail-footer {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f7fafc;
+      border: 1px solid var(--line);
+    }
+
+    .rail-footer strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .rail-footer p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .stage {
+      overflow: hidden;
+    }
+
+    .progress {
+      height: 6px;
+      background: #e7edf4;
+    }
+
+    .progress-bar {
+      width: 16.6%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--blue), var(--mint));
+      transition: width 240ms ease;
+    }
+
+    .screen {
+      display: none;
+      min-height: 620px;
+      padding: clamp(18px, 3vw, 34px);
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .screen-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    .screen-kicker {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .screen h2 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 38px);
+      line-height: 1.12;
+    }
+
+    .screen-desc {
+      margin: 10px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .score-card {
+      min-width: 160px;
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--mint-soft);
+      border: 1px solid #bce9da;
+    }
+
+    .score-card span {
+      color: #127058;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .score-card strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 24px;
+    }
+
+    .question-card {
+      border: 1px solid #ccd8e7;
+      border-radius: 8px;
+      background: #fff;
+      padding: clamp(16px, 2.5vw, 24px);
+    }
+
+    .question-card .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .question-text {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 30px);
+      line-height: 1.55;
+      font-weight: 800;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.88fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 18px;
+    }
+
+    .panel.tint-blue {
+      background: var(--surface-soft);
+      border-color: #bfd7f8;
+    }
+
+    .panel.tint-coral {
+      background: var(--coral-soft);
+      border-color: #ffc7b8;
+    }
+
+    .panel.tint-amber {
+      background: var(--amber-soft);
+      border-color: #f6d991;
+    }
+
+    .panel.tint-mint {
+      background: var(--mint-soft);
+      border-color: #bce9da;
+    }
+
+    .panel h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .panel p,
+    .panel li {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .panel ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .formula-box {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .formula-line {
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 13px 14px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .formula-line mark {
+      background: var(--amber-soft);
+      color: #7a5100;
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+
+    .demo-board {
+      min-height: 360px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 14px;
+    }
+
+    .cylinder-wrap {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 260px;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(52, 120, 246, 0.08), rgba(32, 167, 121, 0.09));
+      border: 1px solid #d4e3f2;
+      overflow: hidden;
+    }
+
+    .cylinder {
+      width: min(280px, 80%);
+      transition: transform 300ms ease;
+    }
+
+    .slice-mode .cylinder {
+      transform: translateX(-28px) rotate(-4deg);
+    }
+
+    .slice-piece {
+      position: absolute;
+      width: 72px;
+      height: 128px;
+      border-radius: 8px;
+      border: 2px solid rgba(240, 106, 77, 0.85);
+      background: rgba(240, 106, 77, 0.16);
+      right: 20%;
+      top: 88px;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: all 300ms ease;
+    }
+
+    .slice-mode .slice-piece {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .range-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .range-card label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .step-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      cursor: pointer;
+    }
+
+    .step-card.done {
+      border-color: #afe1d0;
+      background: #f4fcf8;
+    }
+
+    .step-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .step-top strong {
+      font-size: 16px;
+    }
+
+    .step-answer {
+      display: none;
+      margin: 12px 0 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f7fafc;
+      color: var(--ink);
+      line-height: 1.7;
+    }
+
+    .step-card.open .step-answer {
+      display: block;
+    }
+
+    .mistake-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .mistake {
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+    }
+
+    .mistake strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .mistake p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .quiz-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .option {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .option:hover {
+      border-color: var(--blue);
+      background: #f7fbff;
+    }
+
+    .option.correct {
+      border-color: #8bd6bd;
+      background: var(--mint-soft);
+    }
+
+    .option.wrong {
+      border-color: #ffb7a6;
+      background: var(--coral-soft);
+    }
+
+    .feedback {
+      display: none;
+      margin-top: 14px;
+      border-radius: 8px;
+      padding: 14px;
+      background: #f7fafc;
+      border: 1px solid var(--line);
+      line-height: 1.7;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-top: 22px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .btn.blue {
+      background: var(--blue);
+    }
+
+    .btn.coral {
+      background: var(--coral);
+    }
+
+    .assistant {
+      margin-top: 18px;
+      padding: 12px;
+    }
+
+    .assistant-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .assistant-head strong {
+      font-size: 15px;
+    }
+
+    .assistant-head span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .assistant-input {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      max-width: 720px;
+    }
+
+    .assistant-input input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 12px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .assistant-reply {
+      display: none;
+      max-width: 720px;
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .assistant-reply.show {
+      display: block;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .summary-item {
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 16px;
+    }
+
+    .summary-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .summary-item strong {
+      font-size: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .layout,
+      .split,
+      .mistake-grid,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        position: static;
+      }
+
+      .nav-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .screen {
+        min-height: auto;
+      }
+
+      .control-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .app {
+        width: min(100vw - 18px, 1180px);
+        padding-top: 12px;
+      }
+
+      .topbar,
+      .screen-head,
+      .actions {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .status-strip {
+        justify-content: flex-start;
+      }
+
+      .nav-list {
+        grid-template-columns: 1fr;
+      }
+
+      .assistant-input {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">Z</div>
+        <div>
+          <h1>错题互动卡</h1>
+          <p>把一道错题变成可以点、可以练、可以追问的复习卡</p>
+        </div>
+      </div>
+      <div class="status-strip">
+        <span class="chip blue">薄弱点：圆柱体积</span>
+        <span class="chip mint">来自错题档案：第 10 题</span>
+        <span class="chip">预计 3 分钟</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="rail" aria-label="学习卡导航">
+        <p class="rail-title">学习路径</p>
+        <nav class="nav-list">
+          <button class="nav-btn active" data-target="0">
+            <span class="nav-index">1</span>
+            <span class="nav-meta"><strong>题目拆解</strong><span>先看考点</span></span>
+          </button>
+          <button class="nav-btn" data-target="1">
+            <span class="nav-index">2</span>
+            <span class="nav-meta"><strong>公式可视化</strong><span>底面积乘高</span></span>
+          </button>
+          <button class="nav-btn" data-target="2">
+            <span class="nav-index">3</span>
+            <span class="nav-meta"><strong>逐步解题</strong><span>点开每一步</span></span>
+          </button>
+          <button class="nav-btn" data-target="3">
+            <span class="nav-index">4</span>
+            <span class="nav-meta"><strong>易错提醒</strong><span>结合档案</span></span>
+          </button>
+          <button class="nav-btn" data-target="4">
+            <span class="nav-index">5</span>
+            <span class="nav-meta"><strong>即时检测</strong><span>做一道变式</span></span>
+          </button>
+          <button class="nav-btn" data-target="5">
+            <span class="nav-index">6</span>
+            <span class="nav-meta"><strong>复习收束</strong><span>保存记录</span></span>
+          </button>
+        </nav>
+        <div class="rail-footer">
+          <strong>学生端定位</strong>
+          <p>不是老师讲课用的一整套课件，而是学生围绕某一道错题的短时自学流程。</p>
+        </div>
+      </aside>
+
+      <section>
+        <div class="stage">
+          <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+          <article class="screen active">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 01</p>
+                <h2>先把题目拆开</h2>
+                <p class="screen-desc">AI 助教先判断这道题真正考什么，再把无关文字压下去，让学生直接抓住“直径、半径、底面积、高、体积”的关系。</p>
+              </div>
+              <div class="score-card">
+                <span>掌握度预测</span>
+                <strong id="mastery">62%</strong>
+              </div>
+            </div>
+
+            <div class="question-card">
+              <div class="tag-row">
+                <span class="chip blue">六年级数学</span>
+                <span class="chip mint">圆柱体积</span>
+                <span class="chip">常错原因：直径当半径</span>
+              </div>
+              <p class="question-text">一个圆柱形水杯，底面直径是 8cm，高是 10cm。这个水杯最多能装多少毫升水？</p>
+            </div>
+
+            <div class="split" style="margin-top:18px">
+              <div class="panel tint-blue">
+                <h3>题目给了什么</h3>
+                <ul>
+                  <li>底面直径：8cm</li>
+                  <li>圆柱高度：10cm</li>
+                  <li>要求：容积，也就是圆柱体积</li>
+                </ul>
+              </div>
+              <div class="panel tint-coral">
+                <h3>这题最容易错在哪</h3>
+                <p>不能把 8cm 直接当成半径。半径是直径的一半，所以这里半径是 4cm。</p>
+              </div>
+            </div>
+
+            <div class="actions">
+              <span class="chip">生成来源：错题档案 + AI 助教</span>
+              <button class="btn blue" data-next>看公式动画</button>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 02</p>
+                <h2>把公式变成能看的东西</h2>
+                <p class="screen-desc">这里可以由固定组件渲染，不需要 AI 每次乱写复杂代码。AI 只告诉系统：这题需要一个圆柱体积组件。</p>
+              </div>
+            </div>
+
+            <div class="split">
+              <div class="demo-board panel">
+                <div class="cylinder-wrap" id="cylinderWrap">
+                  <svg class="cylinder" viewBox="0 0 260 260" aria-label="圆柱示意图">
+                    <defs>
+                      <linearGradient id="bodyFill" x1="0" x2="1" y1="0" y2="1">
+                        <stop stop-color="#dfeaff" offset="0"></stop>
+                        <stop stop-color="#bfeedd" offset="1"></stop>
+                      </linearGradient>
+                    </defs>
+                    <ellipse cx="130" cy="50" rx="78" ry="28" fill="#ffffff" stroke="#3478f6" stroke-width="4"></ellipse>
+                    <path d="M52 50v138c0 15 35 28 78 28s78-13 78-28V50" fill="url(#bodyFill)" stroke="#3478f6" stroke-width="4"></path>
+                    <ellipse cx="130" cy="188" rx="78" ry="28" fill="rgba(32,167,121,0.18)" stroke="#20a779" stroke-width="4"></ellipse>
+                    <line x1="130" y1="50" x2="130" y2="188" stroke="#f06a4d" stroke-width="4" stroke-dasharray="8 8"></line>
+                    <text x="140" y="124" fill="#b8462d" font-size="18" font-weight="800">h</text>
+                    <line x1="130" y1="50" x2="205" y2="50" stroke="#19212a" stroke-width="3"></line>
+                    <text x="162" y="42" fill="#19212a" font-size="17" font-weight="800">r</text>
+                  </svg>
+                  <div class="slice-piece"></div>
+                </div>
+                <div class="control-row">
+                  <div class="range-card">
+                    <label><span>半径 r</span><strong><span id="radiusValue">4</span>cm</strong></label>
+                    <input id="radiusRange" type="range" min="1" max="8" value="4">
+                  </div>
+                  <div class="range-card">
+                    <label><span>高度 h</span><strong><span id="heightValue">10</span>cm</strong></label>
+                    <input id="heightRange" type="range" min="2" max="16" value="10">
+                  </div>
+                  <button class="btn coral" id="sliceBtn">切开看看</button>
+                </div>
+              </div>
+
+              <div class="panel tint-mint">
+                <h3>圆柱体积公式</h3>
+                <div class="formula-box">
+                  <div class="formula-line">V = <mark>底面积</mark> × 高</div>
+                  <div class="formula-line">V = π × r² × h</div>
+                  <div class="formula-line" id="liveFormula">3.14 × 4² × 10 = 502.4cm³</div>
+                </div>
+                <p>这个组件可以复用到所有“圆柱体积”错题里，AI 只需要提供半径、高度和讲解文字。</p>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn secondary" data-prev>返回题目</button>
+              <button class="btn blue" data-next>进入步骤</button>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 03</p>
+                <h2>解题步骤一层层展开</h2>
+                <p class="screen-desc">学生不用一次看完一大段解析，而是按自己的节奏打开每一步。每打开一步，系统可以记录他在哪里停留最久。</p>
+              </div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-card">
+                <div class="step-top">
+                  <strong>第 1 步：直径转半径</strong>
+                  <span class="chip">基础转换</span>
+                </div>
+                <div class="step-answer">r = 8 ÷ 2 = 4cm。这里是本题最常见错误点，不能把直径 8cm 直接代入 r。</div>
+              </div>
+              <div class="step-card">
+                <div class="step-top">
+                  <strong>第 2 步：求底面积</strong>
+                  <span class="chip blue">公式应用</span>
+                </div>
+                <div class="step-answer">S = πr² = 3.14 × 4² = 3.14 × 16 = 50.24cm²。</div>
+              </div>
+              <div class="step-card">
+                <div class="step-top">
+                  <strong>第 3 步：求体积</strong>
+                  <span class="chip mint">最终计算</span>
+                </div>
+                <div class="step-answer">V = S × h = 50.24 × 10 = 502.4cm³。因为 1cm³ = 1mL，所以最多能装 502.4mL 水。</div>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn secondary" data-prev>返回公式</button>
+              <button class="btn blue" data-next>看易错点</button>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 04</p>
+                <h2>根据错题档案主动提醒</h2>
+                <p class="screen-desc">这部分就是你的项目优势。普通课件不会知道学生哪里薄弱，但 Zerror 可以从错题档案里把提醒变得更个人化。</p>
+              </div>
+            </div>
+
+            <div class="mistake-grid">
+              <div class="mistake">
+                <strong>错误 1：直径当半径</strong>
+                <p>看到“直径 8cm”就直接代入 r=8，答案会放大 4 倍。</p>
+              </div>
+              <div class="mistake">
+                <strong>错误 2：忘记平方</strong>
+                <p>底面积是 πr²，不是 πr。半径需要先平方。</p>
+              </div>
+              <div class="mistake">
+                <strong>错误 3：单位没换</strong>
+                <p>cm³ 和 mL 在这里数值相同，但要在答句里写清楚。</p>
+              </div>
+            </div>
+
+            <div class="panel tint-amber" style="margin-top:14px">
+              <h3>AI 助教主动关联</h3>
+              <p>你前面错过“圆锥体积”和“长方体体积”各 1 次，说明问题不只在计算，而是在“底面积 × 高”这一类空间体积模型。复习时建议把圆柱、圆锥、长方体放在一起对比。</p>
+            </div>
+
+            <div class="actions">
+              <button class="btn secondary" data-prev>返回步骤</button>
+              <button class="btn blue" data-next>做一道变式</button>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 05</p>
+                <h2>马上检测是不是真懂</h2>
+                <p class="screen-desc">互动卡不只是展示，还要闭环。学生看完后立刻做一道很像的题，答错就回到对应步骤。</p>
+              </div>
+            </div>
+
+            <div class="question-card">
+              <p class="question-text">一个圆柱底面半径是 3cm，高是 12cm，它的体积是多少？</p>
+              <div class="quiz-options">
+                <button class="option" data-correct="false">A. 113.04cm³</button>
+                <button class="option" data-correct="true">B. 339.12cm³</button>
+                <button class="option" data-correct="false">C. 36cm³</button>
+                <button class="option" data-correct="false">D. 678.24cm³</button>
+              </div>
+              <div class="feedback" id="quizFeedback"></div>
+            </div>
+
+            <div class="actions">
+              <button class="btn secondary" data-prev>返回提醒</button>
+              <button class="btn blue" data-next>查看收束</button>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="screen-head">
+              <div>
+                <p class="screen-kicker">STEP 06</p>
+                <h2>生成复习记录</h2>
+                <p class="screen-desc">结束时，系统把这次学习行为写回错题档案。下次 AI 助教回答时，就能知道学生已经看过什么、哪里还没掌握。</p>
+              </div>
+            </div>
+
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span>本题核心</span>
+                <strong>V = πr²h</strong>
+              </div>
+              <div class="summary-item">
+                <span>已修正错误</span>
+                <strong>直径转半径</strong>
+              </div>
+              <div class="summary-item">
+                <span>下一步推荐</span>
+                <strong>圆锥体积</strong>
+              </div>
+            </div>
+
+            <div class="panel tint-blue" style="margin-top:14px">
+              <h3>可以保存到错题档案的数据</h3>
+              <p>看完公式页、打开 3 个步骤、变式题答题结果、追问内容、推荐复习知识点。这些都可以成为 AI 助教的上下文记忆。</p>
+            </div>
+
+            <div class="actions">
+              <button class="btn secondary" data-prev>返回检测</button>
+              <div class="button-row">
+                <button class="btn secondary" id="restartBtn">重新学习</button>
+                <button class="btn blue">保存到错题档案</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <section class="assistant" aria-label="AI 助教追问框">
+          <div class="assistant-head">
+            <strong>AI 助教</strong>
+            <span>会带着当前页面和错题档案一起回答</span>
+          </div>
+          <div class="assistant-input">
+            <input id="askInput" value="为什么不能直接用直径 8 去算？">
+            <button class="btn" id="askBtn">追问</button>
+          </div>
+          <div class="assistant-reply" id="assistantReply">
+            因为圆的面积公式用的是半径 r，不是直径 d。直径 8cm 对应半径 4cm，如果把 8 当半径，底面积会变成 3.14 × 8²，比正确底面积大 4 倍。
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const screens = Array.from(document.querySelectorAll(".screen"));
+    const navButtons = Array.from(document.querySelectorAll(".nav-btn"));
+    const progressBar = document.getElementById("progressBar");
+    const radiusRange = document.getElementById("radiusRange");
+    const heightRange = document.getElementById("heightRange");
+    const radiusValue = document.getElementById("radiusValue");
+    const heightValue = document.getElementById("heightValue");
+    const liveFormula = document.getElementById("liveFormula");
+    const cylinderWrap = document.getElementById("cylinderWrap");
+    let current = 0;
+
+    function showScreen(index) {
+      current = Math.max(0, Math.min(index, screens.length - 1));
+      screens.forEach((screen, i) => screen.classList.toggle("active", i === current));
+      navButtons.forEach((button, i) => button.classList.toggle("active", i === current));
+      progressBar.style.width = `${((current + 1) / screens.length) * 100}%`;
+    }
+
+    function updateFormula() {
+      const r = Number(radiusRange.value);
+      const h = Number(heightRange.value);
+      const result = 3.14 * r * r * h;
+      radiusValue.textContent = r;
+      heightValue.textContent = h;
+      liveFormula.textContent = `3.14 × ${r}² × ${h} = ${result.toFixed(2).replace(/\\.00$/, "")}cm³`;
+    }
+
+    navButtons.forEach((button, index) => {
+      button.addEventListener("click", () => showScreen(index));
+    });
+
+    document.querySelectorAll("[data-next]").forEach((button) => {
+      button.addEventListener("click", () => showScreen(current + 1));
+    });
+
+    document.querySelectorAll("[data-prev]").forEach((button) => {
+      button.addEventListener("click", () => showScreen(current - 1));
+    });
+
+    document.querySelectorAll(".step-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        card.classList.toggle("open");
+        card.classList.add("done");
+        const done = document.querySelectorAll(".step-card.done").length;
+        document.getElementById("mastery").textContent = `${Math.min(96, 62 + done * 9)}%`;
+      });
+    });
+
+    document.querySelectorAll(".option").forEach((option) => {
+      option.addEventListener("click", () => {
+        const isCorrect = option.dataset.correct === "true";
+        document.querySelectorAll(".option").forEach((item) => {
+          item.classList.remove("correct", "wrong");
+          if (item.dataset.correct === "true") item.classList.add("correct");
+        });
+        if (!isCorrect) option.classList.add("wrong");
+        const feedback = document.getElementById("quizFeedback");
+        feedback.classList.add("show");
+        feedback.textContent = isCorrect
+          ? "答对了。计算过程是 3.14 × 3² × 12 = 3.14 × 9 × 12 = 339.12cm³。"
+          : "这题还是要先抓住 r²。正确答案是 B，3.14 × 3² × 12 = 339.12cm³。";
+      });
+    });
+
+    document.getElementById("sliceBtn").addEventListener("click", () => {
+      cylinderWrap.classList.toggle("slice-mode");
+    });
+
+    document.getElementById("restartBtn").addEventListener("click", () => {
+      showScreen(0);
+      document.querySelectorAll(".step-card").forEach((card) => {
+        card.classList.remove("open", "done");
+      });
+      document.querySelectorAll(".option").forEach((option) => {
+        option.classList.remove("correct", "wrong");
+      });
+      document.getElementById("quizFeedback").classList.remove("show");
+      document.getElementById("mastery").textContent = "62%";
+    });
+
+    document.getElementById("askBtn").addEventListener("click", () => {
+      document.getElementById("assistantReply").classList.add("show");
+    });
+
+    radiusRange.addEventListener("input", updateFormula);
+    heightRange.addEventListener("input", updateFormula);
+    updateFormula();
+  </script>
+</body>
+</html>

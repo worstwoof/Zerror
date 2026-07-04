@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/latex_text.dart';
 import '../../core/theme.dart';
 import '../capture/html_artifact_preview_screen.dart';
 import 'quiz_result_screen.dart';
@@ -209,6 +210,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
           infoTitle: 'A4 打印讲义预览',
           infoNote: '这份讲义由组卷接口生成，包含题目区、作答留白和参考答案。可在支持打印的 WebView 或浏览器中按 A4 版式输出。',
           scrollable: true,
+          exportable: true,
         ),
       ),
     );
@@ -420,7 +422,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Text(
+            AppLatexText(
               question['content'] as String,
               style: const TextStyle(
                 color: AppPalette.textPrimary,
@@ -507,7 +509,7 @@ class _QuizPaperScreenState extends State<QuizPaperScreen> {
                 ),
               ),
               Expanded(
-                child: Text(
+                child: AppLatexText(
                   optionText,
                   style: const TextStyle(
                     color: AppPalette.textPrimary,
