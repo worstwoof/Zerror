@@ -77,6 +77,7 @@ class LectureVideoService:
 - 不要把长文字、公式卡、标题压在图像上；文字解析每条短而具体，不能空泛。
 - 分镜要饱满：每个阶段都要让学生学到一个明确结论、判定方法或易错边界。
 - 数学和物理可以给公式；其他学科公式数组留空。
+- 数学题必须选具体 scene_type：椭圆/双曲线/抛物线/离心率/焦点选 conic；函数/导数/单调/图像选 function_graph；平面几何选 geometry。不要把数学题写成 generic。
 - teaching_stages 必须 8 到 12 条，不能少于 8 条。
 - 每个 teaching_stage 都要包含 visual_action、narration、key_conclusion、checkpoint 四个字段。
 - visual_action 写图像/公式卡如何出现、移动、强调或切换；narration 写底部字幕；key_conclusion 写学生该记住的二级结论；checkpoint 写易错提醒或自检问题。
@@ -89,7 +90,7 @@ class LectureVideoService:
   "title": "视频标题",
   "subject": "学科",
   "topic": "知识点",
-  "scene_type": "generic/mechanics/electromagnetism/optics/wave/board_block",
+  "scene_type": "generic/function_graph/conic/geometry/mechanics/electromagnetism/optics/wave/board_block",
   "summary": "一句话简介",
   "focus_points": ["核心点1", "核心点2", "核心点3"],
   "teaching_stages": [
@@ -137,13 +138,19 @@ class LectureVideoService:
             traps=traps,
         )
         steps = [stage["narration"] for stage in stages]
-        target_duration_seconds = max(120, min(240, len(stages) * 18))
+        target_duration_seconds = max(120, min(210, len(stages) * 14))
         scene_type = self._scene_type(
             raw=str(parsed.get("scene_type") or ""),
             subject=subject_text,
             content=" ".join([prompt, topic, summary, " ".join(steps)]),
         )
-        scene_subject = "physics" if scene_type != "generic" and self._is_physics(subject_text, prompt) else "general"
+        content_for_subject = " ".join([prompt, topic, summary, " ".join(steps)])
+        if self._is_physics(subject_text, content_for_subject):
+            scene_subject = "physics"
+        elif self._is_math(subject_text, content_for_subject):
+            scene_subject = "math"
+        else:
+            scene_subject = "general"
         scene_spec: Dict[str, Any] = {
             "schema_version": 2,
             "subject": scene_subject,
@@ -193,6 +200,19 @@ class LectureVideoService:
 
     def _scene_type(self, *, raw: str, subject: str, content: str) -> str:
         normalized = raw.strip().lower()
+        math_allowed = {"function_graph", "conic", "geometry", "generic"}
+        if self._is_math(subject, content):
+            if normalized in math_allowed and normalized != "generic":
+                return normalized
+            if any(token in content for token in ("椭圆", "双曲线", "抛物线", "圆锥曲线", "离心率", "焦点", "准线", "长轴", "短轴")):
+                return "conic"
+            if any(token in content for token in ("函数", "导数", "单调", "图像", "极值", "零点", "切线")):
+                return "function_graph"
+            if any(token in content for token in ("三角形", "圆", "相似", "全等", "角", "垂直", "平行")):
+                return "geometry"
+            if normalized == "generic":
+                return "generic"
+            return "generic"
         if not self._is_physics(subject, content):
             return "generic"
         allowed = {
@@ -223,6 +243,29 @@ class LectureVideoService:
                 {"type": "point", "id": "A", "label": "A", "x": 3, "y": 1},
             ]
         return []
+
+    def _is_math(self, subject: str, content: str) -> bool:
+        combined = f"{subject} {content}".lower()
+        return any(
+            token in combined
+            for token in (
+                "数学",
+                "函数",
+                "导数",
+                "单调",
+                "极值",
+                "零点",
+                "椭圆",
+                "双曲线",
+                "抛物线",
+                "圆锥曲线",
+                "离心率",
+                "焦点",
+                "准线",
+                "三角形",
+                "几何",
+            )
+        )
 
     def _artifact_from_job(self, job: Dict[str, Any], *, title: str) -> RichArtifact:
         content = {

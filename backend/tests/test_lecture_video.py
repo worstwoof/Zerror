@@ -104,8 +104,8 @@ class LectureVideoServiceTest(unittest.TestCase):
 
         self.assertEqual("manim_job", response.artifact.artifact_type)
         scene_spec = create_job.call_args.args[0]
-        self.assertEqual("generic", scene_spec["scene_type"])
-        self.assertEqual("general", scene_spec["subject"])
+        self.assertEqual("function_graph", scene_spec["scene_type"])
+        self.assertEqual("math", scene_spec["subject"])
         self.assertTrue(scene_spec["objects"])
         self.assertGreaterEqual(len(scene_spec["steps"]), 8)
         self.assertGreaterEqual(len(scene_spec["teaching_stages"]), 8)
@@ -114,6 +114,48 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertIn("不要写 Python", service.client.prompts[0])
         self.assertIn("teaching_stages", service.client.prompts[0])
         self.assertIn("8 到 12", service.client.prompts[0])
+        self.assertIn("function_graph/conic/geometry", service.client.prompts[0])
+
+    def test_math_conic_request_routes_to_math_conic_scene(self) -> None:
+        raw = json.dumps(
+            {
+                "title": "椭圆离心率视频讲解",
+                "subject": "数学",
+                "topic": "椭圆离心率",
+                "scene_type": "generic",
+                "summary": "用动画讲清楚 e=c/a 和椭圆扁圆变化。",
+                "focus_points": ["核心定义", "焦点距离", "二级结论"],
+                "steps": ["先画椭圆和焦点", "再看动点距离变化", "最后比较离心率大小"],
+                "formula_steps": ["e=\\frac{c}{a}", "0<e<1"],
+            },
+            ensure_ascii=False,
+        )
+        service = LectureVideoService(_FakeClient(raw))
+
+        with patch(
+            "ai_engine.llm_logic.lecture_video_chain.create_manim_job",
+            return_value={
+                "job_id": "job-conic",
+                "status": "pending",
+                "progress": 0,
+                "message": "queued",
+                "video_url": "",
+                "updated_at": 1.0,
+                "diagnostics": {},
+            },
+        ) as create_job:
+            service.generate_video(
+                LectureVideoRequest(
+                    prompt="用视频讲一下高中数学椭圆离心率核心定义",
+                    subject="数学",
+                    topic="椭圆离心率",
+                )
+            )
+
+        scene_spec = create_job.call_args.args[0]
+        self.assertEqual("math", scene_spec["subject"])
+        self.assertEqual("conic", scene_spec["scene_type"])
+        self.assertGreaterEqual(len(scene_spec["teaching_stages"]), 8)
 
     def test_job_create_query_failure_and_retry(self) -> None:
         service = _FlakyVideoService()

@@ -267,6 +267,7 @@ class LearningScene(Scene):
     def construct(self):
         spec = json.loads(SCENE_SPEC)
         scene_type = str(spec.get("scene_type") or "generic")
+        source_text = self._scene_source_text(spec)
         is_physics_scene = str(spec.get("subject") or "").lower() == "physics" or scene_type in {{
             "board_block",
             "mechanics",
@@ -285,7 +286,7 @@ class LearningScene(Scene):
             "conic",
             "function_graph",
             "geometry",
-        }}
+        }} or any(token in source_text for token in ("椭圆", "离心率", "焦点", "准线", "函数", "导数", "单调", "圆锥曲线"))
         if is_physics_scene:
             self.camera.background_color = BLACK
             self._draw_professional_physics_scene(spec)
@@ -353,8 +354,8 @@ class LearningScene(Scene):
 
     def _stage_wait_time(self, spec, stage_count):
         target = self._target_duration_seconds(spec)
-        available = max(72, target - 36)
-        return max(7.0, min(16.0, available / max(1, stage_count)))
+        available = max(36, target - 64)
+        return max(2.4, min(4.2, available / max(1, stage_count)))
 
     def _stage_text_lines(self, spec, index, fallback):
         raw_stages = spec.get("teaching_stages") if isinstance(spec.get("teaching_stages"), list) else []
@@ -452,14 +453,12 @@ class LearningScene(Scene):
     def _professional_math_scene_type(self, spec):
         scene_type = str(spec.get("scene_type") or "").strip().lower()
         question = self._question_text(spec)
-        source = " ".join([
-            str(spec.get("title") or ""),
-            str(spec.get("fallback_text") or ""),
-            question,
-        ])
+        source = self._scene_source_text(spec)
         ellipse_hits = ["椭圆", "焦点", "F(1,0)", "F（1，0）", "|OA|", "|OB|", "|AB|", "a>b", "a＞b"]
         if any(token in source for token in ellipse_hits) and all(token in source for token in ["|OA|", "|OB|", "|AB|"]):
             return "ellipse_focus_chord"
+        if any(token in source for token in ("椭圆", "离心率", "焦点", "准线", "长轴", "短轴", "圆锥曲线")):
+            return "conic"
         apollonius_hits = ["阿波罗尼斯", "切线长", "|MQ|", "MQ", "x^2+y^2=1", "x²+y²=1", "Q(2,0)", "Q（2，0）"]
         if any(token in source for token in apollonius_hits) and scene_type in {{"", "conic", "geometry", "generic"}}:
             return "apollonius_tangent_circle"
@@ -482,17 +481,38 @@ class LearningScene(Scene):
                 ],
                 goal="求 a 的取值范围",
             )
+        if math_type == "conic":
+            if not question:
+                question = "围绕椭圆离心率 e=c/a，理解焦点距离、长半轴和椭圆形状之间的关系。"
+            return dict(
+                question=question,
+                chips=[
+                    "e = c / a",
+                    "0 < e < 1",
+                    "c^2 = a^2 - b^2",
+                    "焦点距离 2c",
+                ],
+                goal="离心率定义 · 形状判断",
+            )
+        if math_type == "apollonius_tangent_circle":
+            if not question:
+                question = "已知点 Q(2,0) 和圆 C:x^2+y^2=1，动点 M 到圆 C 的切线长与 |MQ| 的比等于常数 λ(λ>0)，求 M 的轨迹方程并说明曲线类型。"
+            return dict(
+                question=question,
+                chips=[
+                    "Q(2,0)",
+                    "C:x^2+y^2=1",
+                    "MT/MQ = λ",
+                    "λ > 0",
+                ],
+                goal="轨迹方程 · 曲线类型",
+            )
         if not question:
-            question = "已知点 Q(2,0) 和圆 C:x^2+y^2=1，动点 M 到圆 C 的切线长与 |MQ| 的比等于常数 λ(λ>0)，求 M 的轨迹方程并说明曲线类型。"
+            question = "把题目条件先放到图像中，再观察关键点、线段和公式之间的对应关系。"
         return dict(
             question=question,
-            chips=[
-                r"Q(2,0)",
-                r"C:x^2+y^2=1",
-                r"\\frac{{MT}}{{MQ}}=\\lambda",
-                r"\\lambda>0",
-            ],
-            goal="轨迹方程 · 曲线类型",
+            chips=["图像", "关键点", "关系式", "检查边界"],
+            goal="图像关系 · 解题路线",
         )
 
     def _math_wrap_lines(self, text, max_chars=58):
@@ -525,24 +545,18 @@ class LearningScene(Scene):
             question_row.arrange(RIGHT, aligned_edge=UP, buff=0.24)
         chips = VGroup()
         for item in data.get("chips") or []:
-            try:
-                value = MathTex(item, color=WHITE).scale(0.46)
-                chip = RoundedRectangle(
-                    width=value.width + 0.42,
-                    height=0.52,
-                    corner_radius=0.04,
-                    color=GREY_D,
-                    stroke_width=1,
-                    fill_color=GREY_E,
-                    fill_opacity=0.22,
-                )
-                chip.move_to(value)
-                chips.add(VGroup(chip, value))
-            except Exception:
-                value = cjk_text(str(item)[:14], font_size=header_font_size, color=WHITE)
-                chip = RoundedRectangle(width=value.width + 0.40, height=0.44, corner_radius=0.04, color=GREY_D, stroke_width=1)
-                chip.move_to(value)
-                chips.add(VGroup(chip, value))
+            value = cjk_text(str(item)[:18], font_size=header_font_size, color=WHITE)
+            chip = RoundedRectangle(
+                width=value.width + 0.42,
+                height=0.52,
+                corner_radius=0.04,
+                color=GREY_D,
+                stroke_width=1,
+                fill_color=GREY_E,
+                fill_opacity=0.22,
+            )
+            chip.move_to(value)
+            chips.add(VGroup(chip, value))
         chips.arrange(RIGHT, buff=0.10)
         known_label = cjk_text("已知", font_size=header_font_size, color=BLUE_B)
         goal_label = cjk_text("目标", font_size=header_font_size, color=BLUE_B)
@@ -963,6 +977,17 @@ class LearningScene(Scene):
     def _question_text(self, spec):
         params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
         return str(params.get("question_excerpt") or spec.get("fallback_text") or spec.get("title") or "").strip()
+
+    def _scene_source_text(self, spec):
+        params = spec.get("parameters") if isinstance(spec.get("parameters"), dict) else {{}}
+        parts = [
+            str(spec.get("title") or ""),
+            str(spec.get("fallback_text") or ""),
+            str(params.get("question_excerpt") or ""),
+        ]
+        parts.extend(str(item) for item in spec.get("steps") or [])
+        parts.extend(str(item) for item in params.get("focus_points") or [])
+        return " ".join(part for part in parts if part)
 
     def _board_block_data(self, spec):
         question = self._question_text(spec)
@@ -2425,10 +2450,14 @@ class LearningScene(Scene):
         self.play(Create(axes), FadeIn(x_label), FadeIn(y_label), run_time=1.2)
 
         if scene_type == "conic":
+            a_value = 3.1
+            b_value = 1.65
+            c_value = 2.2
             curve = ParametricFunction(
-                lambda t: axes.c2p(3.1 * np.cos(t), 1.65 * np.sin(t)),
+                lambda t: axes.c2p(a_value * np.cos(t), b_value * np.sin(t)),
                 t_range=[0, TAU],
                 color=YELLOW,
+                stroke_width=4,
             )
             focus_l = Dot(axes.c2p(-2.2, 0), color=ORANGE)
             focus_r = Dot(axes.c2p(2.2, 0), color=ORANGE)
@@ -2436,13 +2465,53 @@ class LearningScene(Scene):
                 cjk_text("F1", font_size=20, color=ORANGE).next_to(focus_l, DOWN, buff=0.06),
                 cjk_text("F2", font_size=20, color=ORANGE).next_to(focus_r, DOWN, buff=0.06),
             )
-            moving_point = Dot(axes.c2p(1.1, 1.55), color=BLUE)
-            chord = Line(axes.c2p(-1.8, -1.35), axes.c2p(1.1, 1.55), color=BLUE)
-            guide = DashedLine(axes.c2p(1.1, 1.55), axes.c2p(1.1, 0), color=GREY_B)
+            t_tracker = ValueTracker(0.58)
+
+            def ellipse_point():
+                t = t_tracker.get_value()
+                return axes.c2p(a_value * np.cos(t), b_value * np.sin(t))
+
+            moving_point = always_redraw(lambda: Dot(ellipse_point(), color=BLUE, radius=0.07))
+            point_label = always_redraw(lambda: cjk_text("P", font_size=20, color=BLUE).next_to(moving_point, UP + RIGHT, buff=0.05))
+            pf1 = always_redraw(lambda: Line(focus_l.get_center(), moving_point.get_center(), color=TEAL_A, stroke_width=3))
+            pf2 = always_redraw(lambda: Line(focus_r.get_center(), moving_point.get_center(), color=TEAL_A, stroke_width=3))
+            projection = always_redraw(lambda: DashedLine(moving_point.get_center(), axes.c2p(a_value * np.cos(t_tracker.get_value()), 0), color=GREY_B, stroke_width=2))
+            major_axis = Line(axes.c2p(-a_value, 0), axes.c2p(a_value, 0), color=BLUE, stroke_width=3)
+            minor_axis = Line(axes.c2p(0, -b_value), axes.c2p(0, b_value), color=GREEN, stroke_width=3)
+            a_label = cjk_text("a", font_size=20, color=BLUE).next_to(major_axis, DOWN, buff=0.04)
+            b_label = cjk_text("b", font_size=20, color=GREEN).next_to(minor_axis, LEFT, buff=0.04)
+            c_label = cjk_text("c", font_size=20, color=ORANGE).move_to(axes.c2p(c_value / 2, -0.42))
+            focus_segment = Line(axes.c2p(0, -0.35), axes.c2p(c_value, -0.35), color=ORANGE, stroke_width=3)
+            formula_card = VGroup(
+                RoundedRectangle(width=2.45, height=0.86, corner_radius=0.08, color=BLUE_E, fill_color=BLUE_E, fill_opacity=0.24),
+                cjk_text("e = c / a", font_size=24, color=YELLOW),
+            )
+            formula_card[1].move_to(formula_card[0].get_center())
+            formula_card.move_to(self.VISUAL_CENTER + LEFT * 1.45 + DOWN * 1.98)
+            flat_curve = ParametricFunction(
+                lambda t: axes.c2p(3.35 * np.cos(t), 1.03 * np.sin(t)),
+                t_range=[0, TAU],
+                color=RED,
+                stroke_width=3,
+            ).set_opacity(0.52)
+            round_curve = ParametricFunction(
+                lambda t: axes.c2p(2.55 * np.cos(t), 2.08 * np.sin(t)),
+                t_range=[0, TAU],
+                color=GREEN,
+                stroke_width=3,
+            ).set_opacity(0.48)
             self.play(Create(curve), FadeIn(focus_l), FadeIn(focus_r), FadeIn(labels), run_time=1.8)
             self._show_step_caption(steps[1] if len(steps) > 1 else "圆锥曲线题先抓住焦点、弦、切线或对称关系", color=WHITE, wait_time=1.5)
-            self.play(FadeIn(moving_point), Create(chord), Create(guide), run_time=1.3)
-            self.play(moving_point.animate.move_to(axes.c2p(2.3, 1.1)), chord.animate.put_start_and_end_on(axes.c2p(-1.4, -1.45), axes.c2p(2.3, 1.1)), run_time=2.2, rate_func=smooth)
+            self.play(Create(major_axis), Create(minor_axis), FadeIn(a_label), FadeIn(b_label), run_time=1.0)
+            self.play(FadeIn(moving_point), FadeIn(point_label), Create(pf1), Create(pf2), Create(projection), run_time=1.15)
+            self.play(t_tracker.animate.set_value(2.28), run_time=3.2, rate_func=smooth)
+            self._show_step_caption(steps[2] if len(steps) > 2 else "动点沿椭圆移动时，到两个焦点的距离和保持不变", color=WHITE, wait_time=1.15)
+            self.play(Create(focus_segment), FadeIn(c_label), FadeIn(formula_card), run_time=1.1)
+            self.play(t_tracker.animate.set_value(4.58), Indicate(formula_card[1], color=YELLOW, scale_factor=1.08), run_time=3.0, rate_func=smooth)
+            self._show_step_caption(steps[3] if len(steps) > 3 else "离心率 e=c/a：c 越接近 a，椭圆越扁", color=YELLOW, wait_time=1.15)
+            self.play(Create(round_curve), run_time=1.05)
+            self.play(Create(flat_curve), run_time=1.05)
+            self.play(Indicate(flat_curve, color=RED, scale_factor=1.02), Indicate(round_curve, color=GREEN, scale_factor=1.02), run_time=1.15)
         elif scene_type == "function_graph":
             graph = axes.plot(lambda x: 0.16 * (x - 0.8) * (x - 0.8) - 1.1, x_range=[-4.2, 4.4], color=YELLOW)
             tangent_point = Dot(axes.c2p(2.0, 0.16 * (2.0 - 0.8) * (2.0 - 0.8) - 1.1), color=ORANGE)
@@ -2460,7 +2529,8 @@ class LearningScene(Scene):
             self._show_step_caption(steps[1] if len(steps) > 1 else "几何题要把辅助线、角度和相似关系逐步显出来", color=WHITE, wait_time=1.5)
             self.play(Create(altitude), Create(angle_arc), run_time=1.2)
 
-        for extra_step in steps[2:5]:
+        remaining_start = 4 if scene_type == "conic" else 2
+        for extra_step in steps[remaining_start:remaining_start + 4]:
             self._show_step_caption(extra_step, color=WHITE, wait_time=1.2)
         self.wait(0.8)
 
