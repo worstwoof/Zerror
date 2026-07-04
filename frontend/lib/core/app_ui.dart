@@ -570,7 +570,7 @@ class AppChatInputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       decoration: BoxDecoration(
         color: AppPalette.paper,
         border: Border(
@@ -586,10 +586,20 @@ class AppChatInputBar extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   minLines: 1,
-                  maxLines: 3,
+                  maxLines: 1,
                   decoration: InputDecoration(
+                    isDense: true,
                     hintText: hintText,
-                    prefixIcon: const Icon(Icons.auto_awesome_rounded),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    prefixIcon:
+                        const Icon(Icons.auto_awesome_rounded, size: 20),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 42,
+                      minHeight: 38,
+                    ),
                   ),
                 ),
               ),
@@ -599,7 +609,7 @@ class AppChatInputBar extends StatelessWidget {
                 onTap: onSend,
                 color: AppPalette.inkBlue,
                 iconColor: Colors.white,
-                size: 52,
+                size: 42,
               ),
             ],
           ),
