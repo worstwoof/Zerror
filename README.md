@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="frontend/assets/images/logo.png" width="120" alt="Zerror Logo" />
 
   <h1 style="font-family: 'Orbitron', sans-serif;">🌱 知芽 Zerror</h1>
 
@@ -15,269 +14,282 @@
     <br/>
     <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
     <img src="https://img.shields.io/badge/Tencent_COS-00A4FF?style=flat-square&logo=tencentqq&logoColor=white" />
-    <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" />
     <img src="https://img.shields.io/badge/vivo-OCR_&_LLM-6E56CF?style=flat-square&logo=magic&logoColor=white" />
+    <img src="https://img.shields.io/badge/Cloud_Sync-Learning_State-5B8C5A?style=flat-square" />
   </p>
 
   <p><em>🏆 vivo × 南开大学 AIGC 创新大赛“错题都队”参赛作品</em></p>
 </div>
 
----
+------
 
 # 📖 项目简介
 
 传统错题本更多承担“记录错误”的功能，却很少真正帮助用户**理解错误、消化错误、转化错误**。对于许多中学生来说，错题积累得越多，焦虑感反而越强，复习过程也容易陷入机械重复、缺少反馈和动力的泥潭。
 
-**知芽 Zerror** 以“**AI 错题重构**”为核心思路，将错题整理从静态记录升级为动态成长系统。项目围绕“**识别 - 诊断 - 重构 - 训练 - 复习**”的闭环展开，通过图片识别、AI 解析、学习产物生成、智能组卷和云端同步，让每一次错误都不只是被记录下来，而是被进一步理解、利用和延展。
+**知芽 Zerror** 以“**AI 错题重构**”为核心思路，尝试将错题整理从静态记录升级为动态成长系统。项目围绕“**收录 - 识别 - 诊断 - 入档 - 复习 - 训练**”的闭环展开，通过拍题框选、OCR 识别、AI 深度解析、错因归档、复习计划与云端同步，**“不在错误中焦虑，让知识在灵感中发芽”**。
 
 **🚀 当前版本更新进展：**
-当前版本已经从早期界面原型推进到具备**Flutter 客户端、FastAPI 后端、账号体系、云端状态同步、腾讯云 COS 上传、vivo OCR / 文本 / 图像模型链路、后台任务队列与本地 Manim 渲染**的可运行工程。项目不再只是概念展示，而是朝着真实学习应用继续落地。
+当前版本已经从早期界面原型推进到具备**账号登录、拍题框选、后台错题整理、AI 结构化解析、错题档案、智能复习、薄弱点训练、学习计划、数据看板与云端同步**的可运行形态。用户可以拍照或手动录入题目，系统在后台完成 OCR 和高质量解析，完成后进入确认入档页面，再把题目沉淀到个人错题档案中。
 
 **当前已打通的核心链路：**
-- 用户注册、登录、自动登录、会话校验与退出
-- 拍照 / 相册 / 手动录入错题，并支持图片裁剪预览
-- vivo OCR 提取题干，先保存 OCR 结果，再后台生成高质量详解
-- 文本分析、图片分析、错因诊断、知识点标签、复习计划与相似题生成
-- 数学 GeoGebra 交互图、物理 / 数学 Manim 视频、HTML 学习卡片等多模态学习产物
-- 智能组卷：根据错题档案生成专题练习、A4 打印讲义和参考答案
-- AI 助教：围绕错题档案进行快问快答、错题记忆、知识关联和考前短复习
-- 错题档案、收藏、回收站、学习计划、数据看板、成长成就与云端同步
 
----
+- 用户注册、登录、自动登录、会话管理与设备状态展示
+- 拍照 / 图片导入后手动框选题目区域，只上传框内小图进行识别
+- 后台图片解析任务：先提交队列，再轮询 OCR 与高质量详解结果
+- 文本题手动录入，支持直接进入 AI 解析和错题档案完善流程
+- AI 输出知识点、破题思路、详细步骤、错因诊断、复习建议和举一反三练习
+- 错题图片上传至腾讯云 COS，错题状态、收藏、掌握度、资料与设备信息同步到云端
+- 首页、错题档案、智能复习、薄弱点专练、学习计划和数据看板形成完整学习闭环
+
+------
 
 ## 📸 项目一览
 
-> 当前仓库暂未补充真机运行截图；这里先展示仓库中真实可用的品牌与界面素材，后续可补充手机端运行截图。
+> 💡 *注：以下为产品界面演示，展示知芽当前 App 的核心学习流程。*
 
-| 品牌入口 | 学习氛围 | AI 助教 |
-| :---: | :---: | :---: |
-| ![知芽 Logo](frontend/assets/images/logo.png)<br>**知芽品牌标识** | ![学习插画](frontend/assets/images/flat_study_illustration.png)<br>**错题成长视觉资产** | ![AI 助教插画](frontend/assets/images/ai_chat_illustration.png)<br>**助教对话视觉资产** |
-| ![启动背景](frontend/assets/images/splash_bg.png)<br>**移动端启动视觉** | ![空状态插画](frontend/assets/images/empty_study_illustration.png)<br>**空档案 / 引导状态** | ![UI 风格板](frontend/design_exports/zerror-flat-ui-board.png)<br>**Flat UI 设计导出** |
+|                          收录与整理                          |                          复盘与成长                          |
+| :----------------------------------------------------------: | :----------------------------------------------------------: |
+| ![首页/数据看板](./img/placeholder5.png)<br>📊 **首页看板**：展示错题总数、待复习、收藏、掌握率和后台整理状态 | ![衍生题训练营](./img/placeholder2.png)<br>🔄 **举一反三**：AI 基于原题生成变式练习和答案提纲 |
+| ![错题拍照/预览](./img/placeholder1.png)<br>📸 **图片框选**：用户手动框选题目区域，减少无关内容上传 | ![学习计划](./img/placeholder6.png)<br>📅 **学习计划**：根据错题数量、薄弱学科和复习节奏生成今日任务 |
+| ![AI解析页](./img/placeholder3.png)<br>🧠 **确认入档**：题干、解析、错因、自我复盘和练习建议集中确认 | ![错题档案](./img/placeholder4.png)<br>💎 **错题档案**：支持收藏、标为掌握、复盘详情和后续训练 |
 
----
+------
+
+## 🔁 当前 App 工作流程
+
+### 1. 登录与启动
+
+- 用户进入启动页后，可以注册账号或登录已有账号。
+- 登录后 App 会加载本地缓存与云端快照，恢复错题档案、资料、头像、收藏、掌握状态和设备信息。
+- 若开启自动登录，后续启动可直接进入首页。
+
+### 2. 首页进入学习
+
+- 首页聚合错题总数、待复习数量、收藏数量、掌握率和后台整理任务。
+- 新用户可以从“拍照录入”或“手动录入”开始建立第一份错题档案。
+- 已有错题后，首页会引导进入智能复习、薄弱点训练、错题档案和学习计划。
+
+### 3. 拍题框选与后台整理
+
+- 用户从相机或相册导入题目图片。
+- 在“图片框选”页拖动选框，只截取题目区域，避免上传整张无关图片。
+- 点击“加入后台整理”后，App 将裁剪后的小图提交到后台解析队列。
+- 后台任务会持续轮询进度，App 可通过通知展示“正在整理”“整理完成”或“需要重试”。
+
+### 4. AI 解析与确认入档
+
+- 后端先完成 OCR 识别，再生成高质量错题详解。
+- 解析完成后进入确认页面，用户可以查看并修正题干。
+- AI 会返回学科、知识点、破题技巧、详细推导步骤、错因诊断、复习建议和相似练习。
+- 用户可以选择错因标签，例如“粗心大意”“概念模糊”“公式遗忘”“思路中断”“计算错误”。
+- 用户可补充自己的避坑笔记，也可以让 AI 结合当前错因重新分析。
+- 点击保存后，题目进入错题档案；如果有图片，会同步上传至对象存储。
+
+### 5. 手动录入流程
+
+- 用户也可以直接粘贴或输入题目内容。
+- 手动录入支持文字、公式、条件和图形描述。
+- 提交后直接进入确认入档页面，由 AI 进行结构化分析。
+- 这个流程适合纸面图片不清晰、OCR 不稳定或用户已经整理好题干的场景。
+
+### 6. 错题档案与复盘
+
+- 档案页按错题状态展示所有历史题目。
+- 每道题都有题干、错因、我的回忆、AI 深度解析和保存的生成内容。
+- 用户可以收藏重点错题，或将题目标记为“已掌握”。
+- 错题详情页支持复盘分享提示，方便把单题整理成复习卡片。
+
+### 7. 智能复习与薄弱点训练
+
+- 智能复习优先抽取近期仍未掌握的错题，让用户先回忆再看解析。
+- 薄弱点训练会根据待复习错题的学科和 topic 分布，定位当前最集中的薄弱模块。
+- 智能组卷可以围绕抗遗忘复习、薄弱点突破和举一反三拓展生成小练习。
+- 练习结果中的错题可以一键回流到错题档案，继续进入复盘闭环。
+
+### 8. 学习计划与数据看板
+
+- 学习计划会根据当前错题积累生成今日任务，例如智能复习、攻克薄弱点和组一套微练习。
+- 周计划展示复习节奏、待复习数量和记忆趋势提示。
+- 数据看板展示错题收录、掌握率、知识点数量、学科分布和本周复习活跃度。
+
+------
 
 ## ✨ 核心功能亮点
 
 ### 1. 📸 智能错题收录
-- **多渠道导入**：支持拍照上传、图片导入与手动录入。
-- **裁剪与预览**：图片进入解析前可在移动端进行框选裁剪，减少无关背景对 OCR 的干扰。
-- **OCR 减负**：结合 vivo OCR 提取题面文本，并进行题干清洗与规范化处理，降低手抄错题成本。
 
-### 2. 🧠 知芽 AI 深度解析
-- **两阶段图片解析**：后台任务先返回 OCR 与基础档案，再继续生成高质量详解；即使模型超时，也能保留题干和基础信息。
-- **结构化诊断**：围绕题目生成知识点、步骤拆解、错因定位、复习建议和相似题。
-- **文本 / 图片双链路**：既支持纯文本分析，也打通“图片上传 → OCR → AI 解析 → 错题入档”的完整视觉链路。
+- **拍照 / 相册导入**：支持从手机相机和本地图片快速进入错题整理。
+- **框选上传**：只上传用户框选的题目区域，减少无关图片内容进入云端。
+- **后台整理**：图片提交后进入后台队列，用户不需要长时间停留在上传页面等待。
+- **失败可恢复**：网络波动、上游服务慢或任务过期时，App 会尝试恢复任务或提示重新整理。
 
-### 3. 🎞️ 多模态学习产物
-- **数学可视化**：可生成 GeoGebra 交互图，支持函数、圆锥曲线、几何关系等场景。
-- **Manim 视频讲解**：后端提供本地 Manim 渲染任务，前端轮询进度并支持视频预览、保留与清理。
-- **HTML 学习卡片**：对部分物理、化学、生物、编程等内容生成可嵌入 WebView 的学习产物。
+### 2. 🧠 AI 深度解析
 
-### 4. 📝 智能组卷与讲义
-- **错题驱动组卷**：根据错题档案中的学科、知识点、错因和已有解析生成专题练习。
-- **讲义结构完整**：包含学习目标、作答提醒、核心概念、公式卡片、题型模型、例题讲解、练习区和参考答案。
-- **练习回流**：组卷练习中的错题可以继续回流到错题档案，形成二次巩固。
+- **结构化结果**：输出知识点、题目摘要、破题思路、推导步骤、错因诊断和复习计划。
+- **高质量详解**：图片任务采用后台生成方式，避免移动端长连接等待影响体验。
+- **错因再分析**：用户选择错因或修改题干后，可以让 AI 重新生成更贴近当前问题的分析。
+- **公式友好阅读**：前端使用 LaTeX 文本组件渲染公式、分式、根号、上下标等理科题内容。
 
-### 5. 🤖 AI 助教
-- **四种模式**：快问快答、错题档案记忆、主动关联知识点、考前短时复习。
-- **读取学习画像**：结合总错题数、待复习数、薄弱学科、薄弱知识点和错题节选生成建议。
-- **可用性兜底**：AI 服务暂不可用时，会基于本地错题档案生成简洁建议，不中断学习流程。
+### 3. 📝 自我复盘与入档
 
-### 6. ☁️ 云端同步与账号体系
-- **完整账号系统**：支持注册、登录、自动登录、会话持久化和退出。
-- **状态快照同步**：错题记录、收藏、掌握程度、用户资料、设备信息等通过 `/api/v1/app-state/{sync_user_id}` 同步。
-- **对象存储支持**：错题图片、头像等媒体文件上传至腾讯云 COS，并在状态快照中保留文件引用。
+- **题干可修正**：OCR 识别后支持用户手动修正题干，避免错字影响后续复习。
+- **错因标签**：将主观错误归因结构化，便于后续统计和复盘。
+- **避坑笔记**：用户可以记录“我当时为什么错”和“下次怎么避免”。
+- **一键入档**：确认后生成错题记录，自动归类学科、topic、标签、解析和图片。
 
-### 7. 🌱 复习闭环与成长体验
-- **从错题走向训练**：不仅提示“错了”，更引导“为什么错、以后如何避免、下一轮练什么”。
-- **学习计划与弱项训练**：提供智能复习、薄弱点闯关、学习计划、数据看板和成就页面。
-- **后台任务提醒**：图片解析与组卷任务可在后台执行，前端保留进度、失败重试和完成提醒。
+### 4. 🌱 复习闭环
 
----
+- **智能复习队列**：优先回看尚未掌握的高价值错题。
+- **掌握状态管理**：支持标为掌握、取消掌握，让复习队列动态变化。
+- **收藏重点题**：把高频、易错或竞赛前重点题加入收藏。
+- **组卷回流**：练习中暴露的新错题可以继续进入档案，形成循环。
 
-## 🔁 当前主链路
+### 5. ☁️ 云端同步与账号体系
 
-```mermaid
-flowchart LR
-    A[拍照 / 相册 / 手动录入] --> B[裁剪预览与 OCR]
-    B --> C[后台图片解析任务]
-    C --> D[OCR 部分结果先入档]
-    D --> E[高质量 AI 详解与错因诊断]
-    E --> F[多模态产物: GeoGebra / Manim / HTML 卡片]
-    E --> G[错题档案与云端同步]
-    G --> H[智能复习 / 弱项训练 / AI 助教]
-    G --> I[智能组卷与 A4 打印讲义]
-    I --> G
-```
+- **账号体系**：支持注册、登录、登出、自动登录和会话校验。
+- **云端快照**：错题、收藏、掌握状态、头像、资料和设备信息可同步到后端。
+- **本地兜底**：云端读取失败时优先使用本地缓存，恢复网络后再尝试同步。
+- **对象存储**：题目图片等媒体文件可上传到腾讯云 COS，便于跨设备保留。
 
----
+### 6. 📊 成长反馈
+
+- **首页即时反馈**：展示收录数量、待复习、收藏和掌握率。
+- **学科分布**：根据错题档案统计薄弱学科和知识点。
+- **计划驱动**：将错题积累转化为今日任务和周复习节奏。
+- **成就与目标**：通过连续复习、错题数量、收藏和掌握情况鼓励持续使用。
+
+------
 
 ## 💡 设计解读与创新评估
 
 ### 一、理念贯穿性
+
 项目的核心理念是：**“不在错误中焦虑，让知识在灵感中发芽。”**
+
 - **命名哲思**：“知芽”象征知识萌发；“Zerror” 不仅寄托了 “zero error（零失误）” 的期许，更承载着将 error 重新理解为成长入口的意义。
-- **情绪价值**：摒弃传统学习工具中过度强调“扣分、订正”的压迫感，转而使用暗绿色、纸张色和扁平插画营造更轻松的学习氛围。
+- **情绪价值**：产品不把错题当成失败证据，而是把它转化为可理解、可复盘、可继续训练的学习材料。
+- **陪伴体验**：通过温和文案、后台整理、完成通知和复习引导，降低学生面对错题时的抵触感。
 
 ### 二、核心创新点
-1. **升维“错题本”概念**：从“静态存储工具”升级为“理解错误、生成反馈、继续训练”的动态 AI 成长系统。
-2. **先保存，再深析**：图片解析采用后台任务和 `partial_success` 机制，避免因为模型慢或超时导致整题丢失。
-3. **从解析走向产物**：AI 不只返回文字答案，还能生成交互图、讲解视频、学习卡片、专题讲义和二次练习。
-4. **前后端与 AI 真实联动**：Flutter、FastAPI、PostgreSQL、COS、vivo 模型和本地渲染任务已经形成完整工程链路。
 
-### 三、市场前景
-错题整理是中学生群体的高频长期痛点。**知芽 Zerror** 当前已经具备从前端体验到后端服务的完整雏形，兼具效率工具的实用性与养成类产品的粘性，具备进一步打磨为真实学习产品的基础。
+1. **从记录到成长**：错题不再只是列表，而是连接识别、解析、错因、复盘、训练和计划的成长单元。
+2. **把等待变成后台任务**：拍题后先回到首页，系统继续整理，完成后再提醒用户确认入档。
+3. **主观错因与 AI 解析结合**：AI 不只给答案，还会结合用户选择的错因标签重新组织分析。
+4. **云端与本地双保险**：既有云端同步，也有本地缓存兜底，适合移动端网络不稳定场景。
 
----
+### 三、落地价值
+
+错题整理是中学生群体的高频长期需求。**知芽 Zerror** 当前已经具备从账号体系、拍题整理、AI 解析、错题归档到复习训练的完整链路，既能提升错题录入效率，也能帮助学生把“错过的题”转化为下一轮学习计划。
+
+------
 
 ## 🛠️ 技术架构与技术栈
 
-项目采用 **Flutter 客户端 + FastAPI 后端 + AI 引擎 + 云端存储** 的分层架构，把耗时的 OCR、模型分析、组卷和视频渲染任务从前端交互中拆开。
+项目采用 **Flutter 客户端 + FastAPI 后端 + AI 引擎 + 云端存储** 的架构。客户端负责拍题、框选、后台任务状态、复习体验和本地缓存；后端负责账号、状态同步、文件上传、OCR、AI 解析与后台任务管理。
 
-| 层级 | 当前实现 |
-| :--- | :--- |
-| 📱 客户端 | Flutter、Dart、Material Design、WebView、图片选择、SharedPreferences、本地通知 |
-| ⚙️ 服务端 | FastAPI、Python、Pydantic、SQLAlchemy、Uvicorn、Docker |
-| 🗄️ 数据与存储 | PostgreSQL、腾讯云 COS、应用状态快照、媒体文件引用清理 |
-| 🤖 AI 引擎 | vivo OCR、vivo 文本 / 图像模型、Prompt Engineering、结构化诊断、智能组卷、AI 助教 |
-| 🎬 渲染能力 | GeoGebra HTML、Manim、manim-physics、MP4 静态资源服务、渲染任务生命周期管理 |
+### 当前版本已落地的技术栈
 
-### 当前已实现的核心后端接口
+- **📱 客户端 **: Flutter, Dart, Material Design
+- **📦 本地能力**: image_picker, shared_preferences, flutter_local_notifications, LaTeX 文本渲染
+- **⚙️ 服务端**: FastAPI, Python, Pydantic, SQLAlchemy
+- **🗄️ 数据与存储**: PostgreSQL, Tencent COS, Docker / Docker Compose
+- **🤖 AI 引擎**:
+  - 蓝心大模型 OCR
+  - 蓝心大模型文本 / 图像能力封装
+  - 高质量错题解析后台任务
+  - 学科判断、知识点抽取、错因诊断和复习建议生成
 
-| 模块 | 接口 |
-| :--- | :--- |
-| 健康检查 | `GET /api/v1/health` |
-| 账号体系 | `POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`GET /api/v1/auth/me`、`POST /api/v1/auth/logout` |
-| 状态同步 | `GET /api/v1/app-state/{sync_user_id}`、`PUT /api/v1/app-state/{sync_user_id}` |
-| 文件上传 | `POST /api/v1/files/upload` |
-| OCR 与解析 | `POST /api/v1/ocr/extract`、`POST /api/v1/analysis/text`、`POST /api/v1/analysis/image` |
-| 后台图片解析 | `POST /api/v1/analysis/image/jobs`、`GET /api/v1/analysis/image/jobs/{job_id}`、`POST /api/v1/analysis/image/jobs/{job_id}/retry` |
-| 渲染产物 | `POST /api/v1/render/geogebra`、`POST /api/v1/render/manim`、`GET /api/v1/render/manim/{job_id}` |
-| 渲染清理 | `POST /api/v1/render/manim/jobs/retain`、`POST /api/v1/render/manim/jobs/cleanup` |
-| 训练与助教 | `POST /api/v1/analysis/practice-paper`、`POST /api/v1/assistant/chat` |
-| 学科扩展 | `POST /api/v1/analysis/physics-animation` |
+### 当前主流程接口
 
----
+- `GET /api/v1/health`：健康检查
+- `POST /api/v1/auth/register`：注册账号
+- `POST /api/v1/auth/login`：登录并返回同步身份
+- `GET /api/v1/auth/me`：查询当前用户
+- `POST /api/v1/auth/logout`：退出登录
+- `GET / PUT /api/v1/app-state/{sync_user_id}`：读取 / 保存用户学习快照
+- `POST /api/v1/files/upload`：上传错题图片等媒体文件至对象存储
+- `POST /api/v1/ocr/extract`：图片 OCR 提取与文本清洗
+- `POST /api/v1/analysis/text`：手动录入题目的文本解析
+- `POST /api/v1/analysis/image/jobs`：创建图片后台解析任务
+- `GET /api/v1/analysis/image/jobs/{job_id}`：轮询图片解析任务
+- `POST /api/v1/analysis/image/jobs/{job_id}/retry`：基于已有 OCR 结果重新生成详解
 
-## 🚀 快速启动
+### 后台整理任务设计
 
-### 1. 后端服务
+- **提交阶段**：客户端裁剪题目图片后创建后台任务，后端立即返回任务状态。
+- **识别阶段**：后端完成 OCR，保存可用题干，避免题目内容丢失。
+- **解析阶段**：后台继续生成高质量解析、知识点、错因和复习建议。
+- **通知阶段**：客户端轮询进度，并通过系统通知提醒整理完成。
+- **确认阶段**：用户回到确认入档页，修正题干、补充笔记并保存到档案。
 
-先基于 `.env.example` 创建本地环境变量文件：
+------
 
-```powershell
-copy .env.example .env
-```
-
-Docker 启动：
-
-```powershell
-docker compose up --build
-```
-
-或使用本地 Python 环境启动：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r backend\requirements.txt
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 2. 前端应用
-
-```powershell
-cd frontend
-flutter pub get
-flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
-```
-
-如果不传 `API_BASE_URL`，客户端会使用 `frontend/lib/core/constants.dart` 中配置的默认云端 API 地址。
-
-### 3. 环境变量说明
-
-项目只提交 `.env.example`，真实密钥不要提交到仓库。
-
-| 类型 | 变量 |
-| :--- | :--- |
-| 应用与数据库 | `APP_NAME`、`APP_VERSION`、`DEBUG`、`DATABASE_URL`、`AUTH_SESSION_DAYS` |
-| 腾讯云 COS | `TENCENT_COS_SECRET_ID`、`TENCENT_COS_SECRET_KEY`、`TENCENT_COS_REGION`、`TENCENT_COS_BUCKET`、`TENCENT_COS_BASE_URL` |
-| vivo 模型 | `VIVO_API_KEY`、`VIVO_APP_ID`、`VIVO_API_BASE_URL`、`VIVO_OCR_URL`、`VIVO_TEXT_MODEL`、`VIVO_VISION_MODEL`、`VIVO_*_TIMEOUT_SECONDS`、`VIVO_*_MAX_TOKENS` |
-
----
-
-## ✅ 验证与测试
-
-当前仓库中已有几组轻量脚本用于校验 AI 输出、渲染任务和前后端协作关键点：
-
-```powershell
-pip install -r backend\requirements.txt -r ai_engine\requirements.txt
-python scripts\test_analysis_quality_guards.py
-python scripts\test_render_diagnostics.py
-```
-
-如果需要复查 README 与项目结构是否匹配，可以重新检查 `frontend/pubspec.yaml`、`backend/requirements.txt`、`ai_engine/requirements.txt`、`docker-compose.yml` 和 `backend/app/api/v1/` 下的路由文件。
-
----
-
-## 📁 项目结构 (Project Structure)
+## 📁 项目结构
 
 ```text
 Zerror/
-├── .github/
-│   └── pull_request_template.md       # PR 模板
-├── frontend/                          # Flutter 客户端工程
-│   ├── android/                       # Android 原生平台配置
-│   ├── assets/images/                 # Logo、启动图、插画、背景等静态素材
-│   ├── design_exports/                # UI 设计导出图
+├── docs/                            # 接口契约、部署说明、设计记录
+├── frontend/                        # Flutter 客户端工程
+│   ├── android/                     # Android 原生平台能力接入与应用图标
+│   ├── assets/                      # 图片、背景、品牌资源等静态素材
 │   └── lib/
-│       ├── core/                      # 应用状态、主题、会话、通知、仓储抽象
-│       ├── data/                      # AI / Auth / File API 客户端与数据模型
+│       ├── core/                    # 全局状态、本地/云端仓库、通知、主题、会话管理
+│       ├── data/                    # 认证、AI 解析、文件上传等 API 客户端
 │       └── screen/
-│           ├── base/                  # 首页、档案、复习、组卷、助教、设置等页面
-│           └── capture/               # 拍照预览、错题编辑、HTML / GeoGebra / Manim 预览
-├── backend/                           # FastAPI 后端服务
+│           ├── base/                # 启动、登录、首页、档案、计划、复习、练习、资料页
+│           └── capture/             # 图片框选、题目确认、AI 解析、自我复盘与入档流程
+├── backend/                         # FastAPI 后端服务
 │   ├── app/
-│   │   ├── api/v1/                    # auth / app-state / files / upload / render 路由
-│   │   ├── core/                      # 配置、鉴权、对象存储
-│   │   ├── db/                        # SQLAlchemy 模型与数据库连接
-│   │   ├── rendering/                 # GeoGebra 与 Manim 渲染
-│   │   ├── schemas/                   # Pydantic 请求 / 响应模型
-│   │   └── services/                  # 图片解析任务、Manim 任务、状态同步服务
-│   └── Dockerfile                     # 后端容器化构建脚本
-├── ai_engine/                         # AI 能力引擎
-│   └── llm_logic/                     # vivo 客户端、诊断链、OCR 清洗、组卷、助教、学科扩展
-├── scripts/                           # 本地质量校验脚本
-├── third_party/manim-physics/         # Manim 物理扩展依赖源码
-├── vivolm_example/                    # vivo LLM 调用示例与测试素材
-├── docker-compose.yml                 # 后端容器编排
-└── .env.example                       # 环境变量模板
+│   │   ├── api/v1/                  # auth / app-state / files / upload 等核心路由
+│   │   ├── core/                    # 环境变量、鉴权、对象存储与核心配置
+│   │   ├── db/                      # ORM 模型与数据库连接
+│   │   ├── schemas/                 # Pydantic 数据结构验证
+│   │   └── services/                # 后台解析任务、状态同步、文件清理等业务逻辑
+│   └── Dockerfile                   # 后端容器化构建脚本
+├── ai_engine/                       # AI 能力引擎模块
+│   └── llm_logic/                   # OCR 清洗、vivo 调用、诊断链、学科扩展逻辑
+├── scripts/                         # 分析质量与接口诊断脚本
+├── docker-compose.yml               # 后端服务本地/云端容器编排
+└── .env.example                     # 环境变量模板，含 vivo、数据库、COS 等配置
 ```
 
----
+------
 
-## 🔐 数据与隐私说明
+## 🔧 运行与配置提示
 
-- App 会处理用户上传的错题图片、头像、题干文本、错因记录和学习状态。
-- 云端同步接口需要登录会话；不同用户的 `sync_user_id` 由后端鉴权校验。
-- 媒体文件上传依赖腾讯云 COS；状态快照更新时会清理不再引用的旧文件。
-- vivo 与腾讯云相关密钥只应存放在本地 `.env` 或部署环境变量中，不应写入代码或 README。
+### 后端关键环境变量
 
----
+- `DATABASE_URL`：PostgreSQL 或本地 SQLite 连接串
+- `AUTH_SESSION_DAYS`：登录会话有效期
+- `TENCENT_COS_SECRET_ID` / `TENCENT_COS_SECRET_KEY` / `TENCENT_COS_REGION` / `TENCENT_COS_BUCKET`：对象存储配置
+- `VIVO_API_KEY` / `VIVO_APP_ID`：蓝心大模型接口凭证
+- `VIVO_API_BASE_URL` / `VIVO_OCR_URL`：vivo AI 与 OCR 接口地址
+- `VIVO_TEXT_MODEL` / `VIVO_VISION_MODEL` / `VIVO_QUALITY_TEXT_MODEL`：文本、视觉和高质量解析模型
+- `VIVO_TIMEOUT_SECONDS` / `VIVO_VISION_TIMEOUT_SECONDS` / `VIVO_QUALITY_TIMEOUT_SECONDS`：不同阶段的请求超时配置
+
+### 客户端关键点
+
+- `API_BASE_URL` 可通过 Flutter `--dart-define` 覆盖，默认指向云端后端。
+- 本地缓存按 `sync_user_id` 分桶，避免不同账号错题数据混在一起。
+- 后台整理任务在 App 回到前台时会继续恢复轮询。
+- 通知权限用于展示错题整理进度和完成提醒。
+
+------
 
 ## 👥 开发团队
 
-本项目围绕需求分析、界面实现、AI 链路打通与服务端部署协同推进：
+本项目围绕需求分析、界面实现、AI 链路打通、错题复习体验与服务端部署协同推进：
 
-| 姓名 | 负责模块 | 核心贡献 |
-| :---: | :--- | :--- |
-| **[黄子豪]** | 🎨 **客户端与 UI** | Flutter 页面实现、视觉氛围设计、核心交互流程与主要学习页面开发 |
-| **[蔡子涵]** | 🔌 **AI 链路集成** | vivo OCR / 文本 / 图像能力接入，端到端 AI 数据流封装与返回结构设计 |
-| **[张天译]** | 📝 **文档与表达** | 项目理念整理、方案说明文案、项目策划与展示 README 撰写 |
-| **[金宇辰]** | ⚙️ **服务端与部署** | FastAPI 架构设计、数据库建模、应用状态同步、腾讯云数据库与 COS 部署 |
-| **[林子媛]** | 🤖 **Prompt 调优** | AI 解析风格、错因分析逻辑、学科扩展提示词与输出稳定性调试 |
+|     姓名     | 负责模块           | 核心贡献                                                     |
+| :----------: | :----------------- | :----------------------------------------------------------- |
+| **[黄子豪]** | 🎨 **客户端与 UI**  | Flutter 页面实现、拍题框选、首页看板、确认入档、错题档案与复习体验开发 |
+| **[蔡子涵]** | 🔌 **AI 链路集成**  | vivo OCR / 文本 / 图像能力接入，图片后台解析任务与 AI 返回结构设计 |
+| **[张天译]** | 📝 **文档与表达**   | 项目理念整理、方案说明文案、项目策划与展示 README 撰写       |
+| **[金宇辰]** | ⚙️ **服务端与部署** | FastAPI 架构设计、账号体系、数据库建模、应用状态同步、腾讯云数据库与 COS 部署 |
+| **[林子媛]** | 🤖 **Prompt 调优**  | AI 解析风格、错因分析逻辑、复习建议、举一反三练习与输出稳定性调试 |
 
----
+------
 
 <div align="center">
   <p><strong>知芽 Zerror</strong> —— 让每一次错误，都成为知识发芽的起点。</p>
