@@ -10,7 +10,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
+from backend.app.rendering import tts_provider
 from backend.app.rendering.manim_renderer import add_background_music
+from backend.app.rendering.tts_provider import TtsSynthesisResult
 from backend.app.schemas.card_schema import (
     LectureVideoRequest,
     LectureVideoResponse,
@@ -136,6 +138,9 @@ class LectureVideoServiceTest(unittest.TestCase):
                     piper_voice_config="",
                     background_music_path="",
                 ),
+            ), patch(
+                "backend.app.rendering.tts_provider.settings",
+                self._tts_settings(),
             ), patch.dict(
                 "os.environ",
                 {
@@ -143,6 +148,9 @@ class LectureVideoServiceTest(unittest.TestCase):
                     "PIPER_COMMAND": "",
                     "PIPER_VOICE_MODEL": "",
                     "ZERROR_PIPER_VOICE_MODEL": "",
+                    "ZERROR_TTS_PROVIDER": "",
+                    "ZERROR_TTS_SERVICE_URL": "",
+                    "ZERROR_TTS_FALLBACK_PROVIDER": "",
                 },
                 clear=False,
             ):
@@ -161,6 +169,82 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertFalse(diagnostics["voiceover_configured"])
         self.assertFalse(diagnostics["voiceover_generated"])
         self.assertFalse(diagnostics["background_music_added"])
+
+    def test_cosyvoice_http_provider_chunks_and_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            video_path = Path(temporary_dir) / "lesson.mp4"
+            video_path.write_bytes(b"video")
+
+            def fake_http_chunk(**kwargs: object) -> None:
+                output_path = kwargs["output_path"]
+                assert isinstance(output_path, Path)
+                output_path.write_bytes(b"wav")
+
+            def fake_combine(chunks: list[Path], output_path: Path) -> bool:
+                self.assertGreater(len(chunks), 1)
+                output_path.write_bytes(b"combined")
+                return True
+
+            with patch(
+                "backend.app.rendering.tts_provider.settings",
+                self._tts_settings(
+                    tts_provider="cosyvoice_http",
+                    tts_service_url="http://tts.local:7861",
+                ),
+            ), patch(
+                "backend.app.rendering.tts_provider._http_tts_chunk",
+                side_effect=fake_http_chunk,
+            ), patch(
+                "backend.app.rendering.tts_provider._combine_audio_chunks",
+                side_effect=fake_combine,
+            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
+                result = tts_provider.synthesize_voiceover(
+                    video_path,
+                    text="函数图像先向右移动，再观察切线斜率变化。" * 18,
+                )
+
+            self.assertEqual("cosyvoice_http", result.provider)
+            self.assertFalse(result.fallback_used)
+            self.assertGreater(result.chunk_count, 1)
+            self.assertTrue(result.path and result.path.exists())
+
+    def test_cosyvoice_http_timeout_falls_back_to_piper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            video_path = Path(temporary_dir) / "lesson.mp4"
+            video_path.write_bytes(b"video")
+
+            def fake_piper(path: Path, *, text: str) -> TtsSynthesisResult:
+                output_path = path.with_name(f"{path.stem}.voice.wav")
+                output_path.write_bytes(b"piper")
+                return TtsSynthesisResult(
+                    path=output_path,
+                    provider="piper",
+                    fallback_used=False,
+                    chunk_count=1,
+                    voice="teacher_female_clear",
+                    elapsed_seconds=0,
+                )
+
+            with patch(
+                "backend.app.rendering.tts_provider.settings",
+                self._tts_settings(
+                    tts_provider="cosyvoice_http",
+                    tts_service_url="http://tts.local:7861",
+                    tts_fallback_provider="piper",
+                ),
+            ), patch(
+                "backend.app.rendering.tts_provider._http_tts_chunk",
+                side_effect=TimeoutError("timeout"),
+            ), patch(
+                "backend.app.rendering.tts_provider._synthesize_piper_voiceover",
+                side_effect=fake_piper,
+            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
+                result = tts_provider.synthesize_voiceover(video_path, text="讲解一段知识点。")
+
+            self.assertEqual("piper", result.provider)
+            self.assertTrue(result.fallback_used)
+            self.assertEqual(1, result.chunk_count)
+            self.assertTrue(result.path and result.path.exists())
 
     def test_math_conic_request_routes_to_math_conic_scene(self) -> None:
         raw = json.dumps(
@@ -253,6 +337,35 @@ class LectureVideoServiceTest(unittest.TestCase):
                 return job
             time.sleep(0.05)
         self.fail(f"job {job_id} did not reach status {status}")
+
+    def _tts_settings(self, **overrides: object) -> SimpleNamespace:
+        values = {
+            "piper_tts_command": "",
+            "piper_voice_model": "",
+            "piper_voice_config": "",
+            "tts_provider": "cosyvoice_http",
+            "tts_service_url": "",
+            "tts_api_key": "",
+            "tts_voice": "teacher_female_clear",
+            "tts_timeout_seconds": 300,
+            "tts_fallback_provider": "piper",
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def _empty_tts_env(self) -> dict[str, str]:
+        return {
+            "ZERROR_TTS_PROVIDER": "",
+            "ZERROR_TTS_SERVICE_URL": "",
+            "ZERROR_TTS_API_KEY": "",
+            "ZERROR_TTS_VOICE": "",
+            "ZERROR_TTS_TIMEOUT_SECONDS": "",
+            "ZERROR_TTS_FALLBACK_PROVIDER": "",
+            "PIPER_TTS_COMMAND": "",
+            "PIPER_COMMAND": "",
+            "PIPER_VOICE_MODEL": "",
+            "ZERROR_PIPER_VOICE_MODEL": "",
+        }
 
 
 if __name__ == "__main__":

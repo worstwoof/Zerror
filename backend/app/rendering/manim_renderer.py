@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from backend.app.core.config import PROJECT_ROOT, settings
+from backend.app.rendering.tts_provider import (
+    synthesize_voiceover,
+    tts_diagnostics_base,
+)
 
 
 class ManimUnavailable(RuntimeError):
@@ -84,8 +88,15 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
         return diagnostics
 
     temporary_path = video_path.with_name(f"{video_path.stem}.music{video_path.suffix}")
-    narration_path = _synthesize_voiceover(video_path, scene_spec=scene_spec)
-    diagnostics["voiceover_generated"] = bool(narration_path and narration_path.exists())
+    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
+    narration_path = None
+    if audio_config.get("voiceover"):
+        voiceover_result = synthesize_voiceover(
+            video_path,
+            text=_voiceover_text(scene_spec),
+        )
+        diagnostics.update(voiceover_result.diagnostics())
+        narration_path = voiceover_result.path
     music_path = _background_music_path()
     has_narration = narration_path is not None and narration_path.exists()
     has_music = music_path is not None
@@ -211,10 +222,7 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
 
 def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    piper = _piper_command()
-    model = _piper_voice_model()
     music_path = _background_music_path()
-    model_exists = bool(model and Path(model).exists())
     return {
         "background_music_requested": scene_spec.get("background_music") is not False,
         "background_music_added": False,
@@ -225,37 +233,8 @@ def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
         "audio_muxed": False,
         "ffmpeg_available": False,
         "voiceover_requested": bool(audio_config.get("voiceover")),
-        "voiceover_engine": "piper",
-        "voiceover_command_configured": bool(piper),
-        "voiceover_model_configured": model_exists,
-        "voiceover_configured": bool(piper and model_exists),
-        "voiceover_generated": False,
+        **tts_diagnostics_base(),
     }
-
-
-def _piper_command() -> str | None:
-    return (
-        os.getenv("PIPER_TTS_COMMAND")
-        or os.getenv("PIPER_COMMAND")
-        or settings.piper_tts_command
-        or shutil.which("piper")
-    )
-
-
-def _piper_voice_model() -> str:
-    return (
-        os.getenv("PIPER_VOICE_MODEL")
-        or os.getenv("ZERROR_PIPER_VOICE_MODEL")
-        or settings.piper_voice_model
-    )
-
-
-def _piper_voice_config() -> str:
-    return (
-        os.getenv("PIPER_VOICE_CONFIG")
-        or os.getenv("ZERROR_PIPER_VOICE_CONFIG")
-        or settings.piper_voice_config
-    )
 
 
 def _background_music_path_raw() -> str:
@@ -272,55 +251,6 @@ def _background_music_path() -> Path | None:
         return None
     path = Path(value)
     return path if path.exists() and path.is_file() else None
-
-
-def _synthesize_voiceover(
-    video_path: Path,
-    *,
-    scene_spec: Dict[str, Any],
-) -> Path | None:
-    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    if not audio_config.get("voiceover"):
-        return None
-    text = _voiceover_text(scene_spec)
-    if not text:
-        return None
-    piper = _piper_command()
-    model = _piper_voice_model()
-    if not piper or not model or not Path(model).exists():
-        return None
-    output_path = video_path.with_name(f"{video_path.stem}.voice.wav")
-    command = [
-        piper,
-        "--model",
-        model,
-        "--output_file",
-        str(output_path),
-    ]
-    config_path = _piper_voice_config()
-    if config_path and Path(config_path).exists():
-        command.extend(["--config", config_path])
-    try:
-        if output_path.exists():
-            output_path.unlink()
-        completed = subprocess.run(
-            command,
-            input=text,
-            cwd=video_path.parent,
-            capture_output=True,
-            text=True,
-            timeout=240,
-            check=False,
-        )
-        if completed.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
-            return output_path
-    except Exception:
-        pass
-    try:
-        output_path.unlink(missing_ok=True)
-    except OSError:
-        pass
-    return None
 
 
 def _voiceover_text(scene_spec: Dict[str, Any]) -> str:

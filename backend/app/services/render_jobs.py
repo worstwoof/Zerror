@@ -22,7 +22,7 @@ from backend.app.rendering.manim_renderer import (
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "local-manim-real-bgm-v7"
+MANIM_RENDER_CACHE_VERSION = "local-manim-natural-tts-v8"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
