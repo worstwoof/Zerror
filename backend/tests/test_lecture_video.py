@@ -12,7 +12,11 @@ from unittest.mock import patch
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
 from backend.app.rendering import tts_provider
-from backend.app.rendering.manim_renderer import VoiceoverUnavailable, add_background_music
+from backend.app.rendering.manim_renderer import (
+    VoiceoverUnavailable,
+    _safe_scene_spec,
+    add_background_music,
+)
 from backend.app.rendering.tts_provider import TtsSynthesisResult
 from backend.app.schemas.card_schema import (
     LectureVideoRequest,
@@ -197,6 +201,27 @@ class LectureVideoServiceTest(unittest.TestCase):
                     )
 
         self.assertIn("ZERROR_TTS_SERVICE_URL", str(raised.exception))
+
+    def test_manim_formula_steps_normalize_unicode_math_for_latex(self) -> None:
+        safe = _safe_scene_spec(
+            {
+                "formula_steps": [
+                    "h₂=m/qB√(2qBv₁d/m)=√(2mdv₁/qB)",
+                    "v²≤x×y",
+                ],
+            }
+        )
+
+        formulas = safe["formula_steps"]
+        joined = " ".join(formulas)
+        self.assertNotIn("√", joined)
+        self.assertNotIn("₁", joined)
+        self.assertNotIn("₂", joined)
+        self.assertIn(r"\sqrt{2qBv_{1}d/m}", joined)
+        self.assertIn(r"h_{2}", joined)
+        self.assertIn(r"v^{2}", joined)
+        self.assertIn(r"\le", joined)
+        self.assertIn(r"\times", joined)
 
     def test_cosyvoice_http_provider_chunks_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_dir:

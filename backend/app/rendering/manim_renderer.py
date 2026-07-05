@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -2920,12 +2921,79 @@ _LATEX_COMMANDS = (
 )
 
 
+_UNICODE_SUBSCRIPTS = str.maketrans(
+    {
+        "₀": "0",
+        "₁": "1",
+        "₂": "2",
+        "₃": "3",
+        "₄": "4",
+        "₅": "5",
+        "₆": "6",
+        "₇": "7",
+        "₈": "8",
+        "₉": "9",
+    }
+)
+_UNICODE_SUPERSCRIPTS = str.maketrans(
+    {
+        "⁰": "0",
+        "¹": "1",
+        "²": "2",
+        "³": "3",
+        "⁴": "4",
+        "⁵": "5",
+        "⁶": "6",
+        "⁷": "7",
+        "⁸": "8",
+        "⁹": "9",
+    }
+)
+_UNICODE_MATH_REPLACEMENTS = {
+    "π": r"\pi",
+    "θ": r"\theta",
+    "α": r"\alpha",
+    "β": r"\beta",
+    "γ": r"\gamma",
+    "λ": r"\lambda",
+    "μ": r"\mu",
+    "Δ": r"\Delta",
+    "×": r"\times",
+    "÷": r"\div",
+    "·": r"\cdot",
+    "≤": r"\le",
+    "≥": r"\ge",
+    "≠": r"\ne",
+    "≈": r"\approx",
+    "±": r"\pm",
+}
+
+
 def _normalize_latex_escapes(value: Any) -> str:
     text = str(value)
+    text = re.sub(r"([A-Za-z\\][A-Za-z0-9{}\\]*)\s*([₀₁₂₃₄₅₆₇₈₉]+)", _replace_unicode_subscript, text)
+    text = re.sub(r"([A-Za-z0-9{}\\)])\s*([⁰¹²³⁴⁵⁶⁷⁸⁹]+)", _replace_unicode_superscript, text)
+    text = re.sub(r"√\s*\(([^()]+)\)", r"\\sqrt{\1}", text)
+    text = re.sub(r"√\s*([A-Za-z0-9_{}\\./+\-*]+)", r"\\sqrt{\1}", text)
+    text = re.sub(r"(?<!\\)\bsqrt\s*\(([^()]+)\)", r"\\sqrt{\1}", text)
+    for source, target in _UNICODE_MATH_REPLACEMENTS.items():
+        text = text.replace(source, target)
     for _ in range(4):
         for command in _LATEX_COMMANDS:
             text = text.replace("\\\\" + command, "\\" + command)
     return text
+
+
+def _replace_unicode_subscript(match: re.Match[str]) -> str:
+    base = match.group(1)
+    digits = match.group(2).translate(_UNICODE_SUBSCRIPTS)
+    return f"{base}_{{{digits}}}"
+
+
+def _replace_unicode_superscript(match: re.Match[str]) -> str:
+    base = match.group(1)
+    digits = match.group(2).translate(_UNICODE_SUPERSCRIPTS)
+    return f"{base}^{{{digits}}}"
 
 
 def _safe_formula_step(item: Any) -> Any:
