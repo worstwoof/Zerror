@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
 from backend.app.rendering import tts_provider
 from backend.app.rendering.manim_renderer import add_background_music
@@ -245,6 +246,49 @@ class LectureVideoServiceTest(unittest.TestCase):
             self.assertTrue(result.fallback_used)
             self.assertEqual(1, result.chunk_count)
             self.assertTrue(result.path and result.path.exists())
+
+    def test_cosyvoice_http_timeout_does_not_use_piper_when_fallback_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            video_path = Path(temporary_dir) / "lesson.mp4"
+            video_path.write_bytes(b"video")
+
+            with patch(
+                "backend.app.rendering.tts_provider.settings",
+                self._tts_settings(
+                    tts_provider="cosyvoice_http",
+                    tts_service_url="http://tts.local:7861",
+                    tts_fallback_provider="none",
+                ),
+            ), patch(
+                "backend.app.rendering.tts_provider._http_tts_chunk",
+                side_effect=TimeoutError("timeout"),
+            ), patch(
+                "backend.app.rendering.tts_provider._synthesize_piper_voiceover",
+            ) as piper, patch.dict("os.environ", self._empty_tts_env(), clear=False):
+                result = tts_provider.synthesize_voiceover(video_path, text="讲解一段知识点。")
+
+            self.assertEqual("cosyvoice_http", result.provider)
+            self.assertFalse(result.fallback_used)
+            self.assertIsNone(result.path)
+            piper.assert_not_called()
+
+    def test_physics_manim_scene_requests_natural_voiceover(self) -> None:
+        service = DiagnosticService(_FakeClient("{}"))  # type: ignore[arg-type]
+
+        scene_spec = service._build_physics_manim_scene_spec(
+            cleaned_question="长木板放在光滑平台上，物块在木板上表面，细线绕过定滑轮。",
+            scene_brief="木板和物块组成板块模型，物块受到水平拉力。",
+            knowledge_points=["牛顿第二定律", "板块模型动力学"],
+            solution_summary="先判断相对滑动，再分别列牛顿第二定律。",
+            solution_steps=[
+                "第(1)问：对木板和物块分别受力分析，判断静摩擦力是否足够。",
+                "第(2)问：相对位移等于板长，列位移公式求时间。",
+            ],
+        )
+
+        self.assertTrue(scene_spec["audio"]["voiceover"])
+        self.assertTrue(scene_spec["audio"]["narration_outline"])
+        self.assertIn("木板", " ".join(scene_spec["audio"]["narration_outline"]))
 
     def test_math_conic_request_routes_to_math_conic_scene(self) -> None:
         raw = json.dumps(

@@ -249,7 +249,7 @@ def get_settings() -> Settings:
         tts_fallback_provider=_get_setting(
             "ZERROR_TTS_FALLBACK_PROVIDER",
             file_values,
-            "piper",
+            "none",
         ),
         background_music_path=_get_setting(
             "ZERROR_BACKGROUND_MUSIC_PATH",

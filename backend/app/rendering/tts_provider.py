@@ -364,12 +364,15 @@ def _tts_provider() -> str:
 
 
 def _tts_fallback_provider() -> str:
-    return (
+    value = (
         os.getenv("ZERROR_TTS_FALLBACK_PROVIDER")
         or os.getenv("TTS_FALLBACK_PROVIDER")
         or settings.tts_fallback_provider
         or "piper"
     ).strip()
+    if value.lower() in {"", "none", "off", "disabled", "disable", "false", "no"}:
+        return ""
+    return value
 
 
 def _tts_service_url() -> str:

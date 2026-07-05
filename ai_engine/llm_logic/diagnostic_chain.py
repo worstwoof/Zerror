@@ -702,6 +702,14 @@ class DiagnosticService:
             solution_steps=solution_steps,
             solution_summary=solution_summary,
         )
+        narration_outline = self._build_physics_voiceover_outline(
+            title=title_map.get(scene_type, "物理动画视频"),
+            scene_type=scene_type,
+            scene_brief=scene_brief,
+            knowledge_points=focus_points,
+            solution_steps=solution_steps,
+            solution_summary=solution_summary,
+        )
         scene_spec = {
             "schema_version": 2,
             "subject": "physics",
@@ -723,6 +731,11 @@ class DiagnosticService:
             "steps": narration_steps,
             "render_targets": ["manim"],
             "fallback_text": fallback_text,
+            "background_music": True,
+            "audio": {
+                "voiceover": True,
+                "narration_outline": narration_outline,
+            },
             "show_title": True,
             "show_summary": True,
         }
@@ -739,6 +752,51 @@ class DiagnosticService:
                 }
             )
         return scene_spec
+
+    def _build_physics_voiceover_outline(
+        self,
+        *,
+        title: str,
+        scene_type: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+        solution_summary: str,
+    ) -> List[str]:
+        intro_map = {
+            "board_block": "这段视频先把木板和物块分成两个研究对象，再看摩擦力怎样决定相对运动。",
+            "incline": "这段视频沿斜面方向和垂直斜面方向拆解受力，再对应运动变化。",
+            "projectile": "这段视频把运动拆成水平和竖直两个方向，观察位移和速度如何配合。",
+            "collision": "这段视频围绕碰撞前后状态，比较动量、能量和速度变化。",
+            "circuit": "这段视频先看电流路径和关键元件，再解释表计读数或亮暗变化。",
+            "electromagnetism": "这段视频先确定速度、磁场和受力方向，再观察轨迹或电流怎样变化。",
+            "mechanics": "这段视频先画研究对象和主要受力，再把受力变化翻译成运动变化。",
+        }
+        outline = [
+            intro_map.get(
+                scene_type,
+                f"这段视频围绕“{title}”，把题目里的物理对象、受力和运动过程连起来看。",
+            )
+        ]
+        brief = self._display_plain_text(scene_brief, limit=90)
+        if brief:
+            outline.append(f"先看题目场景：{brief}")
+        points = [
+            self._display_plain_text(str(item), limit=24)
+            for item in knowledge_points[:3]
+            if str(item).strip()
+        ]
+        if points:
+            outline.append(f"本题主要用到：{'、'.join(points)}。")
+        for step in solution_steps[:6]:
+            cleaned = re.sub(r"\$\$.+?\$\$", "", str(step), flags=re.S)
+            text = self._display_plain_text(cleaned, limit=96)
+            if text:
+                outline.append(text)
+        summary = self._display_plain_text(solution_summary, limit=100)
+        if summary:
+            outline.append(f"最后回到结论：{summary}")
+        return outline[:10]
 
     def _extract_physics_formula_steps(self, solution_steps: List[str]) -> List[str]:
         formulas: List[str] = []
