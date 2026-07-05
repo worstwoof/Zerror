@@ -134,6 +134,7 @@ class LectureVideoServiceTest(unittest.TestCase):
                     piper_tts_command="",
                     piper_voice_model="",
                     piper_voice_config="",
+                    background_music_path="",
                 ),
             ), patch.dict(
                 "os.environ",
@@ -155,6 +156,8 @@ class LectureVideoServiceTest(unittest.TestCase):
 
         self.assertTrue(diagnostics["background_music_requested"])
         self.assertTrue(diagnostics["voiceover_requested"])
+        self.assertEqual("none", diagnostics["background_music_source"])
+        self.assertFalse(diagnostics["background_music_file_configured"])
         self.assertFalse(diagnostics["voiceover_configured"])
         self.assertFalse(diagnostics["voiceover_generated"])
         self.assertFalse(diagnostics["background_music_added"])

@@ -79,6 +79,7 @@ class Settings:
     piper_tts_command: str
     piper_voice_model: str
     piper_voice_config: str
+    background_music_path: str
     debug: bool
 
     @property
@@ -223,6 +224,11 @@ def get_settings() -> Settings:
             "PIPER_VOICE_CONFIG",
             file_values,
             _get_setting("ZERROR_PIPER_VOICE_CONFIG", file_values),
+        ),
+        background_music_path=_get_setting(
+            "ZERROR_BACKGROUND_MUSIC_PATH",
+            file_values,
+            _get_setting("BACKGROUND_MUSIC_PATH", file_values),
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )

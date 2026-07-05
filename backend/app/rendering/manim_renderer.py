@@ -86,18 +86,18 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
     temporary_path = video_path.with_name(f"{video_path.stem}.music{video_path.suffix}")
     narration_path = _synthesize_voiceover(video_path, scene_spec=scene_spec)
     diagnostics["voiceover_generated"] = bool(narration_path and narration_path.exists())
-    bed_source = (
-        "aevalsrc="
-        "(0.0045*sin(2*PI*440*t)"
-        "+0.0034*sin(2*PI*554.37*t)"
-        "+0.0028*sin(2*PI*659.25*t)"
-        "+0.0022*sin(2*PI*880*t))"
-        "*(0.70+0.30*sin(2*PI*0.045*t)):s=44100"
-    )
+    music_path = _background_music_path()
+    has_narration = narration_path is not None and narration_path.exists()
+    has_music = music_path is not None
+    if not has_music and not has_narration:
+        return diagnostics
+    if has_music:
+        diagnostics["background_music_file_exists"] = True
+        diagnostics["background_music_source"] = "file"
     try:
         if temporary_path.exists():
             temporary_path.unlink()
-        if narration_path is not None and narration_path.exists():
+        if has_narration and has_music:
             command = [
                 ffmpeg,
                 "-y",
@@ -105,15 +105,38 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
                 str(video_path),
                 "-i",
                 str(narration_path),
-                "-f",
-                "lavfi",
+                "-stream_loop",
+                "-1",
                 "-i",
-                bed_source,
+                str(music_path),
                 "-filter_complex",
                 "[1:a]volume=1.18,aresample=44100[narr];"
-                "[2:a]highpass=f=260,lowpass=f=3600,afade=t=in:st=0:d=1.2,"
-                "volume=0.18[bed];"
-                "[narr][bed]amix=inputs=2:duration=longest:dropout_transition=2[a]",
+                "[2:a]volume=0.11,afade=t=in:st=0:d=1.2,"
+                "afade=t=out:st=99999:d=0.1[bgm];"
+                "[narr][bgm]amix=inputs=2:duration=longest:dropout_transition=2[a]",
+                "-map",
+                "0:v:0",
+                "-map",
+                "[a]",
+                "-shortest",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                str(temporary_path),
+            ]
+        elif has_narration:
+            command = [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-i",
+                str(narration_path),
+                "-filter_complex",
+                "[1:a]volume=1.18,aresample=44100[a]",
                 "-map",
                 "0:v:0",
                 "-map",
@@ -133,16 +156,16 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
                 "-y",
                 "-i",
                 str(video_path),
-                "-f",
-                "lavfi",
+                "-stream_loop",
+                "-1",
                 "-i",
-                bed_source,
+                str(music_path),
                 "-filter_complex",
-                "[1:a]highpass=f=260,lowpass=f=3600,afade=t=in:st=0:d=1.2,volume=0.20[bed]",
+                "[1:a]volume=0.13,afade=t=in:st=0:d=1.2[a]",
                 "-map",
                 "0:v:0",
                 "-map",
-                "[bed]",
+                "[a]",
                 "-shortest",
                 "-c:v",
                 "copy",
@@ -166,7 +189,7 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
             and temporary_path.stat().st_size > 0
         ):
             temporary_path.replace(video_path)
-            diagnostics["background_music_added"] = True
+            diagnostics["background_music_added"] = has_music
             diagnostics["audio_muxed"] = True
             return diagnostics
         if temporary_path.exists():
@@ -190,11 +213,15 @@ def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
     piper = _piper_command()
     model = _piper_voice_model()
+    music_path = _background_music_path()
     model_exists = bool(model and Path(model).exists())
     return {
         "background_music_requested": scene_spec.get("background_music") is not False,
         "background_music_added": False,
-        "background_music_style": "soft_high_harmonic_no_low_loop",
+        "background_music_style": "real_music_file",
+        "background_music_source": "file" if music_path else "none",
+        "background_music_file_configured": bool(_background_music_path_raw()),
+        "background_music_file_exists": music_path is not None,
         "audio_muxed": False,
         "ffmpeg_available": False,
         "voiceover_requested": bool(audio_config.get("voiceover")),
@@ -229,6 +256,22 @@ def _piper_voice_config() -> str:
         or os.getenv("ZERROR_PIPER_VOICE_CONFIG")
         or settings.piper_voice_config
     )
+
+
+def _background_music_path_raw() -> str:
+    return (
+        os.getenv("ZERROR_BACKGROUND_MUSIC_PATH")
+        or os.getenv("BACKGROUND_MUSIC_PATH")
+        or settings.background_music_path
+    )
+
+
+def _background_music_path() -> Path | None:
+    value = _background_music_path_raw()
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.exists() and path.is_file() else None
 
 
 def _synthesize_voiceover(
