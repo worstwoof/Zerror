@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-from backend.app.core.config import PROJECT_ROOT
+from backend.app.core.config import PROJECT_ROOT, settings
 
 
 class ManimUnavailable(RuntimeError):
@@ -188,8 +188,8 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
 
 def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    piper = os.getenv("PIPER_TTS_COMMAND") or os.getenv("PIPER_COMMAND") or shutil.which("piper")
-    model = os.getenv("PIPER_VOICE_MODEL") or os.getenv("ZERROR_PIPER_VOICE_MODEL")
+    piper = _piper_command()
+    model = _piper_voice_model()
     model_exists = bool(model and Path(model).exists())
     return {
         "background_music_requested": scene_spec.get("background_music") is not False,
@@ -206,6 +206,31 @@ def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _piper_command() -> str | None:
+    return (
+        os.getenv("PIPER_TTS_COMMAND")
+        or os.getenv("PIPER_COMMAND")
+        or settings.piper_tts_command
+        or shutil.which("piper")
+    )
+
+
+def _piper_voice_model() -> str:
+    return (
+        os.getenv("PIPER_VOICE_MODEL")
+        or os.getenv("ZERROR_PIPER_VOICE_MODEL")
+        or settings.piper_voice_model
+    )
+
+
+def _piper_voice_config() -> str:
+    return (
+        os.getenv("PIPER_VOICE_CONFIG")
+        or os.getenv("ZERROR_PIPER_VOICE_CONFIG")
+        or settings.piper_voice_config
+    )
+
+
 def _synthesize_voiceover(
     video_path: Path,
     *,
@@ -217,8 +242,8 @@ def _synthesize_voiceover(
     text = _voiceover_text(scene_spec)
     if not text:
         return None
-    piper = os.getenv("PIPER_TTS_COMMAND") or os.getenv("PIPER_COMMAND") or shutil.which("piper")
-    model = os.getenv("PIPER_VOICE_MODEL") or os.getenv("ZERROR_PIPER_VOICE_MODEL")
+    piper = _piper_command()
+    model = _piper_voice_model()
     if not piper or not model or not Path(model).exists():
         return None
     output_path = video_path.with_name(f"{video_path.stem}.voice.wav")
@@ -229,7 +254,7 @@ def _synthesize_voiceover(
         "--output_file",
         str(output_path),
     ]
-    config_path = os.getenv("PIPER_VOICE_CONFIG") or os.getenv("ZERROR_PIPER_VOICE_CONFIG")
+    config_path = _piper_voice_config()
     if config_path and Path(config_path).exists():
         command.extend(["--config", config_path])
     try:

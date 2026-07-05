@@ -76,6 +76,9 @@ class Settings:
     vivo_animation_timeout_seconds: int
     vivo_max_tokens: int
     vivo_animation_max_tokens: int
+    piper_tts_command: str
+    piper_voice_model: str
+    piper_voice_config: str
     debug: bool
 
     @property
@@ -205,6 +208,21 @@ def get_settings() -> Settings:
                 file_values,
                 "8192",
             )
+        ),
+        piper_tts_command=_get_setting(
+            "PIPER_TTS_COMMAND",
+            file_values,
+            _get_setting("PIPER_COMMAND", file_values),
+        ),
+        piper_voice_model=_get_setting(
+            "PIPER_VOICE_MODEL",
+            file_values,
+            _get_setting("ZERROR_PIPER_VOICE_MODEL", file_values),
+        ),
+        piper_voice_config=_get_setting(
+            "PIPER_VOICE_CONFIG",
+            file_values,
+            _get_setting("ZERROR_PIPER_VOICE_CONFIG", file_values),
         ),
         debug=_get_setting("DEBUG", file_values, "false").lower() == "true",
     )

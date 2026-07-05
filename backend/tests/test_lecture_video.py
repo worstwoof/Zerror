@@ -128,7 +128,14 @@ class LectureVideoServiceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_dir:
             video_path = Path(temporary_dir) / "lesson.mp4"
             video_path.write_bytes(b"not a real video")
-            with patch("backend.app.rendering.manim_renderer.shutil.which", return_value=None), patch.dict(
+            with patch("backend.app.rendering.manim_renderer.shutil.which", return_value=None), patch(
+                "backend.app.rendering.manim_renderer.settings",
+                SimpleNamespace(
+                    piper_tts_command="",
+                    piper_voice_model="",
+                    piper_voice_config="",
+                ),
+            ), patch.dict(
                 "os.environ",
                 {
                     "PIPER_TTS_COMMAND": "",
