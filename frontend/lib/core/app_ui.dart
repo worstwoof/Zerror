@@ -561,11 +561,13 @@ class AppChatInputBar extends StatelessWidget {
     required this.controller,
     required this.onSend,
     this.hintText = '问问 AI 助教',
+    this.modeSelector,
   });
 
   final TextEditingController controller;
   final VoidCallback? onSend;
   final String hintText;
+  final Widget? modeSelector;
 
   @override
   Widget build(BuildContext context) {
@@ -582,6 +584,10 @@ class AppChatInputBar extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 286),
           child: Row(
             children: [
+              if (modeSelector != null) ...[
+                modeSelector!,
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: TextField(
                   controller: controller,

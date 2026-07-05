@@ -15,7 +15,7 @@ from backend.app.schemas.card_schema import (
     LectureHandoutSummaryTable,
 )
 
-from .vivo_client import VivoLMClient
+from .vivo_client import VivoAPIError, VivoLMClient
 
 
 logger = logging.getLogger(__name__)
@@ -52,14 +52,7 @@ class LectureHandoutService:
         if not request.prompt.strip():
             raise ValueError("讲义主题不能为空。")
 
-        raw_output = self.client.chat_completion(
-            self._build_prompt(request),
-            model_name=self.client.settings.vivo_handout_model,
-            thinking_mode=self.client.settings.vivo_handout_thinking_mode,
-            reasoning_effort=self.client.settings.vivo_handout_reasoning_effort,
-            max_tokens=self.client.settings.vivo_handout_max_tokens,
-            timeout_seconds=self.client.settings.vivo_handout_timeout_seconds,
-        )
+        raw_output = self._chat_completion_with_fallback(self._build_prompt(request))
         parsed = self._parse_json(raw_output)
         response = self._build_response(
             request=request,
@@ -73,6 +66,110 @@ class LectureHandoutService:
             len(response.sections),
         )
         return response
+
+    def _chat_completion_with_fallback(self, prompt: str) -> str:
+        last_error: VivoAPIError | None = None
+        for attempt in self._completion_attempts():
+            try:
+                return self.client.chat_completion(prompt, **attempt)
+            except VivoAPIError as exc:
+                last_error = exc
+                logger.warning(
+                    "lecture handout completion failed model=%s max_tokens=%s error=%s",
+                    attempt.get("model_name"),
+                    attempt.get("max_tokens"),
+                    exc,
+                )
+        if last_error is not None:
+            raise last_error
+        raise VivoAPIError("讲义模型调用失败：没有可用模型配置。")
+
+    def _completion_attempts(self) -> list[dict[str, Any]]:
+        settings = self.client.settings
+        primary_model = str(getattr(settings, "vivo_handout_model", "") or "").strip()
+        text_model = str(getattr(settings, "vivo_text_model", "") or "").strip()
+        primary_max_tokens = self._positive_int_setting(
+            "vivo_handout_max_tokens",
+            8192,
+        )
+        safe_max_tokens = min(primary_max_tokens, 8192)
+        timeout_seconds = self._positive_int_setting(
+            "vivo_handout_timeout_seconds",
+            240,
+        )
+        attempts: list[dict[str, Any]] = []
+
+        if primary_model:
+            attempts.append(
+                {
+                    "model_name": primary_model,
+                    "thinking_mode": str(
+                        getattr(settings, "vivo_handout_thinking_mode", "auto")
+                    ),
+                    "reasoning_effort": str(
+                        getattr(settings, "vivo_handout_reasoning_effort", "medium")
+                    ),
+                    "max_tokens": primary_max_tokens,
+                    "timeout_seconds": timeout_seconds,
+                }
+            )
+            if safe_max_tokens != primary_max_tokens:
+                attempts.append(
+                    {
+                        "model_name": primary_model,
+                        "thinking_mode": str(
+                            getattr(settings, "vivo_handout_thinking_mode", "auto")
+                        ),
+                        "reasoning_effort": str(
+                            getattr(
+                                settings,
+                                "vivo_handout_reasoning_effort",
+                                "medium",
+                            )
+                        ),
+                        "max_tokens": safe_max_tokens,
+                        "timeout_seconds": timeout_seconds,
+                    }
+                )
+
+        if text_model and text_model != primary_model:
+            attempts.append(
+                {
+                    "model_name": text_model,
+                    "thinking_mode": str(
+                        getattr(settings, "vivo_text_thinking_mode", "auto")
+                    ),
+                    "reasoning_effort": str(
+                        getattr(settings, "vivo_text_reasoning_effort", "auto")
+                    ),
+                    "max_tokens": safe_max_tokens,
+                    "timeout_seconds": timeout_seconds,
+                }
+            )
+
+        deduped: list[dict[str, Any]] = []
+        seen: set[tuple[Any, ...]] = set()
+        for attempt in attempts:
+            key = (
+                attempt.get("model_name"),
+                attempt.get("thinking_mode"),
+                attempt.get("reasoning_effort"),
+                attempt.get("max_tokens"),
+                attempt.get("timeout_seconds"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(attempt)
+        return deduped
+
+    def _positive_int_setting(self, name: str, default: int) -> int:
+        value = getattr(self.client.settings, name, default)
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed > 0 else default
 
     def _build_prompt(self, request: LectureHandoutRequest) -> str:
         subject_hint = request.subject.strip() or "从用户输入中判断"

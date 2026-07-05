@@ -7,6 +7,7 @@ import unittest
 from types import SimpleNamespace
 
 from ai_engine.llm_logic.lecture_handout_chain import LectureHandoutService
+from ai_engine.llm_logic.vivo_client import VivoAPIError
 from backend.app.schemas.card_schema import (
     LectureHandoutRequest,
     LectureHandoutResponse,
@@ -26,12 +27,37 @@ class _FakeClient:
             vivo_handout_model="Doubao-Seed-2.0-pro",
             vivo_handout_thinking_mode="auto",
             vivo_handout_reasoning_effort="medium",
-            vivo_handout_max_tokens=20000,
+            vivo_handout_max_tokens=8192,
             vivo_handout_timeout_seconds=360,
+            vivo_text_model="Doubao-Seed-2.0-mini",
+            vivo_text_thinking_mode="auto",
+            vivo_text_reasoning_effort="auto",
         )
 
     def chat_completion(self, prompt: str, *_args, **_kwargs) -> str:
         self.prompts.append(prompt)
+        return self.raw_output
+
+
+class _TokenFallbackClient:
+    def __init__(self, raw_output: str) -> None:
+        self.raw_output = raw_output
+        self.calls: list[dict] = []
+        self.settings = SimpleNamespace(
+            vivo_handout_model="Doubao-Seed-2.0-pro",
+            vivo_handout_thinking_mode="auto",
+            vivo_handout_reasoning_effort="medium",
+            vivo_handout_max_tokens=20000,
+            vivo_handout_timeout_seconds=360,
+            vivo_text_model="Doubao-Seed-2.0-mini",
+            vivo_text_thinking_mode="auto",
+            vivo_text_reasoning_effort="auto",
+        )
+
+    def chat_completion(self, prompt: str, *_args, **kwargs) -> str:
+        self.calls.append(kwargs)
+        if len(self.calls) == 1:
+            raise VivoAPIError("vivo 接口请求失败，status=400，body=max_tokens too large")
         return self.raw_output
 
 
@@ -166,6 +192,30 @@ class LectureHandoutServiceTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             service.generate_handout(LectureHandoutRequest(prompt="   "))
+
+    def test_handout_model_retries_with_safe_token_limit(self) -> None:
+        raw = json.dumps(
+            {
+                "title": "圆锥曲线讲义",
+                "subtitle": "数学 · 知识梳理",
+                "subject": "数学",
+                "topic": "圆锥曲线",
+                "overview": "圆锥曲线核心复习。",
+            },
+            ensure_ascii=False,
+        )
+        client = _TokenFallbackClient(raw)
+        service = LectureHandoutService(client)  # type: ignore[arg-type]
+
+        response = service.generate_handout(
+            LectureHandoutRequest(prompt="生成圆锥曲线讲义")
+        )
+
+        self.assertEqual("圆锥曲线讲义", response.title)
+        self.assertEqual(2, len(client.calls))
+        self.assertEqual(20000, client.calls[0]["max_tokens"])
+        self.assertEqual(8192, client.calls[1]["max_tokens"])
+        self.assertEqual(client.calls[0]["model_name"], client.calls[1]["model_name"])
 
     def test_job_create_query_failure_and_retry(self) -> None:
         service = _FlakyHandoutService()

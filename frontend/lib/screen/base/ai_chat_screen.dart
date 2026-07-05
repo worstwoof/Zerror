@@ -80,10 +80,6 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (_didRestoreMessages) return;
     _didRestoreMessages = true;
     _appendMessageRecords(AppStateScope.of(context).assistantChatMessages);
-    if (_messages.isNotEmpty) {
-      _showChat = true;
-      _scrollToBottom(animated: false);
-    }
   }
 
   AnimationController _ensureFlipController() {
@@ -102,6 +98,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed && _isFlipping) {
           setState(() => _isFlipping = false);
+          _scrollToBottom(animated: false);
         }
       });
     _flipController = controller;
@@ -130,6 +127,43 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (text.isEmpty || _isThinking) return;
     final selectedMode = mode ?? _activeMode;
     final store = AppStateScope.of(context);
+
+    if (selectedMode == _AssistantMode.lectureVideo) {
+      final subject = _extractSubject(text);
+      final task = store.enqueueLectureVideoTask(
+        prompt: text,
+        subject: subject,
+        topic: _extractLectureVideoTopic(text, subject),
+      );
+      final userMessage = store.addAssistantChatUserMessage(text);
+      final videoMessage = store.addAssistantChatLectureVideoTask(task.id);
+      setState(() {
+        _activeMode = selectedMode;
+        _appendMessageRecords([userMessage, videoMessage]);
+        _controller.clear();
+      });
+      _scrollToBottom();
+      return;
+    }
+
+    if (selectedMode == _AssistantMode.lectureHandout) {
+      final subject = _extractSubject(text);
+      final task = store.enqueueLectureHandoutTask(
+        prompt: text,
+        subject: subject,
+        topic: _extractLectureTopic(text, subject),
+      );
+      final userMessage = store.addAssistantChatUserMessage(text);
+      final handoutMessage = store.addAssistantChatLectureHandoutTask(task.id);
+      setState(() {
+        _activeMode = selectedMode;
+        _appendMessageRecords([userMessage, handoutMessage]);
+        _controller.clear();
+      });
+      _scrollToBottom();
+      return;
+    }
+
     final videoIntent = _detectLectureVideoIntent(text);
     final lectureIntent = _detectLectureHandoutIntent(text);
 
@@ -142,7 +176,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       final userMessage = store.addAssistantChatUserMessage(text);
       final videoMessage = store.addAssistantChatLectureVideoTask(task.id);
       setState(() {
-        _activeMode = selectedMode;
+        _activeMode = _AssistantMode.lectureVideo;
         _appendMessageRecords([userMessage, videoMessage]);
         _controller.clear();
       });
@@ -159,7 +193,7 @@ class _AiChatScreenState extends State<AiChatScreen>
       final userMessage = store.addAssistantChatUserMessage(text);
       final handoutMessage = store.addAssistantChatLectureHandoutTask(task.id);
       setState(() {
-        _activeMode = selectedMode;
+        _activeMode = _AssistantMode.lectureHandout;
         _appendMessageRecords([userMessage, handoutMessage]);
         _controller.clear();
       });
@@ -284,6 +318,8 @@ class _AiChatScreenState extends State<AiChatScreen>
         pool.addAll(store.pendingReviewErrors);
         addWhere(store.errors, sameFocus);
         break;
+      case _AssistantMode.lectureHandout:
+      case _AssistantMode.lectureVideo:
       case _AssistantMode.errorMemory:
         pool.addAll(store.pendingReviewErrors);
         addWhere(store.errors, sameFocus);
@@ -357,6 +393,10 @@ class _AiChatScreenState extends State<AiChatScreen>
         return '围绕「$topic」先补定义和公式条件，再连接相邻题型，最后检查易混边界。';
       case _AssistantMode.examSprint:
         return '考前不要铺太开，只抓「$topic」做回看、同类题和步骤复述。';
+      case _AssistantMode.lectureHandout:
+        return '我会围绕「$text」整理成知识讲义，重点放在概念、公式条件、方法步骤和易错提醒。';
+      case _AssistantMode.lectureVideo:
+        return '我会围绕「$text」生成讲解视频，先规划图形变化，再配合分阶段字幕说明。';
       case _AssistantMode.quickAnswer:
         return '先给结论，再找题干条件，最后决定是算、判定，还是回到错题档案补同类练习。';
     }
@@ -374,6 +414,10 @@ class _AiChatScreenState extends State<AiChatScreen>
         return const ['前置定义', '相邻题型', '最容易混淆的条件'];
       case _AssistantMode.errorMemory:
         return const ['找重复错因', '对照最近错题', '用一句话复述修正动作'];
+      case _AssistantMode.lectureHandout:
+        return const ['知识结构', '二级结论', '易错提醒'];
+      case _AssistantMode.lectureVideo:
+        return const ['图形演示', '分阶段字幕', '关键检查点'];
       case _AssistantMode.quickAnswer:
         return const ['先判断题型', '再列已知条件', '最后给下一步动作'];
     }
@@ -799,6 +843,12 @@ class _AiChatScreenState extends State<AiChatScreen>
             controller: _controller,
             onSend: () => _send(),
             hintText: '',
+            modeSelector: _AssistantModeSelector(
+              mode: _activeMode,
+              onChanged: (mode) {
+                setState(() => _activeMode = mode);
+              },
+            ),
           ),
         ),
       ],
@@ -1730,7 +1780,14 @@ class _ChatMessage {
   final String? lectureVideoTaskId;
 }
 
-enum _AssistantMode { quickAnswer, errorMemory, knowledgeLink, examSprint }
+enum _AssistantMode {
+  quickAnswer,
+  errorMemory,
+  knowledgeLink,
+  examSprint,
+  lectureHandout,
+  lectureVideo,
+}
 
 extension _AssistantModeInfo on _AssistantMode {
   String get apiName {
@@ -1743,6 +1800,10 @@ extension _AssistantModeInfo on _AssistantMode {
         return 'knowledge_link';
       case _AssistantMode.examSprint:
         return 'exam_sprint';
+      case _AssistantMode.lectureHandout:
+        return 'lecture_handout';
+      case _AssistantMode.lectureVideo:
+        return 'lecture_video';
     }
   }
 
@@ -1756,6 +1817,10 @@ extension _AssistantModeInfo on _AssistantMode {
         return '关联知识点';
       case _AssistantMode.examSprint:
         return '考前短复习';
+      case _AssistantMode.lectureHandout:
+        return '生成讲义';
+      case _AssistantMode.lectureVideo:
+        return '生成讲解视频';
     }
   }
 
@@ -1769,7 +1834,146 @@ extension _AssistantModeInfo on _AssistantMode {
         return '主动关联知识点';
       case _AssistantMode.examSprint:
         return '考前短时复习';
+      case _AssistantMode.lectureHandout:
+        return '知识讲义生成';
+      case _AssistantMode.lectureVideo:
+        return '讲解视频生成';
     }
+  }
+
+  String get compactTitle {
+    switch (this) {
+      case _AssistantMode.lectureVideo:
+        return '讲解视频';
+      case _AssistantMode.lectureHandout:
+        return '生成讲义';
+      case _AssistantMode.quickAnswer:
+        return '快问';
+      case _AssistantMode.errorMemory:
+        return '错题';
+      case _AssistantMode.knowledgeLink:
+        return '关联';
+      case _AssistantMode.examSprint:
+        return '冲刺';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _AssistantMode.quickAnswer:
+        return Icons.flash_on_rounded;
+      case _AssistantMode.errorMemory:
+        return Icons.folder_special_rounded;
+      case _AssistantMode.knowledgeLink:
+        return Icons.hub_rounded;
+      case _AssistantMode.examSprint:
+        return Icons.timer_rounded;
+      case _AssistantMode.lectureHandout:
+        return Icons.description_rounded;
+      case _AssistantMode.lectureVideo:
+        return Icons.smart_display_rounded;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case _AssistantMode.quickAnswer:
+        return AppPalette.mint;
+      case _AssistantMode.errorMemory:
+        return AppPalette.peach;
+      case _AssistantMode.knowledgeLink:
+        return AppPalette.blush;
+      case _AssistantMode.examSprint:
+        return AppPalette.leaf;
+      case _AssistantMode.lectureHandout:
+        return AppPalette.moodBlue;
+      case _AssistantMode.lectureVideo:
+        return AppPalette.inkBlue;
+    }
+  }
+}
+
+class _AssistantModeSelector extends StatelessWidget {
+  const _AssistantModeSelector({
+    required this.mode,
+    required this.onChanged,
+  });
+
+  final _AssistantMode mode;
+  final ValueChanged<_AssistantMode> onChanged;
+
+  static const List<_AssistantMode> _modes = [
+    _AssistantMode.quickAnswer,
+    _AssistantMode.errorMemory,
+    _AssistantMode.knowledgeLink,
+    _AssistantMode.examSprint,
+    _AssistantMode.lectureHandout,
+    _AssistantMode.lectureVideo,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_AssistantMode>(
+      tooltip: '选择提问模式',
+      initialValue: mode,
+      onSelected: onChanged,
+      position: PopupMenuPosition.over,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      itemBuilder: (context) {
+        return _modes.map((item) {
+          return PopupMenuItem<_AssistantMode>(
+            value: item,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(item.icon, size: 18, color: item.color),
+                const SizedBox(width: 10),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(growable: false);
+      },
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: mode.color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: mode.color.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(mode.icon, size: 17, color: mode.color),
+            const SizedBox(width: 5),
+            Text(
+              mode.compactTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: mode.color,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 17,
+              color: mode.color,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

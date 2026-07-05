@@ -182,7 +182,7 @@ def get_settings() -> Settings:
             _get_setting("VIVO_HANDOUT_TIMEOUT_SECONDS", file_values, "360")
         ),
         vivo_handout_max_tokens=int(
-            _get_setting("VIVO_HANDOUT_MAX_TOKENS", file_values, "20000")
+            _get_setting("VIVO_HANDOUT_MAX_TOKENS", file_values, "8192")
         ),
         vivo_animation_model=_get_setting(
             "VIVO_ANIMATION_MODEL",

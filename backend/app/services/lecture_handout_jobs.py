@@ -173,6 +173,12 @@ def _to_response(job: Dict[str, Any]) -> LectureHandoutJobResponse:
 
 def _friendly_error(exc: Exception) -> str:
     message = str(exc).lower()
+    if "permission" in message or "no model access" in message or "30001" in message:
+        return "当前讲义模型权限或额度不可用，已尝试降级模型仍失败，请检查 VIVO_HANDOUT_MODEL 或模型额度。"
+    if "rate limit" in message or "429" in message or "限流" in message:
+        return "AI 讲义服务触发限流，请稍后重试。"
+    if "max_tokens" in message or "max token" in message or "token" in message:
+        return "讲义生成长度参数被模型接口拒绝，请降低 VIVO_HANDOUT_MAX_TOKENS 后重试。"
     if "timed out" in message or "timeout" in message:
         return "AI 生成讲义暂时较慢，请稍后重试。"
     if "connection" in message or "network" in message or "网络" in message:
