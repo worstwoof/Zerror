@@ -7,6 +7,7 @@ import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
+import '../../core/native_channel.dart';
 import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
@@ -2217,22 +2218,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      if (source == ImageSource.gallery) {
+        final nativeImagePath = await NativeChannel.pickGalleryImagePath();
+        if (!mounted || nativeImagePath == null) return;
+        _openImagePreview(nativeImagePath);
+        return;
+      }
       final picker = ImagePicker();
       final image = await picker.pickImage(
         source: source,
         requestFullMetadata: false,
       );
       if (!mounted || image == null) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-            builder: (_) => ErrorPreviewScreen(imagePath: image.path)),
-      );
+      _openImagePreview(image.path);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('图片选择失败：$error')),
       );
     }
+  }
+
+  void _openImagePreview(String imagePath) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ErrorPreviewScreen(imagePath: imagePath),
+      ),
+    );
   }
 
   void _showAddActionSheet(BuildContext context) {
