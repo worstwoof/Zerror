@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -63,28 +64,71 @@ def render_manim_video(
     final_path = output_dir / f"{job_id}.mp4"
     if candidates[0] != final_path:
         final_path.write_bytes(candidates[0].read_bytes())
-    add_background_music(final_path, scene_spec=scene_spec)
+    scene_spec["_render_audio_diagnostics"] = add_background_music(
+        final_path,
+        scene_spec=scene_spec,
+    )
     optimize_mp4_for_streaming(final_path)
     return final_path
 
 
-def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> bool:
-    """Add a quiet study-music bed to generated videos when ffmpeg is available."""
+def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Add a quiet study-music bed and optional narration when ffmpeg is available."""
 
+    diagnostics = _initial_audio_diagnostics(scene_spec=scene_spec)
     if scene_spec.get("background_music") is False:
-        return False
+        return diagnostics
     ffmpeg = shutil.which("ffmpeg")
+    diagnostics["ffmpeg_available"] = bool(ffmpeg)
     if not ffmpeg or not video_path.exists():
-        return False
+        return diagnostics
 
-    temporary_path = video_path.with_name(
-        f"{video_path.stem}.music{video_path.suffix}"
+    temporary_path = video_path.with_name(f"{video_path.stem}.music{video_path.suffix}")
+    narration_path = _synthesize_voiceover(video_path, scene_spec=scene_spec)
+    diagnostics["voiceover_generated"] = bool(narration_path and narration_path.exists())
+    bed_source = (
+        "aevalsrc="
+        "(0.0045*sin(2*PI*440*t)"
+        "+0.0034*sin(2*PI*554.37*t)"
+        "+0.0028*sin(2*PI*659.25*t)"
+        "+0.0022*sin(2*PI*880*t))"
+        "*(0.70+0.30*sin(2*PI*0.045*t)):s=44100"
     )
     try:
         if temporary_path.exists():
             temporary_path.unlink()
-        completed = subprocess.run(
-            [
+        if narration_path is not None and narration_path.exists():
+            command = [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-i",
+                str(narration_path),
+                "-f",
+                "lavfi",
+                "-i",
+                bed_source,
+                "-filter_complex",
+                "[1:a]volume=1.18,aresample=44100[narr];"
+                "[2:a]highpass=f=260,lowpass=f=3600,afade=t=in:st=0:d=1.2,"
+                "volume=0.18[bed];"
+                "[narr][bed]amix=inputs=2:duration=longest:dropout_transition=2[a]",
+                "-map",
+                "0:v:0",
+                "-map",
+                "[a]",
+                "-shortest",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                str(temporary_path),
+            ]
+        else:
+            command = [
                 ffmpeg,
                 "-y",
                 "-i",
@@ -92,9 +136,9 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> boo
                 "-f",
                 "lavfi",
                 "-i",
-                "aevalsrc=0.012*sin(2*PI*220*t)+0.008*sin(2*PI*330*t):s=44100",
+                bed_source,
                 "-filter_complex",
-                "[1:a]afade=t=in:st=0:d=1.2,volume=0.65[bed]",
+                "[1:a]highpass=f=260,lowpass=f=3600,afade=t=in:st=0:d=1.2,volume=0.20[bed]",
                 "-map",
                 "0:v:0",
                 "-map",
@@ -107,7 +151,9 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> boo
                 "-b:a",
                 "96k",
                 str(temporary_path),
-            ],
+            ]
+        completed = subprocess.run(
+            command,
             cwd=video_path.parent,
             capture_output=True,
             text=True,
@@ -120,7 +166,9 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> boo
             and temporary_path.stat().st_size > 0
         ):
             temporary_path.replace(video_path)
-            return True
+            diagnostics["background_music_added"] = True
+            diagnostics["audio_muxed"] = True
+            return diagnostics
         if temporary_path.exists():
             temporary_path.unlink()
     except Exception:
@@ -129,7 +177,107 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> boo
                 temporary_path.unlink()
         except OSError:
             pass
-    return False
+    finally:
+        if narration_path is not None:
+            try:
+                narration_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+    return diagnostics
+
+
+def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
+    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
+    piper = os.getenv("PIPER_TTS_COMMAND") or os.getenv("PIPER_COMMAND") or shutil.which("piper")
+    model = os.getenv("PIPER_VOICE_MODEL") or os.getenv("ZERROR_PIPER_VOICE_MODEL")
+    model_exists = bool(model and Path(model).exists())
+    return {
+        "background_music_requested": scene_spec.get("background_music") is not False,
+        "background_music_added": False,
+        "background_music_style": "soft_high_harmonic_no_low_loop",
+        "audio_muxed": False,
+        "ffmpeg_available": False,
+        "voiceover_requested": bool(audio_config.get("voiceover")),
+        "voiceover_engine": "piper",
+        "voiceover_command_configured": bool(piper),
+        "voiceover_model_configured": model_exists,
+        "voiceover_configured": bool(piper and model_exists),
+        "voiceover_generated": False,
+    }
+
+
+def _synthesize_voiceover(
+    video_path: Path,
+    *,
+    scene_spec: Dict[str, Any],
+) -> Path | None:
+    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
+    if not audio_config.get("voiceover"):
+        return None
+    text = _voiceover_text(scene_spec)
+    if not text:
+        return None
+    piper = os.getenv("PIPER_TTS_COMMAND") or os.getenv("PIPER_COMMAND") or shutil.which("piper")
+    model = os.getenv("PIPER_VOICE_MODEL") or os.getenv("ZERROR_PIPER_VOICE_MODEL")
+    if not piper or not model or not Path(model).exists():
+        return None
+    output_path = video_path.with_name(f"{video_path.stem}.voice.wav")
+    command = [
+        piper,
+        "--model",
+        model,
+        "--output_file",
+        str(output_path),
+    ]
+    config_path = os.getenv("PIPER_VOICE_CONFIG") or os.getenv("ZERROR_PIPER_VOICE_CONFIG")
+    if config_path and Path(config_path).exists():
+        command.extend(["--config", config_path])
+    try:
+        if output_path.exists():
+            output_path.unlink()
+        completed = subprocess.run(
+            command,
+            input=text,
+            cwd=video_path.parent,
+            capture_output=True,
+            text=True,
+            timeout=240,
+            check=False,
+        )
+        if completed.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
+            return output_path
+    except Exception:
+        pass
+    try:
+        output_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return None
+
+
+def _voiceover_text(scene_spec: Dict[str, Any]) -> str:
+    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
+    outline = audio_config.get("narration_outline")
+    parts: list[str] = []
+    if isinstance(outline, list):
+        parts.extend(str(item).strip() for item in outline if str(item).strip())
+    stages = scene_spec.get("teaching_stages")
+    if isinstance(stages, list):
+        for item in stages:
+            if not isinstance(item, dict):
+                continue
+            for key in ("narration", "visual_transform", "key_conclusion", "checkpoint"):
+                text = str(item.get(key) or "").strip()
+                if text:
+                    parts.append(text)
+    if not parts:
+        parts.extend(str(item).strip() for item in scene_spec.get("steps") or [] if str(item).strip())
+    cleaned = []
+    for part in parts:
+        value = " ".join(part.replace("\n", " ").split())
+        if value and value not in cleaned:
+            cleaned.append(value)
+    return "。".join(cleaned)[:1800]
 
 
 def optimize_mp4_for_streaming(video_path: Path) -> None:
@@ -362,12 +510,20 @@ class LearningScene(Scene):
         if index < len(raw_stages) and isinstance(raw_stages[index], dict):
             stage = raw_stages[index]
             lines = [
-                str(stage.get("narration") or fallback).strip(),
+                str(stage.get("visual_transform") or stage.get("visual_action") or "").strip(),
                 str(stage.get("key_conclusion") or "").strip(),
                 str(stage.get("checkpoint") or "").strip(),
             ]
             return [line for line in lines if line][:3] or [fallback]
         return [fallback]
+
+    def _stage_caption_text(self, spec, index, fallback):
+        raw_stages = spec.get("teaching_stages") if isinstance(spec.get("teaching_stages"), list) else []
+        if index < len(raw_stages) and isinstance(raw_stages[index], dict):
+            stage = raw_stages[index]
+            value = str(stage.get("narration") or stage.get("voiceover") or fallback).strip()
+            return value or fallback
+        return fallback
 
     def _stage_panel(self, title, lines, *, accent=YELLOW, max_lines=4):
         heading = cjk_text(compact_text(title, 18), font_size=21, color=accent)
@@ -447,7 +603,6 @@ class LearningScene(Scene):
             return
         self.play(question_block.animate.scale(0.90).to_edge(UP, buff=0.10), run_time=0.55)
         self._draw_math_story_scene(spec)
-        self._show_solution_walkthrough(spec)
         self._show_formula_review(spec)
 
     def _professional_math_scene_type(self, spec):
@@ -2446,7 +2601,7 @@ class LearningScene(Scene):
         axes.move_to(self.VISUAL_CENTER + DOWN * 0.08)
         x_label = cjk_text("x", font_size=20).next_to(axes.x_axis.get_end(), RIGHT, buff=0.08)
         y_label = cjk_text("y", font_size=20).next_to(axes.y_axis.get_end(), UP, buff=0.08)
-        self._show_step_caption(steps[0] if steps else "先建立图形和坐标系，把题目条件放到图上", color=YELLOW, wait_time=1.4)
+        self._show_step_caption(self._stage_caption_text(spec, 0, steps[0] if steps else "先建立图形和坐标系，把题目条件放到图上"), color=YELLOW, wait_time=0.65)
         self.play(Create(axes), FadeIn(x_label), FadeIn(y_label), run_time=1.2)
 
         if scene_type == "conic":
@@ -2501,26 +2656,82 @@ class LearningScene(Scene):
                 stroke_width=3,
             ).set_opacity(0.48)
             self.play(Create(curve), FadeIn(focus_l), FadeIn(focus_r), FadeIn(labels), run_time=1.8)
-            self._show_step_caption(steps[1] if len(steps) > 1 else "圆锥曲线题先抓住焦点、弦、切线或对称关系", color=WHITE, wait_time=1.5)
+            self._show_step_caption(self._stage_caption_text(spec, 1, steps[1] if len(steps) > 1 else "圆锥曲线题先抓住焦点、弦、切线或对称关系"), color=WHITE, wait_time=0.55)
             self.play(Create(major_axis), Create(minor_axis), FadeIn(a_label), FadeIn(b_label), run_time=1.0)
             self.play(FadeIn(moving_point), FadeIn(point_label), Create(pf1), Create(pf2), Create(projection), run_time=1.15)
             self.play(t_tracker.animate.set_value(2.28), run_time=3.2, rate_func=smooth)
-            self._show_step_caption(steps[2] if len(steps) > 2 else "动点沿椭圆移动时，到两个焦点的距离和保持不变", color=WHITE, wait_time=1.15)
+            panel = self._stage_panel("图形变换 3", self._stage_text_lines(spec, 2, steps[2] if len(steps) > 2 else "动点沿椭圆移动时，到两个焦点的距离和保持不变"), accent=YELLOW, max_lines=2)
+            self.play(FadeIn(panel, shift=LEFT * 0.10), run_time=0.35)
+            self.play(t_tracker.animate.set_value(3.36), run_time=2.0, rate_func=smooth)
+            self.play(FadeOut(panel, shift=RIGHT * 0.08), run_time=0.30)
             self.play(Create(focus_segment), FadeIn(c_label), FadeIn(formula_card), run_time=1.1)
             self.play(t_tracker.animate.set_value(4.58), Indicate(formula_card[1], color=YELLOW, scale_factor=1.08), run_time=3.0, rate_func=smooth)
-            self._show_step_caption(steps[3] if len(steps) > 3 else "离心率 e=c/a：c 越接近 a，椭圆越扁", color=YELLOW, wait_time=1.15)
+            panel = self._stage_panel("图形变换 4", self._stage_text_lines(spec, 3, steps[3] if len(steps) > 3 else "离心率 e=c/a：c 越接近 a，椭圆越扁"), accent=YELLOW, max_lines=2)
+            self.play(FadeIn(panel, shift=LEFT * 0.10), run_time=0.35)
+            self.play(t_tracker.animate.set_value(5.64), Indicate(focus_segment, color=ORANGE, scale_factor=1.05), run_time=2.2, rate_func=smooth)
+            self.play(FadeOut(panel, shift=RIGHT * 0.08), run_time=0.30)
             self.play(Create(round_curve), run_time=1.05)
             self.play(Create(flat_curve), run_time=1.05)
             self.play(Indicate(flat_curve, color=RED, scale_factor=1.02), Indicate(round_curve, color=GREEN, scale_factor=1.02), run_time=1.15)
+            conic_targets = [1.10, 2.05, 3.05, 4.10, 5.25]
+            for offset, target in enumerate(conic_targets, start=4):
+                if offset >= len(steps):
+                    break
+                panel = self._stage_panel(
+                    "图形变换 " + str(offset + 1),
+                    self._stage_text_lines(spec, offset, steps[offset]),
+                    accent=YELLOW if offset % 2 == 0 else BLUE_B,
+                    max_lines=2,
+                )
+                self.play(FadeIn(panel, shift=LEFT * 0.10), run_time=0.32)
+                if offset % 3 == 1:
+                    self.play(t_tracker.animate.set_value(target), Indicate(pf1, color=TEAL_A, scale_factor=1.02), Indicate(pf2, color=TEAL_A, scale_factor=1.02), run_time=2.6, rate_func=smooth)
+                elif offset % 3 == 2:
+                    self.play(Indicate(flat_curve, color=RED, scale_factor=1.03), Indicate(round_curve, color=GREEN, scale_factor=1.03), run_time=2.1)
+                else:
+                    self.play(t_tracker.animate.set_value(target), Indicate(formula_card[1], color=YELLOW, scale_factor=1.08), run_time=2.4, rate_func=smooth)
+                self.play(FadeOut(panel, shift=RIGHT * 0.08), run_time=0.30)
         elif scene_type == "function_graph":
-            graph = axes.plot(lambda x: 0.16 * (x - 0.8) * (x - 0.8) - 1.1, x_range=[-4.2, 4.4], color=YELLOW)
-            tangent_point = Dot(axes.c2p(2.0, 0.16 * (2.0 - 0.8) * (2.0 - 0.8) - 1.1), color=ORANGE)
-            tangent = Line(axes.c2p(0.3, -1.1), axes.c2p(3.7, 1.0), color=BLUE)
-            area = axes.get_area(graph, x_range=[-1.5, 1.8], color=TEAL, opacity=0.32)
+            def f(x):
+                return 0.16 * (x - 0.8) * (x - 0.8) - 1.1
+            def df(x):
+                return 0.32 * (x - 0.8)
+            graph = axes.plot(lambda x: f(x), x_range=[-4.2, 4.4], color=YELLOW)
+            x_tracker = ValueTracker(-3.2)
+            moving_dot = always_redraw(lambda: Dot(axes.c2p(x_tracker.get_value(), f(x_tracker.get_value())), color=ORANGE, radius=0.07))
+            tangent = always_redraw(lambda: Line(
+                axes.c2p(x_tracker.get_value() - 0.85, f(x_tracker.get_value()) - 0.85 * df(x_tracker.get_value())),
+                axes.c2p(x_tracker.get_value() + 0.85, f(x_tracker.get_value()) + 0.85 * df(x_tracker.get_value())),
+                color=BLUE,
+                stroke_width=3,
+            ))
+            scan_line = always_redraw(lambda: DashedLine(
+                axes.c2p(x_tracker.get_value(), -2.75),
+                axes.c2p(x_tracker.get_value(), f(x_tracker.get_value())),
+                color=GREY_B,
+                stroke_width=2,
+            ))
+            left_arrow = Arrow(axes.c2p(-3.35, f(-3.35) + 0.42), axes.c2p(-1.25, f(-1.25) + 0.42), buff=0, color=RED)
+            right_arrow = Arrow(axes.c2p(1.05, f(1.05) + 0.42), axes.c2p(3.25, f(3.25) + 0.42), buff=0, color=GREEN)
+            area_left = axes.get_area(graph, x_range=[-3.4, 0.8], color=RED, opacity=0.15)
+            area_right = axes.get_area(graph, x_range=[0.8, 3.8], color=GREEN, opacity=0.15)
             self.play(Create(graph), run_time=1.8)
-            self._show_step_caption(steps[1] if len(steps) > 1 else "函数题要把图像、关键点和变化趋势同步看", color=WHITE, wait_time=1.5)
-            self.play(FadeIn(tangent_point), Create(tangent), FadeIn(area), run_time=1.4)
-            self.play(tangent_point.animate.move_to(axes.c2p(3.0, 0.16 * (3.0 - 0.8) * (3.0 - 0.8) - 1.1)), run_time=1.8, rate_func=smooth)
+            self._show_step_caption(self._stage_caption_text(spec, 1, steps[1] if len(steps) > 1 else "函数题要把图像、关键点和变化趋势同步看"), color=WHITE, wait_time=0.55)
+            self.play(FadeIn(area_left), FadeIn(area_right), FadeIn(moving_dot), Create(tangent), Create(scan_line), GrowArrow(left_arrow), GrowArrow(right_arrow), run_time=1.4)
+            targets = [-1.8, 0.8, 2.4, 3.65, -2.8, 1.35]
+            for offset, target in enumerate(targets, start=2):
+                if offset >= len(steps):
+                    break
+                panel = self._stage_panel(
+                    "图形变换 " + str(offset + 1),
+                    self._stage_text_lines(spec, offset, steps[offset]),
+                    accent=GREEN if target > 0.8 else RED,
+                    max_lines=2,
+                )
+                self.play(FadeIn(panel, shift=LEFT * 0.10), run_time=0.30)
+                self.play(x_tracker.animate.set_value(target), run_time=2.25, rate_func=smooth)
+                self.play(Indicate(tangent, color=YELLOW, scale_factor=1.04), run_time=0.55)
+                self.play(FadeOut(panel, shift=RIGHT * 0.08), run_time=0.28)
         else:
             triangle = Polygon(axes.c2p(-2.8, -1.2), axes.c2p(2.0, -1.2), axes.c2p(0.8, 1.6), color=YELLOW)
             altitude = DashedLine(axes.c2p(0.8, 1.6), axes.c2p(0.8, -1.2), color=BLUE)
@@ -2529,9 +2740,18 @@ class LearningScene(Scene):
             self._show_step_caption(steps[1] if len(steps) > 1 else "几何题要把辅助线、角度和相似关系逐步显出来", color=WHITE, wait_time=1.5)
             self.play(Create(altitude), Create(angle_arc), run_time=1.2)
 
-        remaining_start = 4 if scene_type == "conic" else 2
-        for extra_step in steps[remaining_start:remaining_start + 4]:
-            self._show_step_caption(extra_step, color=WHITE, wait_time=1.2)
+        if scene_type not in {"conic", "function_graph"}:
+            remaining_start = 2
+            for index, extra_step in enumerate(steps[remaining_start:remaining_start + 4], start=remaining_start):
+                panel = self._stage_panel(
+                    "图形变换 " + str(index + 1),
+                    self._stage_text_lines(spec, index, extra_step),
+                    accent=YELLOW,
+                    max_lines=2,
+                )
+                self.play(FadeIn(panel, shift=LEFT * 0.10), run_time=0.32)
+                self._show_step_caption(self._stage_caption_text(spec, index, extra_step), color=WHITE, wait_time=0.45)
+                self.play(FadeOut(panel, shift=RIGHT * 0.08), run_time=0.28)
         self.wait(0.8)
 
     def _draw_axes_scene(self, spec):

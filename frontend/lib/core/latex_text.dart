@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latext/latext.dart';
+
+class AppLatexSelectionAction {
+  const AppLatexSelectionAction({
+    required this.label,
+    required this.onSelected,
+  });
+
+  final String label;
+  final ValueChanged<String> onSelected;
+}
 
 class AppLatexText extends StatelessWidget {
   const AppLatexText(
@@ -7,11 +18,13 @@ class AppLatexText extends StatelessWidget {
     super.key,
     required this.style,
     this.textAlign = TextAlign.start,
+    this.selectionAction,
   });
 
   final String content;
   final TextStyle style;
   final TextAlign textAlign;
+  final AppLatexSelectionAction? selectionAction;
 
   @override
   Widget build(BuildContext context) {
@@ -27,22 +40,29 @@ class AppLatexText extends StatelessWidget {
       style: style,
     );
 
-    return Builder(
-      builder: (context) => Align(
-        alignment: _alignmentFor(textAlign),
-        child: LaTexT(
-          laTeXCode: plainText,
-          equationStyle: style.copyWith(
-            fontSize: style.fontSize == null ? null : style.fontSize! + 1,
+    final rendered = Builder(
+      builder: (context) {
+        return Align(
+          alignment: _alignmentFor(textAlign),
+          child: LaTexT(
+            laTeXCode: plainText,
+            equationStyle: style.copyWith(
+              fontSize: style.fontSize == null ? null : style.fontSize! + 1,
+            ),
+            onErrorFallback: (_) => Text(
+              fallbackText,
+              textAlign: textAlign,
+              style: style,
+            ),
           ),
-          onErrorFallback: (_) => Text(
-            fallbackText,
-            textAlign: textAlign,
-            style: style,
-          ),
-        ),
-      ),
+        );
+      },
     );
+    final action = selectionAction;
+    if (action == null) {
+      return rendered;
+    }
+    return _SelectableLatexArea(action: action, child: rendered);
   }
 
   Alignment _alignmentFor(TextAlign textAlign) {
@@ -143,5 +163,59 @@ class AppLatexText extends StatelessWidget {
         )
         .replaceAll('{', '')
         .replaceAll('}', '');
+  }
+}
+
+class _SelectableLatexArea extends StatefulWidget {
+  const _SelectableLatexArea({
+    required this.action,
+    required this.child,
+  });
+
+  final AppLatexSelectionAction action;
+  final Widget child;
+
+  @override
+  State<_SelectableLatexArea> createState() => _SelectableLatexAreaState();
+}
+
+class _SelectableLatexAreaState extends State<_SelectableLatexArea> {
+  String _selectedText = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectionArea(
+      onSelectionChanged: (content) {
+        _selectedText = content?.plainText.trim() ?? '';
+      },
+      contextMenuBuilder: (context, selectableRegionState) {
+        if (_selectedText.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return AdaptiveTextSelectionToolbar.buttonItems(
+          anchors: selectableRegionState.contextMenuAnchors,
+          buttonItems: [
+            ContextMenuButtonItem(
+              label: widget.action.label,
+              onPressed: () {
+                final selectedText = _selectedText;
+                ContextMenuController.removeAny();
+                selectableRegionState.clearSelection();
+                widget.action.onSelected(selectedText);
+              },
+            ),
+            ContextMenuButtonItem(
+              label: '复制',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: _selectedText));
+                ContextMenuController.removeAny();
+                selectableRegionState.clearSelection();
+              },
+            ),
+          ],
+        );
+      },
+      child: widget.child,
+    );
   }
 }

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
 import time
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
+from backend.app.rendering.manim_renderer import add_background_music
 from backend.app.schemas.card_schema import (
     LectureVideoRequest,
     LectureVideoResponse,
@@ -109,12 +112,45 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertTrue(scene_spec["objects"])
         self.assertGreaterEqual(len(scene_spec["steps"]), 8)
         self.assertGreaterEqual(len(scene_spec["teaching_stages"]), 8)
-        self.assertGreaterEqual(scene_spec["parameters"]["target_duration_seconds"], 120)
+        self.assertGreaterEqual(scene_spec["parameters"]["target_duration_seconds"], 150)
         self.assertLessEqual(scene_spec["parameters"]["target_duration_seconds"], 240)
+        self.assertTrue(scene_spec["audio"]["voiceover"])
+        self.assertTrue(scene_spec["audio"]["narration_outline"])
+        self.assertTrue(scene_spec["teaching_stages"][0]["visual_transform"])
         self.assertIn("不要写 Python", service.client.prompts[0])
         self.assertIn("teaching_stages", service.client.prompts[0])
+        self.assertIn("visual_transform", service.client.prompts[0])
+        self.assertIn("讲解语音", service.client.prompts[0])
         self.assertIn("8 到 12", service.client.prompts[0])
         self.assertIn("function_graph/conic/geometry", service.client.prompts[0])
+
+    def test_audio_diagnostics_report_missing_voiceover_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            video_path = Path(temporary_dir) / "lesson.mp4"
+            video_path.write_bytes(b"not a real video")
+            with patch("backend.app.rendering.manim_renderer.shutil.which", return_value=None), patch.dict(
+                "os.environ",
+                {
+                    "PIPER_TTS_COMMAND": "",
+                    "PIPER_COMMAND": "",
+                    "PIPER_VOICE_MODEL": "",
+                    "ZERROR_PIPER_VOICE_MODEL": "",
+                },
+                clear=False,
+            ):
+                diagnostics = add_background_music(
+                    video_path,
+                    scene_spec={
+                        "background_music": True,
+                        "audio": {"voiceover": True},
+                    },
+                )
+
+        self.assertTrue(diagnostics["background_music_requested"])
+        self.assertTrue(diagnostics["voiceover_requested"])
+        self.assertFalse(diagnostics["voiceover_configured"])
+        self.assertFalse(diagnostics["voiceover_generated"])
+        self.assertFalse(diagnostics["background_music_added"])
 
     def test_math_conic_request_routes_to_math_conic_scene(self) -> None:
         raw = json.dumps(

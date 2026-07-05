@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
@@ -1038,35 +1037,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     );
   }
 
-  void _openAnalysisSelectionSheet() {
-    final analysisText = _analysisPlainText();
-    if (analysisText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前还没有可追问的解析内容。')),
-      );
-      return;
-    }
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return _AnalysisSelectionSheet(
-          analysisText: analysisText,
-          onAsk: (selectedText) {
-            Navigator.of(sheetContext).pop();
-            Future.microtask(
-              () => _openAskAboutSelection(
-                selectedText: selectedText,
-                sourceSection: 'AI 解析全文',
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _openAskAboutSelection({
     required String selectedText,
     required String sourceSection,
@@ -1211,6 +1181,18 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
     return '${compact.substring(0, limit)}...';
   }
 
+  AppLatexSelectionAction _askAiSelectionAction(String sourceSection) {
+    return AppLatexSelectionAction(
+      label: '问 AI',
+      onSelected: (selectedText) {
+        _openAskAboutSelection(
+          selectedText: selectedText,
+          sourceSection: sourceSection,
+        );
+      },
+    );
+  }
+
   Widget _buildAiSolutionCard(String subject, String topic) {
     return AppPanel(
       color: _readablePanel,
@@ -1244,39 +1226,13 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             iconColor: _readableAccent,
           ),
           const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _analysisPlainText().isEmpty
-                  ? null
-                  : _openAnalysisSelectionSheet,
-              icon: const Icon(
-                Icons.question_answer_rounded,
-                size: 18,
-                color: _readableAccent,
-              ),
-              label: const Text(
-                '划线问 AI',
-                style: TextStyle(
-                  color: _readableAccent,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           _buildSectionLabel('💡 破题技巧'),
           const SizedBox(height: 6),
           AppLatexText(
             _solutionSummary.isEmpty ? '等待 AI 返回解析结果。' : _solutionSummary,
+            selectionAction: _solutionSummary.trim().isEmpty
+                ? null
+                : _askAiSelectionAction('破题技巧'),
             style: const TextStyle(
               color: AppPalette.textPrimary,
               height: 1.5,
@@ -1371,6 +1327,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
               child: AppLatexText(
                 r'$$' + text + r'$$',
                 textAlign: TextAlign.center,
+                selectionAction: _askAiSelectionAction('详细推导公式'),
                 style: const TextStyle(
                   color: AppPalette.textPrimary,
                   height: 1.7,
@@ -1383,6 +1340,7 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
             padding: const EdgeInsets.only(bottom: 4),
             child: AppLatexText(
               text,
+              selectionAction: _askAiSelectionAction('详细推导步骤'),
               style: const TextStyle(
                 color: AppPalette.textPrimary,
                 height: 1.65,
@@ -3391,91 +3349,6 @@ class _ErrorEditScreenState extends State<ErrorEditScreen>
       default:
         return scene;
     }
-  }
-}
-
-class _AnalysisSelectionSheet extends StatelessWidget {
-  const _AnalysisSelectionSheet({
-    required this.analysisText,
-    required this.onAsk,
-  });
-
-  final String analysisText;
-  final ValueChanged<String> onAsk;
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          ),
-          child: Column(
-            children: [
-              _SheetHeader(
-                title: '选择解析片段',
-                icon: Icons.text_fields_rounded,
-                onClose: () => Navigator.of(context).pop(),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  child: SelectableText(
-                    analysisText,
-                    style: const TextStyle(
-                      color: AppPalette.textPrimary,
-                      fontSize: 15,
-                      height: 1.7,
-                    ),
-                    contextMenuBuilder: (context, editableTextState) {
-                      final value = editableTextState.textEditingValue;
-                      final selection = value.selection;
-                      final selectedText =
-                          selection.isValid && !selection.isCollapsed
-                              ? selection.textInside(value.text).trim()
-                              : '';
-                      if (selectedText.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      final items = <ContextMenuButtonItem>[
-                        ContextMenuButtonItem(
-                          label: '问 AI',
-                          onPressed: () {
-                            ContextMenuController.removeAny();
-                            onAsk(selectedText);
-                          },
-                        ),
-                        ContextMenuButtonItem(
-                          label: '复制',
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: selectedText),
-                            );
-                            ContextMenuController.removeAny();
-                          },
-                        ),
-                      ];
-                      return AdaptiveTextSelectionToolbar.buttonItems(
-                        anchors: editableTextState.contextMenuAnchors,
-                        buttonItems: items,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

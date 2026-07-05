@@ -22,7 +22,7 @@ from backend.app.rendering.manim_renderer import (
 MEDIA_ROOT = PROJECT_ROOT / "static" / "media" / "manim"
 JOBS_ROOT = MEDIA_ROOT / "_jobs"
 MEDIA_URL_PREFIX = "/static/media/manim"
-MANIM_RENDER_CACHE_VERSION = "local-manim-math-physics-v5"
+MANIM_RENDER_CACHE_VERSION = "local-manim-visual-voice-v6"
 
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()
@@ -178,6 +178,11 @@ def _run_manim_job(job_id: str, scene_hash: str, scene_spec: Dict[str, Any]) -> 
                 "renderer_backend": renderer_backend,
                 "render_elapsed_seconds": round(elapsed, 3),
                 "error_summary": "",
+                **(
+                    scene_spec.get("_render_audio_diagnostics")
+                    if isinstance(scene_spec.get("_render_audio_diagnostics"), dict)
+                    else {}
+                ),
             }
         )
         _update_job(
@@ -487,6 +492,8 @@ def _delete_job_artifacts_locked(
         MEDIA_ROOT / f"{safe_id}.py",
         MEDIA_ROOT / f"{safe_id}.mp4",
         MEDIA_ROOT / f"{safe_id}.faststart.mp4",
+        MEDIA_ROOT / f"{safe_id}.music.mp4",
+        MEDIA_ROOT / f"{safe_id}.voice.wav",
     ):
         deleted = _unlink_safe(path) or deleted
 
