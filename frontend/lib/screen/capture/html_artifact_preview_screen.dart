@@ -90,7 +90,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(
-                  color: AppPalette.pastelGrey.withOpacity(0.10),
+                  color: AppPalette.pastelGrey.withValues(alpha: 0.10),
                 ),
               ),
               child: WebViewWidget(
@@ -144,7 +144,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     final normalized = rawHtml.trim();
     final previewFitHead = scrollable
         ? '''
-<meta name="viewport" content="width=device-width, initial-scale=0.75, minimum-scale=0.25, maximum-scale=5.0, user-scalable=yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes" />
 <style id="zerror-preview-fit">
   html, body {
     margin: 0;
@@ -152,7 +152,7 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     height: auto !important;
     min-height: 100% !important;
     max-height: none !important;
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -164,18 +164,54 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
     min-width: 0;
     height: auto !important;
     min-height: 100% !important;
-    width: max-content;
+    width: 100%;
     min-width: 100%;
     max-width: none !important;
     max-height: none !important;
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
     overflow-y: auto !important;
     touch-action: pan-x pan-y pinch-zoom;
   }
-  .sheet {
-    width: 210mm !important;
-    min-width: 210mm !important;
-    max-width: none !important;
+  @media screen {
+    .sheet {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      min-height: auto !important;
+      margin: 0 auto !important;
+      padding: clamp(24px, 6vw, 48px) clamp(18px, 5vw, 42px) !important;
+    }
+    h1 {
+      font-size: clamp(22px, 7vw, 30px) !important;
+      word-break: break-word;
+    }
+    .part-title {
+      font-size: clamp(20px, 5.5vw, 26px) !important;
+    }
+    .q-head {
+      flex-wrap: wrap;
+    }
+    .stem,
+    .example-row,
+    .options > div {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .options,
+    .visual-grid,
+    .teach-grid {
+      grid-template-columns: 1fr !important;
+    }
+    table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    mjx-container {
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
   }
   img, svg, canvas, video {
     max-width: 100%;
@@ -210,19 +246,19 @@ class _HtmlArtifactPreviewScreenState extends State<HtmlArtifactPreviewScreen> {
       viewport.name = 'viewport';
       document.head.appendChild(viewport);
     }
-    viewport.setAttribute('content', 'width=device-width, initial-scale=0.75, minimum-scale=0.25, maximum-scale=5.0, user-scalable=yes');
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3.0, user-scalable=yes');
     document.documentElement.style.height = 'auto';
     document.documentElement.style.minHeight = '100%';
     document.documentElement.style.maxHeight = 'none';
-    document.documentElement.style.overflowX = 'auto';
+    document.documentElement.style.overflowX = 'hidden';
     document.documentElement.style.overflowY = 'auto';
     document.body.style.height = 'auto';
     document.body.style.minHeight = '100%';
     document.body.style.maxHeight = 'none';
-    document.body.style.width = 'max-content';
+    document.body.style.width = '100%';
     document.body.style.minWidth = '100%';
-    document.body.style.maxWidth = 'none';
-    document.body.style.overflowX = 'auto';
+    document.body.style.maxWidth = '100%';
+    document.body.style.overflowX = 'hidden';
     document.body.style.overflowY = 'auto';
     document.body.style.touchAction = 'pan-x pan-y pinch-zoom';
     if (window.MathJax && window.MathJax.typesetPromise) {

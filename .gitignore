@@ -26,9 +26,12 @@ htmlcov/
 
 # Logs and runtime output
 *.log
+*.db
+*.swp
 server.err
 server.out
 static/media/manim/
+static/uploads/
 backend/static/media/manim/
 
 # IDE and OS files
