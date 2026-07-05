@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
@@ -2219,24 +2220,40 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       if (source == ImageSource.gallery) {
-        final nativeImagePath = await NativeChannel.pickGalleryImagePath();
-        if (!mounted || nativeImagePath == null) return;
-        _openImagePreview(nativeImagePath);
+        await _pickGalleryImage();
         return;
       }
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
-        source: source,
-        requestFullMetadata: false,
-      );
-      if (!mounted || image == null) return;
-      _openImagePreview(image.path);
+      await _pickImageWithPlugin(source);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('图片选择失败：$error')),
       );
     }
+  }
+
+  Future<void> _pickGalleryImage() async {
+    try {
+      final nativeImagePath = await NativeChannel.pickGalleryImagePath();
+      if (!mounted || nativeImagePath == null) return;
+      _openImagePreview(nativeImagePath);
+    } on MissingPluginException {
+      await _pickImageWithPlugin(ImageSource.gallery);
+    } on PlatformException catch (error) {
+      debugPrint(
+          'Native gallery picker failed: ${error.code} ${error.message}');
+      await _pickImageWithPlugin(ImageSource.gallery);
+    }
+  }
+
+  Future<void> _pickImageWithPlugin(ImageSource source) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: source,
+      requestFullMetadata: false,
+    );
+    if (!mounted || image == null) return;
+    _openImagePreview(image.path);
   }
 
   void _openImagePreview(String imagePath) {
