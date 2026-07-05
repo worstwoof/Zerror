@@ -30,6 +30,24 @@ class NativeChannel {
 
   static const MethodChannel _mediaChannel = MethodChannel('zerror/media');
 
+  static Future<bool> hasGalleryPermission() async {
+    final granted = await _mediaChannel.invokeMethod<bool>(
+      'hasGalleryPermission',
+    );
+    return granted ?? false;
+  }
+
+  static Future<bool> requestGalleryPermission() async {
+    final granted = await _mediaChannel.invokeMethod<bool>(
+      'requestGalleryPermission',
+    );
+    return granted ?? false;
+  }
+
+  static Future<void> openAppSettings() {
+    return _mediaChannel.invokeMethod<void>('openAppSettings');
+  }
+
   static Future<List<GalleryImageItem>> listGalleryImages({
     int limit = 200,
   }) async {

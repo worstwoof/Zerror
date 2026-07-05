@@ -15,6 +15,7 @@ import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Size
 import android.webkit.MimeTypeMap
 import android.webkit.WebView
@@ -33,8 +34,7 @@ class MainActivity : FlutterActivity() {
     private val galleryPermissionRequestCode = 7302
     private var printWebView: WebView? = null
     private var pendingPickImageResult: MethodChannel.Result? = null
-    private var pendingListGalleryResult: MethodChannel.Result? = null
-    private var pendingGalleryLimit: Int = 200
+    private var pendingGalleryPermissionResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -62,6 +62,16 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "pickGalleryImage" -> pickGalleryImage(result)
+                "hasGalleryPermission" -> result.success(hasGalleryPermission())
+                "requestGalleryPermission" -> requestGalleryPermission(result)
+                "openAppSettings" -> {
+                    try {
+                        openAppSettings()
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("OPEN_SETTINGS_FAILED", error.message, null)
+                    }
+                }
                 "listGalleryImages" -> listGalleryImages(
                     call.argument<Int>("limit") ?: 200,
                     result,
@@ -113,19 +123,9 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         if (requestCode == galleryPermissionRequestCode) {
-            val result = pendingListGalleryResult ?: return
-            pendingListGalleryResult = null
-            val granted = grantResults.isNotEmpty() &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                result.error("PERMISSION_DENIED", "Gallery permission was denied.", null)
-                return
-            }
-            try {
-                result.success(queryGalleryImages(pendingGalleryLimit))
-            } catch (error: Exception) {
-                result.error("QUERY_GALLERY_FAILED", error.message, null)
-            }
+            val result = pendingGalleryPermissionResult ?: return
+            pendingGalleryPermissionResult = null
+            result.success(hasGalleryPermission())
             return
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -134,18 +134,7 @@ class MainActivity : FlutterActivity() {
     private fun listGalleryImages(limit: Int, result: MethodChannel.Result) {
         val safeLimit = limit.coerceIn(1, 500)
         if (!hasGalleryPermission()) {
-            val permission = requiredGalleryPermission()
-            if (permission == null) {
-                result.error("PERMISSION_UNAVAILABLE", "Gallery permission is unavailable.", null)
-                return
-            }
-            if (pendingListGalleryResult != null) {
-                result.error("PERMISSION_IN_PROGRESS", "Gallery permission is already being requested.", null)
-                return
-            }
-            pendingGalleryLimit = safeLimit
-            pendingListGalleryResult = result
-            requestPermissions(arrayOf(permission), galleryPermissionRequestCode)
+            result.error("PERMISSION_DENIED", "Gallery permission has not been granted.", null)
             return
         }
 
@@ -156,19 +145,55 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun requiredGalleryPermission(): String? {
+    private fun requestGalleryPermission(result: MethodChannel.Result) {
+        if (hasGalleryPermission()) {
+            result.success(true)
+            return
+        }
+
+        val permissions = requiredGalleryPermissions()
+        if (permissions.isEmpty()) {
+            result.success(true)
+            return
+        }
+
+        if (pendingGalleryPermissionResult != null) {
+            result.error("PERMISSION_IN_PROGRESS", "Gallery permission is already being requested.", null)
+            return
+        }
+
+        pendingGalleryPermissionResult = result
+        requestPermissions(permissions, galleryPermissionRequestCode)
+    }
+
+    private fun requiredGalleryPermissions(): Array<String> {
         return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                arrayOf(
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+                )
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
-                Manifest.permission.READ_MEDIA_IMAGES
+                arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            else -> null
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            else -> emptyArray()
         }
     }
 
     private fun hasGalleryPermission(): Boolean {
-        val permission = requiredGalleryPermission() ?: return true
-        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        val permissions = requiredGalleryPermissions()
+        if (permissions.isEmpty()) return true
+        return permissions.any { permission ->
+            checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        startActivity(intent)
     }
 
     private fun queryGalleryImages(limit: Int): List<Map<String, Any?>> {

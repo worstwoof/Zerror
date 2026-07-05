@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/native_channel.dart';
 import '../../core/theme.dart';
@@ -13,16 +14,99 @@ class GalleryImagePickerScreen extends StatefulWidget {
       _GalleryImagePickerScreenState();
 }
 
-class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen> {
+class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen>
+    with WidgetsBindingObserver {
   List<GalleryImageItem> _items = const [];
+  bool _isCheckingPermission = true;
+  bool _hasPermission = false;
+  bool _isRequestingPermission = false;
   bool _isLoading = true;
+  bool _permissionDenied = false;
   Object? _error;
   String? _copyingUri;
 
   @override
   void initState() {
     super.initState();
-    _loadImages();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPermissionAndLoad();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_hasPermission) {
+      _checkPermissionAndLoad();
+    }
+  }
+
+  Future<void> _checkPermissionAndLoad() async {
+    if (!mounted) return;
+    setState(() {
+      _isCheckingPermission = true;
+      _error = null;
+    });
+    try {
+      final granted = await NativeChannel.hasGalleryPermission();
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = granted;
+        _isCheckingPermission = false;
+        _isLoading = granted;
+        if (granted) {
+          _permissionDenied = false;
+        }
+      });
+      if (granted) {
+        await _loadImages();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _isCheckingPermission = false;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    if (_isRequestingPermission) return;
+    setState(() {
+      _isRequestingPermission = true;
+      _error = null;
+    });
+    try {
+      final granted = await NativeChannel.requestGalleryPermission();
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = granted;
+        _permissionDenied = !granted;
+        _isRequestingPermission = false;
+        _isLoading = granted;
+      });
+      if (granted) {
+        await _loadImages();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _permissionDenied = true;
+        _isRequestingPermission = false;
+        _error = error;
+      });
+    }
+  }
+
+  Future<void> _openSettings() async {
+    await NativeChannel.openAppSettings();
   }
 
   Future<void> _loadImages() async {
@@ -39,6 +123,15 @@ class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen> {
       });
     } catch (error) {
       if (!mounted) return;
+      if (error is PlatformException && error.code == 'PERMISSION_DENIED') {
+        setState(() {
+          _hasPermission = false;
+          _permissionDenied = true;
+          _isLoading = false;
+          _error = null;
+        });
+        return;
+      }
       setState(() {
         _error = error;
         _isLoading = false;
@@ -83,14 +176,30 @@ class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen> {
         actions: [
           IconButton(
             tooltip: '刷新',
-            onPressed: _isLoading ? null : _loadImages,
+            onPressed: _isLoading || _isCheckingPermission
+                ? null
+                : _checkPermissionAndLoad,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: Stack(
         children: [
-          if (_isLoading)
+          if (_isCheckingPermission)
+            const Center(child: CircularProgressIndicator())
+          else if (!_hasPermission)
+            _buildMessage(
+              icon: Icons.photo_library_outlined,
+              title: '需要相册权限',
+              detail: _permissionDenied
+                  ? '系统没有授予相册权限，请在权限弹窗里允许访问照片；如果不再弹窗，就到应用设置里开启照片/相册权限。'
+                  : '为了从相册导入题目图片，需要先允许知芽访问照片和图片。',
+              actionLabel: _permissionDenied ? '去设置开启' : '允许访问相册',
+              onAction: _permissionDenied ? _openSettings : _requestPermission,
+              secondaryActionLabel: _permissionDenied ? '重新申请' : null,
+              onSecondaryAction: _permissionDenied ? _requestPermission : null,
+            )
+          else if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else if (_error != null)
             _buildMessage(
@@ -137,7 +246,9 @@ class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen> {
     required String title,
     required String detail,
     required String actionLabel,
-    required VoidCallback onAction,
+    required VoidCallback? onAction,
+    String? secondaryActionLabel,
+    VoidCallback? onSecondaryAction,
   }) {
     return Center(
       child: Padding(
@@ -169,8 +280,24 @@ class _GalleryImagePickerScreenState extends State<GalleryImagePickerScreen> {
             const SizedBox(height: 18),
             FilledButton(
               onPressed: onAction,
-              child: Text(actionLabel),
+              child: _isRequestingPermission
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(actionLabel),
             ),
+            if (secondaryActionLabel != null && onSecondaryAction != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _isRequestingPermission ? null : onSecondaryAction,
+                child: Text(secondaryActionLabel),
+              ),
+            ],
           ],
         ),
       ),
