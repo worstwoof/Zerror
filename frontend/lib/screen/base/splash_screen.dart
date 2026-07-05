@@ -15,7 +15,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -83,11 +84,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const DecoratedBox(decoration: BoxDecoration(gradient: AppPalette.appBackground)),
+          const DecoratedBox(
+              decoration: BoxDecoration(gradient: AppPalette.appBackground)),
           AnimatedOpacity(
             opacity: _showBackground ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 1200),
@@ -95,15 +97,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset('assets/images/splash_bg.png', fit: BoxFit.cover),
+                const SizedBox.shrink(),
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        AppPalette.pineGreen.withValues(alpha: 0.22),
-                        AppPalette.night.withValues(alpha: 0.55),
+                        AppPalette.pineGreen.withOpacity(0.22),
+                        AppPalette.night.withOpacity(0.55),
                       ],
                     ),
                   ),
@@ -111,8 +113,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ],
             ),
           ),
-          Positioned(top: -80, left: -40, child: _buildGlow(const Size(240, 240), AppPalette.honeyOrange.withValues(alpha: 0.26))),
-          Positioned(right: -40, bottom: 120, child: _buildGlow(const Size(220, 220), AppPalette.matchaMist.withValues(alpha: 0.18))),
+          Positioned(
+              top: -80,
+              left: -40,
+              child: _buildGlow(const Size(240, 240),
+                  AppPalette.honeyOrange.withOpacity(0.26))),
+          Positioned(
+              right: -40,
+              bottom: 120,
+              child: _buildGlow(const Size(220, 220),
+                  AppPalette.matchaMist.withOpacity(0.18))),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

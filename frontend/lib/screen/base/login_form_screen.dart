@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
+import '../../core/app_ui.dart';
 import '../../core/theme.dart';
 import '../../data/auth_api_client.dart';
 import 'home_screen.dart';
@@ -153,7 +154,7 @@ class _LoginFormScreenState extends State<LoginFormScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppPalette.kombuGreen,
+        backgroundColor: AppPalette.inkBlue,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -177,16 +178,27 @@ class _LoginFormScreenState extends State<LoginFormScreen>
           const DecoratedBox(
             decoration: BoxDecoration(gradient: AppPalette.appBackground),
           ),
-          Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppPalette.pineGreen.withValues(alpha: 0.18),
-                  AppPalette.night.withValues(alpha: 0.72),
-                ],
+          Positioned(
+            top: 116,
+            right: -30,
+            child: FlatShape(
+              width: 142,
+              height: 110,
+              color: AppPalette.mint.withOpacity(0.55),
+            ),
+          ),
+          Positioned(
+            bottom: 128,
+            left: -36,
+            child: FlatShape(
+              width: 118,
+              height: 92,
+              color: AppPalette.peach.withOpacity(0.52),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(26),
+                topRight: Radius.circular(58),
+                bottomLeft: Radius.circular(46),
+                bottomRight: Radius.circular(32),
               ),
             ),
           ),
@@ -289,13 +301,13 @@ class _LoginFormScreenState extends State<LoginFormScreen>
                         width: double.infinity,
                         height: 56,
                         decoration: BoxDecoration(
-                          color: AppPalette.almondCream,
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppPalette.inkBlue,
+                          borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: AppPalette.almondCream.withValues(alpha: 0.18),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
+                              color: AppPalette.inkBlue.withOpacity(0.12),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
@@ -305,7 +317,7 @@ class _LoginFormScreenState extends State<LoginFormScreen>
                                   width: 24,
                                   height: 24,
                                   child: CircularProgressIndicator(
-                                    color: AppPalette.night,
+                                    color: Colors.white,
                                     strokeWidth: 2.5,
                                   ),
                                 )
@@ -314,7 +326,7 @@ class _LoginFormScreenState extends State<LoginFormScreen>
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
-                                    color: AppPalette.night,
+                                    color: Colors.white,
                                   ),
                                 ),
                         ),
@@ -352,16 +364,16 @@ class _LoginFormScreenState extends State<LoginFormScreen>
           fontSize: 15,
         ),
         floatingLabelStyle: const TextStyle(
-          color: AppPalette.almondCream,
+          color: AppPalette.warmAccentText,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Icon(icon, color: AppPalette.textSecondary, size: 22),
         enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0x66F8F3EA), width: 1),
+          borderSide: BorderSide(color: AppPalette.fieldBorder, width: 1.2),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: AppPalette.honeyOrange, width: 2),
+          borderSide: BorderSide(color: AppPalette.moodBlue, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
       ),
@@ -376,7 +388,7 @@ class _LoginFormScreenState extends State<LoginFormScreen>
   }) {
     final textColor = enabled
         ? AppPalette.textSecondary
-        : AppPalette.textSecondary.withValues(alpha: 0.45);
+        : AppPalette.textSecondary.withOpacity(0.45);
     return InkWell(
       onTap: enabled ? () => onChanged(!value) : null,
       borderRadius: BorderRadius.circular(10),
@@ -390,8 +402,8 @@ class _LoginFormScreenState extends State<LoginFormScreen>
               child: Checkbox(
                 value: value,
                 onChanged: enabled ? (next) => onChanged(next ?? false) : null,
-                activeColor: AppPalette.almondCream,
-                checkColor: AppPalette.night,
+                activeColor: AppPalette.moodBlue,
+                checkColor: Colors.white,
                 side: BorderSide(color: textColor),
               ),
             ),

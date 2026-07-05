@@ -7,17 +7,19 @@ import '../../core/app_state.dart';
 import '../../core/media_utils.dart';
 import '../../core/theme.dart';
 import '../../data/file_upload_client.dart';
-import 'achievements_screen.dart';
+import 'data_dashboard_screen.dart';
 import 'edit_profile_screen.dart';
-import 'favorites_screen.dart';
 import 'goals_screen.dart';
-import 'privacy_security_screen.dart';
-import 'share_center_screen.dart';
+import 'learning_plan_screen.dart';
+import 'smart_review_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.onOpenDrawer});
 
   static const FileUploadClient _fileUploadClient = FileUploadClient();
+  static const Color _blueTop = AppPalette.moodBlue;
+  static const Color _blueDeep = AppPalette.inkBlue;
+  static const Color _sheet = AppPalette.paper;
 
   final VoidCallback? onOpenDrawer;
 
@@ -27,219 +29,130 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(gradient: AppPalette.appBackground),
-          ),
-          Image.asset(
-            'assets/images/background_dark.png',
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.low,
-            excludeFromSemantics: true,
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppPalette.matchaMist.withValues(alpha: 0.05),
-                  AppPalette.kombuGreen.withValues(alpha: 0.18),
-                  AppPalette.night.withValues(alpha: 0.74),
-                ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          const minSheetSize = 0.36;
+          const maxSheetSize = 0.84;
+          final topInset = MediaQuery.of(context).padding.top;
+          final preferredSheetTop = topInset + 320;
+          final initialSheetSize =
+              ((constraints.maxHeight - preferredSheetTop) /
+                      constraints.maxHeight)
+                  .clamp(minSheetSize + 0.06, maxSheetSize - 0.04)
+                  .toDouble();
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              const DecoratedBox(
+                decoration: BoxDecoration(color: _blueTop),
               ),
-            ),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 12, 22, 38),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      _topButton(icon: Icons.notes_rounded, onTap: onOpenDrawer),
-                      const Spacer(),
-                      _topButton(
-                        icon: Icons.edit_rounded,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _heroCard(context, store),
-                  const SizedBox(height: 18),
-                  _shareCard(context, store),
-                  const SizedBox(height: 18),
-                  _goalsCard(context, store),
-                  const SizedBox(height: 18),
-                  _menuCard(context),
+              _topStage(context, store),
+              DraggableScrollableSheet(
+                minChildSize: minSheetSize,
+                initialChildSize: initialSheetSize,
+                maxChildSize: maxSheetSize,
+                snap: true,
+                snapSizes: [
+                  minSheetSize,
+                  initialSheetSize,
+                  maxSheetSize,
                 ],
+                builder: (context, scrollController) {
+                  return _contentSheet(context, store, scrollController);
+                },
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _heroCard(BuildContext context, AppStore store) {
+  Widget _topStage(BuildContext context, AppStore store) {
+    final topInset = MediaQuery.of(context).padding.top;
+
     return Container(
-      decoration: BoxDecoration(
-        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
+      width: double.infinity,
+      decoration: const BoxDecoration(color: _blueTop),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Container(
-            height: 144,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppPalette.artichoke.withValues(alpha: 0.96),
-                  AppPalette.matchaMist.withValues(alpha: 0.92),
-                  AppPalette.almondCream.withValues(alpha: 0.48),
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 18,
-                  top: 16,
-                  child: Container(
-                    width: 78,
-                    height: 78,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppPalette.honeyOrange.withValues(alpha: 0.18),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 18,
-                  top: 18,
-                  child: Icon(
-                    Icons.spa_rounded,
-                    size: 60,
-                    color: AppPalette.kombuGreen.withValues(alpha: 0.58),
-                  ),
-                ),
-              ],
+          Positioned(
+            top: topInset + 38,
+            right: -48,
+            child: _headerBlob(
+              size: 154,
+              color: Colors.white.withValues(alpha: 0.05),
             ),
           ),
-          Transform.translate(
-            offset: const Offset(0, -34),
-            child: GestureDetector(
-              onTap: () => _pickAvatar(context, store),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: _avatarContent(store, iconSize: 34),
-                    ),
-                  ),
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: AppPalette.almondCream,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppPalette.night, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt_rounded,
-                        color: AppPalette.night,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          Positioned(
+            top: topInset + 154,
+            left: -42,
+            child: _headerBlob(
+              size: 116,
+              color: AppPalette.mint.withValues(alpha: 0.18),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
-            child: Transform.translate(
-              offset: const Offset(0, -22),
+          Positioned(
+            top: topInset + 136,
+            right: 34,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white.withValues(alpha: 0.08),
+              size: 86,
+            ),
+          ),
+          Positioned(
+            top: topInset + 356,
+            left: 24,
+            right: 24,
+            child: _blueStageNote(store),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: Column(
                 children: [
+                  _topToolbar(context),
+                  const SizedBox(height: 18),
+                  _heroAvatar(context, store),
+                  const SizedBox(height: 8),
                   Text(
                     store.userName,
-                    style: const TextStyle(
-                      color: AppPalette.textPrimary,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    store.userMotto,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: AppPalette.textSecondary,
-                      fontSize: 14,
-                      height: 1.45,
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppPalette.almondCream.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.workspace_premium_rounded, color: AppPalette.almondCream, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Premium Study',
-                          style: TextStyle(
-                            color: AppPalette.almondCream,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                  _greetingMark(),
+                  const SizedBox(height: 10),
+                  Text(
+                    _greetingText(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(child: _heroStat('\u7d2f\u8ba1\u5f55\u5165', '${store.totalErrors}', '\u9898')),
-                      Expanded(child: _heroStat('\u575a\u6301\u590d\u4e60', '${store.studyStreakDays}', '\u5929')),
-                      Expanded(
-                        child: _heroStat('\u653b\u514b\u8003\u70b9', '${store.knowledgePointCount}', '\u4e2a'),
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  const Text(
+                    'How was your review today?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xBFFFFBF3),
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -250,38 +163,230 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _shareCard(BuildContext context, AppStore store) {
-    return _glassCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ShareCenterScreen()),
-      ),
-      child: Row(
+  Widget _topToolbar(BuildContext context) {
+    return Row(
+      children: [
+        _headerButton(icon: Icons.notes_rounded, onTap: onOpenDrawer),
+        const Spacer(),
+        _headerButton(
+          icon: Icons.edit_calendar_rounded,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _heroAvatar(BuildContext context, AppStore store) {
+    return GestureDetector(
+      onTap: () => _pickAvatar(context, store),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 96,
+            height: 96,
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: AppPalette.honeyOrange.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(18),
+              color: Colors.white.withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.28),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _blueDeep.withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            child: const Icon(Icons.redeem_rounded, color: AppPalette.almondCream, size: 28),
+            child: ClipOval(
+              child: _avatarContent(store, iconSize: 34),
+            ),
           ),
-          const SizedBox(width: 14),
+          Positioned(
+            right: 2,
+            bottom: 2,
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: AppPalette.almondCream,
+                shape: BoxShape.circle,
+                border: Border.all(color: _blueTop, width: 3),
+              ),
+              child: const Icon(
+                Icons.camera_alt_rounded,
+                color: _blueDeep,
+                size: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contentSheet(
+    BuildContext context,
+    AppStore store,
+    ScrollController scrollController,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _sheet,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: _blueDeep.withValues(alpha: 0.08),
+            blurRadius: 22,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: ListView(
+        controller: scrollController,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 116),
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _blueDeep.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          _sectionHeader(
+            title: '\u63a8\u8350\u590d\u76d8',
+            actionLabel: 'See All',
+            onAction: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _recommendationList(context, store),
+          const SizedBox(height: 18),
+          _drawerNote(store),
+        ],
+      ),
+    );
+  }
+
+  Widget _recommendationList(BuildContext context, AppStore store) {
+    return Column(
+      children: [
+        _recommendationCard(
+          title: '\u4eca\u65e5\u590d\u76d8',
+          subtitle: store.hasLearningHistory
+              ? '\u4f18\u5148\u56de\u6536 ${store.pendingReviewCount} \u9053\u9519\u9898'
+              : '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9519\u9898',
+          metric: '${store.smartReviewQueue.length}',
+          metricLabel: '\u9898',
+          icon: Icons.playlist_add_check_rounded,
+          accent: AppPalette.mint,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SmartReviewScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _recommendationCard(
+          title: '\u9636\u6bb5\u76ee\u6807',
+          subtitle: store.goalSteps.isNotEmpty
+              ? '\u6b63\u5728\u63a8\u8fdb ${store.goalSteps.length} \u4e2a\u9636\u6bb5'
+              : '\u5efa\u7acb\u672c\u5468\u5b66\u4e60\u8282\u594f',
+          metric: '${store.goalSteps.length}',
+          metricLabel: '\u4e2a',
+          icon: Icons.flag_circle_rounded,
+          accent: AppPalette.peach,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const GoalsScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _recommendationCard(
+          title: '\u6570\u636e\u770b\u677f',
+          subtitle: '\u67e5\u770b\u8584\u5f31\u5b66\u79d1\u548c\u8d8b\u52bf',
+          metric: '${store.knowledgePointCount}',
+          metricLabel: '\u70b9',
+          icon: Icons.stacked_line_chart_rounded,
+          accent: AppPalette.blush,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DataDashboardScreen()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _blueStageNote(AppStore store) {
+    final message = store.hasLearningHistory
+        ? '\u5148\u6311\u4e00\u4ef6\u6700\u987a\u624b\u7684\u5c0f\u4efb\u52a1\uff0c\u8ba9\u4eca\u5929\u7684\u8282\u594f\u8f7b\u4e00\u70b9\u3002'
+        : '\u4eca\u5929\u53ea\u8981\u6709\u4e00\u4e2a\u5c0f\u5f00\u59cb\uff0c\u5c31\u5df2\u7ecf\u5728\u5f80\u524d\u8d70\u4e86\u3002';
+
+    return Text(
+      message,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: Color(0xDFFFFBF3),
+        fontSize: 14,
+        height: 1.55,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _drawerNote(AppStore store) {
+    final message = store.hasLearningHistory
+        ? '\u628a\u6700\u5bb9\u6613\u5fd8\u7684\u90a3\u4e00\u6b65\u5199\u6e05\u695a\uff0c\u660e\u5929\u590d\u76d8\u4f1a\u8f7b\u5f88\u591a\u3002'
+        : '\u4e0d\u7528\u4e00\u6b21\u5b8c\u6210\u5f88\u591a\uff0c\u53ea\u8981\u7559\u4e0b\u7b2c\u4e00\u6761\u53ef\u56de\u6536\u7684\u7ebf\u7d22\u3002';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: AppPalette.cream,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _blueDeep.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: AppPalette.almondCream,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.lightbulb_rounded,
+              color: _blueDeep,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '\u5206\u4eab\u5b66\u4e60\u7a7a\u95f4',
+                  '\u590d\u76d8\u5c0f\u8bb0',
                   style: TextStyle(
                     color: AppPalette.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 Text(
-                  '\u5df2\u9080\u8bf7 ${store.invitedCount} \u4f4d\u540c\u5b66\uff0c\u7d2f\u8ba1\u89e3\u9501 ${store.unlockedMonths} \u4e2a\u6708\u9ad8\u7ea7\u6743\u76ca\u3002',
+                  message,
                   style: const TextStyle(
                     color: AppPalette.textSecondary,
                     fontSize: 13,
@@ -291,331 +396,238 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppPalette.matchaMist.withValues(alpha: 0.18),
-            ),
-            child: const Icon(Icons.ios_share_rounded, color: AppPalette.textPrimary, size: 20),
-          ),
         ],
       ),
     );
   }
 
-  Widget _goalsCard(BuildContext context, AppStore store) {
-    final focusGoal = store.goalSteps.isNotEmpty
-        ? store.goalSteps.first
-        : const GoalStepData(
-            title: '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
-            progress: '0',
-            note: '\u65b0\u8d26\u53f7\u4f1a\u4ece 0 \u5f00\u59cb\u7d2f\u8ba1\u5b66\u4e60\u76ee\u6807\uff0c\u5f55\u5165\u9519\u9898\u540e\u8fd9\u91cc\u624d\u4f1a\u51fa\u73b0\u9636\u6bb5\u8ba1\u5212\u3002',
-          );
-    final hasGoals = store.goalSteps.isNotEmpty;
-    return _glassCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const GoalsScreen()),
-      ),
-      padding: const EdgeInsets.all(20),
-      borderRadius: 28,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppPalette.matchaMist.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.flag_circle_rounded, color: AppPalette.textPrimary),
-              ),
-              const SizedBox(width: 12),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '\u5b66\u4e60\u76ee\u6807',
-                    style: TextStyle(
-                      color: AppPalette.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Goals',
-                    style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            hasGoals
-                ? '\u4f60\u5f53\u524d\u6b63\u5728\u63a8\u8fdb ${store.goalSteps.length} \u4e2a\u9636\u6bb5\u76ee\u6807'
-                : '\u4f60\u5f53\u524d\u6b63\u5728\u63a8\u8fdb 0 \u4e2a\u9636\u6bb5\u76ee\u6807',
+  Widget _sectionHeader({
+    required String title,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
             style: const TextStyle(
               color: AppPalette.textPrimary,
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
             ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppPalette.kombuGreen.withValues(alpha: 0.30),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppPalette.matchaMist.withValues(alpha: 0.16)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppPalette.matchaMist.withValues(alpha: 0.18),
-                  ),
-                  child: const Icon(Icons.auto_graph_rounded, color: AppPalette.textPrimary, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        hasGoals ? focusGoal.title : '\u5148\u5f55\u5165\u7b2c\u4e00\u9053\u9898',
-                        style: const TextStyle(
-                          color: AppPalette.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${focusGoal.progress} · ${focusGoal.note}',
-                        style: const TextStyle(
-                          color: AppPalette.textSecondary,
-                          fontSize: 13,
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppPalette.matchaMist,
-                  ),
-                  child: const Icon(Icons.add_rounded, color: AppPalette.night, size: 30),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _menuCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 18, 18, 8),
-            child: Row(
-              children: [
-                Text(
-                  '\u66f4\u591a\u8bbe\u7f6e',
-                  style: TextStyle(
-                    color: AppPalette.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _menuItem(
-            context,
-            icon: Icons.workspace_premium_rounded,
-            title: '\u6211\u7684\u6210\u5c31',
-            subtitle: '\u67e5\u770b\u6210\u957f\u5fbd\u7ae0\u3001\u8fde\u7eed\u6253\u5361\u548c\u91cc\u7a0b\u7891',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AchievementsScreen()),
-            ),
-          ),
-          _divider(),
-          _menuItem(
-            context,
-            icon: Icons.favorite_rounded,
-            title: '\u6211\u7684\u6536\u85cf',
-            subtitle: '\u96c6\u4e2d\u67e5\u770b\u9ad8\u4ef7\u503c\u9519\u9898\u3001\u9898\u578b\u6a21\u677f\u548c\u91cd\u70b9\u7b14\u8bb0',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-            ),
-          ),
-          _divider(),
-          _menuItem(
-            context,
-            icon: Icons.security_rounded,
-            title: '\u9690\u79c1\u4e0e\u5b89\u5168',
-            subtitle: '\u7ba1\u7406\u8d26\u53f7\u5bc6\u7801\u3001\u767b\u5f55\u8bbe\u5907\u548c\u9690\u79c1\u9009\u9879',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacySecurityScreen()),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _glassCard({
-    required Widget child,
-    required VoidCallback onTap,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(18),
-    double borderRadius = 24,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-
-  Widget _heroStat(String label, String value, String unit) {
-    return Column(
-      children: [
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: value,
-                style: const TextStyle(
-                  color: AppPalette.textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              TextSpan(
-                text: ' $unit',
-                style: const TextStyle(
-                  color: AppPalette.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(color: AppPalette.textSecondary, fontSize: 12),
-        ),
+        if (actionLabel != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 34),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionLabel,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _menuItem(
-    BuildContext context, {
-    required IconData icon,
+  Widget _recommendationCard({
     required String title,
     required String subtitle,
+    required String metric,
+    required String metricLabel,
+    required IconData icon,
+    required Color accent,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: AppPalette.matchaMist.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, color: AppPalette.matchaMist, size: 22),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: AppPalette.textPrimary,
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          subtitle,
-          style: const TextStyle(
-            color: AppPalette.textSecondary,
-            fontSize: 12,
-            height: 1.35,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Ink(
+          height: 136,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppPalette.cream,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _blueDeep.withValues(alpha: 0.06)),
+          ),
+          child: Stack(
+            clipBehavior: Clip.antiAlias,
+            children: [
+              Positioned(
+                right: -24,
+                bottom: -36,
+                child: Icon(
+                  icon,
+                  color: accent.withValues(alpha: 0.42),
+                  size: 122,
+                ),
+              ),
+              Positioned(
+                right: 18,
+                top: 18,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: _blueDeep, size: 22),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 92, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          metric,
+                          style: const TextStyle(
+                            color: AppPalette.textPrimary,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            metricLabel,
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: AppPalette.textSecondary, size: 16),
-      onTap: onTap,
     );
   }
 
-  Widget _divider() {
-    return Divider(
-      color: AppPalette.textPrimary.withValues(alpha: 0.08),
-      height: 1,
-      indent: 70,
-      endIndent: 18,
-    );
-  }
-
-  Widget _topButton({
+  Widget _headerButton({
     required IconData icon,
     required VoidCallback? onTap,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(999),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
         child: Ink(
-          width: 44,
-          height: 44,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
-            color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppPalette.pastelGrey.withValues(alpha: 0.08)),
+            color: Colors.white.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-          child: Icon(icon, color: AppPalette.textPrimary),
+          child: Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );
+  }
+
+  Widget _greetingMark() {
+    return SizedBox(
+      width: 58,
+      height: 34,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 4,
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 3),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 8,
+            child: Container(
+              width: 54,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            child: Icon(
+              Icons.air_rounded,
+              color: Colors.white.withValues(alpha: 0.92),
+              size: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerBlob({required double size, required Color color}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  String _greetingText() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning!';
+    if (hour < 18) return 'Good Afternoon!';
+    return 'Good Evening!';
   }
 
   Future<void> _pickAvatar(BuildContext context, AppStore store) async {
@@ -632,6 +644,7 @@ class ProfileScreen extends StatelessWidget {
         syncUserId: store.syncUserId,
         authToken: store.authToken,
       );
+      if (!context.mounted) return;
       store.setAvatarPath(uploaded.fileUrl);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('\u5934\u50cf\u5df2\u66f4\u65b0')),
@@ -645,7 +658,8 @@ class ProfileScreen extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6\u5934\u50cf\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5'),
+          content: Text(
+              '\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6\u5934\u50cf\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5'),
         ),
       );
     }
@@ -678,9 +692,13 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _avatarFallback({double iconSize = 28}) {
     return Container(
-      color: AppPalette.kombuGreen,
+      color: AppPalette.almondCream,
       alignment: Alignment.center,
-      child: Icon(Icons.person_rounded, color: AppPalette.textPrimary, size: iconSize),
+      child: Icon(
+        Icons.person_rounded,
+        color: AppPalette.textPrimary,
+        size: iconSize,
+      ),
     );
   }
 }

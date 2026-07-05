@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
-  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120';
+  static const String _defaultCloudApiBaseUrl = 'http://101.35.214.120:8001';
 
   static const String _apiBaseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
@@ -31,6 +31,23 @@ class AppConstants {
   static String get meEndpoint => '$apiBaseUrl/api/v1/auth/me';
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';
   static String get analysisEndpoint => '$apiBaseUrl/api/v1/analysis/text';
+  static String get imageAnalysisJobsEndpoint =>
+      '$apiBaseUrl/api/v1/analysis/image/jobs';
+  static String imageAnalysisJobEndpoint(String jobId) =>
+      '$imageAnalysisJobsEndpoint/${Uri.encodeComponent(jobId)}';
+  static String imageAnalysisJobRetryEndpoint(String jobId) =>
+      '${imageAnalysisJobEndpoint(jobId)}/retry';
+  static String get manimRenderEndpoint => '$apiBaseUrl/api/v1/render/manim';
+  static String get manimRetainEndpoint =>
+      '$apiBaseUrl/api/v1/render/manim/jobs/retain';
+  static String get manimCleanupEndpoint =>
+      '$apiBaseUrl/api/v1/render/manim/jobs/cleanup';
+  static String manimJobEndpoint(String jobId) =>
+      '$apiBaseUrl/api/v1/render/manim/${Uri.encodeComponent(jobId)}';
+  static String get practicePaperEndpoint =>
+      '$apiBaseUrl/api/v1/analysis/practice-paper';
+  static String get assistantChatEndpoint =>
+      '$apiBaseUrl/api/v1/assistant/chat';
   static String get fileUploadEndpoint => '$apiBaseUrl/api/v1/files/upload';
   static String appStateEndpoint(String syncUserId) =>
       '$apiBaseUrl/api/v1/app-state/${Uri.encodeComponent(syncUserId)}';

@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -8,20 +6,22 @@ import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
+import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
-import 'data_dashboard_screen.dart';
+import 'achievements_screen.dart';
+import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
-import 'learning_plan_screen.dart';
+import 'favorites_screen.dart';
 import 'login_screen.dart';
 import 'manual_entry_screen.dart';
+import 'privacy_security_screen.dart';
 import 'profile_screen.dart';
+import 'practice_paper_entry_screen.dart';
 import 'recycle_bin_screen.dart';
 import 'settings_screen.dart';
 import 'smart_quiz_screen.dart';
-import 'smart_review_screen.dart';
-import 'weakness_practice_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +31,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const Color _flatInk = AppPalette.inkBlue;
+  static const Color _flatCream = AppPalette.cream;
+  static const Color _flatMuted = AppPalette.textSecondary;
+  static const Color _flatBlue = AppPalette.moodBlue;
+  static const Color _flatGreen = AppPalette.leaf;
+  static const Color _flatMint = AppPalette.mint;
+  static const Color _flatPeach = AppPalette.peach;
+  static const Color _flatPink = AppPalette.blush;
+  static const Color _queueSheetSurface = Color(0xFFFFFCF6);
+  static const Color _queueTaskSurface = Color(0xFFFFFEFB);
+  static const Color _queueSuccess = Color(0xFF53784F);
+  static const Color _queueWarning = Color(0xFF9A681F);
+  static const Color _queueDanger = Color(0xFFB9574F);
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final PageController _pageController;
   int _currentIndex = 0;
@@ -53,38 +67,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppPalette.night,
+      backgroundColor: AppPalette.cream,
       extendBody: true,
       drawer: _buildDrawer(context, store),
       body: Stack(
         children: [
           const Positioned.fill(
             child: DecoratedBox(
-              decoration: BoxDecoration(gradient: AppPalette.appBackground),
+              decoration: BoxDecoration(color: _flatCream),
             ),
           ),
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/splash_bg.png',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-              excludeFromSemantics: true,
+          _flatBlob(
+            top: 94,
+            right: -28,
+            width: 150,
+            height: 106,
+            color: _flatMint.withOpacity(0.55),
+            radius: const BorderRadius.only(
+              topLeft: Radius.circular(42),
+              topRight: Radius.circular(30),
+              bottomLeft: Radius.circular(64),
+              bottomRight: Radius.circular(34),
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppPalette.night.withValues(alpha: 0.42),
-                    AppPalette.pineGreen.withValues(alpha: 0.36),
-                    AppPalette.night.withValues(alpha: 0.76),
-                  ],
-                ),
-              ),
+          _flatBlob(
+            top: 226,
+            left: -28,
+            width: 132,
+            height: 96,
+            color: _flatGreen.withOpacity(0.54),
+            radius: const BorderRadius.only(
+              topLeft: Radius.circular(34),
+              topRight: Radius.circular(56),
+              bottomLeft: Radius.circular(42),
+              bottomRight: Radius.circular(28),
             ),
+          ),
+          _flatBlob(
+            bottom: 142,
+            right: 26,
+            width: 94,
+            height: 94,
+            color: _flatPink.withOpacity(0.52),
+            radius: BorderRadius.circular(36),
           ),
           PageView(
             controller: _pageController,
@@ -112,206 +137,350 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab(BuildContext context, AppStore store) {
-    if (store.totalErrors == 0) {
-      return _buildEmptyHomeTab(context, store);
-    }
-
-    final featuredReview = store.smartReviewQueue.isNotEmpty
-        ? store.smartReviewQueue.first
-        : store.errors.first;
     final topPadding = MediaQuery.of(context).padding.top + 38;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-          24, topPadding, 24, 120),
+      padding: EdgeInsets.fromLTRB(24, topPadding, 24, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHomeHeader(context, store),
-          const SizedBox(height: 10),
-          Text(
-            '\u4eca\u5929\u8fd8\u6709 ${store.pendingReviewCount} \u9053\u9519\u9898\u5f85\u590d\u4e60\uff0c\u4f18\u5148\u8865\u5f3a\u300c${store.weakestSubject}\u300d\u3002',
-            style: const TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 16,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = (constraints.maxWidth - 36) / 4;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 14,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.camera_alt_rounded,
-                      label: '\u62cd\u7167\u5f55\u5165',
-                      onTap: () => _showAddActionSheet(context),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.bolt_rounded,
-                      label: '\u667a\u80fd\u7ec4\u5377',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const SmartQuizScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.folder_special_rounded,
-                      label: '\u9519\u9898\u6863\u6848',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const ErrorArchiveScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.event_note_rounded,
-                      label: '\u5b66\u4e60\u8ba1\u5212',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const LearningPlanScreen()),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-          _featureCard(
-            title: '\u4eca\u65e5\u667a\u80fd\u590d\u4e60',
-            subtitle:
-                '\u7cfb\u7edf\u5df2\u7ecf\u4e3a\u4f60\u6311\u51fa ${store.smartReviewQueue.length} \u9053\u4f18\u5148\u9519\u9898\uff0c\u5148\u56de\u6536\u300c${featuredReview.topic}\u300d\u3002',
-            tag: '${store.pendingReviewCount} \u9053\u5f85\u590d\u4e60',
-            icon: Icons.menu_book_rounded,
-            actionLabel: '\u5f00\u59cb\u590d\u4e60',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SmartReviewScreen()),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _featureCard(
-            title: '\u653b\u514b\u8584\u5f31\u70b9',
-            subtitle:
-                '\u5f53\u524d\u6700\u9700\u8981\u8865\u5f3a\u7684\u662f\u300c${store.weakestSubject}\u300d\uff0c\u5df2\u8986\u76d6 ${store.knowledgePointCount} \u4e2a\u8003\u70b9\u3002',
-            tag: '\u8fde\u7eed\u5b66\u4e60 ${store.studyStreakDays} \u5929',
-            icon: Icons.psychology_rounded,
-            actionLabel: '\u53bb\u8bad\u7ec3',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const WeaknessPracticeScreen()),
-            ),
-          ),
+          const SizedBox(height: 14),
+          _buildHomeBrief(store),
+          const SizedBox(height: 26),
+          _buildPrimaryCaptureCard(context, store),
+          const SizedBox(height: 16),
+          _buildSecondaryActions(context, store),
+          const SizedBox(height: 16),
+          _buildAiAssistantCard(context),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyHomeTab(BuildContext context, AppStore store) {
-    final topPadding = MediaQuery.of(context).padding.top + 38;
+  Widget _buildHomeBrief(AppStore store) {
+    final description = store.totalErrors == 0
+        ? '先拍下第一道错题，后面只围绕录入、档案和组卷继续展开。'
+        : '已收录 ${store.totalErrors} 道错题，今天可以继续补充档案，或直接用档案生成一套练习。';
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-          24, topPadding, 24, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHomeHeader(context, store),
-          const SizedBox(height: 10),
-          const Text(
-            '你的错题档案还是空的。先录入第一道题，后面的复习、学科拓展和数据统计才会慢慢长出来。',
-            style: TextStyle(
-              color: AppPalette.textSecondary,
-              fontSize: 16,
-              height: 1.5,
+    return Text(
+      description,
+      style: const TextStyle(
+        color: _flatMuted,
+        fontSize: 16,
+        height: 1.55,
+      ),
+    );
+  }
+
+  Widget _flatBlob({
+    double? top,
+    double? right,
+    double? bottom,
+    double? left,
+    required double width,
+    required double height,
+    required Color color,
+    required BorderRadiusGeometry radius,
+  }) {
+    return Positioned(
+      top: top,
+      right: right,
+      bottom: bottom,
+      left: left,
+      child: IgnorePointer(
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: radius,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryCaptureCard(BuildContext context, AppStore store) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showAddActionSheet(context),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(24, 24, 22, 24),
+          decoration: BoxDecoration(
+            color: _flatBlue,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: _flatInk.withOpacity(0.14),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF2FFFFFF),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0x22000000),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Text(
+                        store.totalErrors == 0
+                            ? '从第一题开始'
+                            : '档案中已有 ${store.totalErrors} 题',
+                        style: const TextStyle(
+                          color: _flatInk,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      '拍照录入',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '拍下题目后进入预览，确认识别结果，再保存到错题档案。',
+                      style: TextStyle(
+                        color: Color(0xDDEFF2FF),
+                        fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _flatCream,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_rounded,
+                            color: _flatInk,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '开始录入',
+                            style: TextStyle(
+                              color: _flatInk,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+              Container(
+                width: 94,
+                height: 94,
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: _flatCream,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.42),
+                  ),
+                ),
+                child: const Center(
+                  child: _FlatHomeIcon(
+                    kind: _FlatHomeIconKind.capture,
+                    size: 78,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryActions(BuildContext context, AppStore store) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 360 ? 10.0 : 14.0;
+        return Row(
+          children: [
+            Expanded(
+              child: _homeActionTile(
+                icon: _FlatHomeIconKind.archive,
+                color: _flatGreen,
+                title: '错题档案',
+                subtitle: '${store.totalErrors} 道已收录',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ErrorArchiveScreen()),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = (constraints.maxWidth - 36) / 4;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 14,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.camera_alt_rounded,
-                      label: '拍照录入',
-                      onTap: () => _showAddActionSheet(context),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.bolt_rounded,
-                      label: '智能组卷',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const SmartQuizScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.folder_special_rounded,
-                      label: '错题档案',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const ErrorArchiveScreen()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: _quickAction(
-                      icon: Icons.event_note_rounded,
-                      label: '学习计划',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const LearningPlanScreen()),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-          _featureCard(
-            title: '开始建立第一份错题档案',
-            subtitle: '拍题或手动录入都可以。只要有了第一道题，首页就会自动长出复习队列、收藏和学科扩展。',
-            tag: '当前 0 道错题',
-            icon: Icons.auto_stories_rounded,
-            actionLabel: '去录入',
-            onTap: () => _showAddActionSheet(context),
-          ),
-          const SizedBox(height: 18),
-          _featureCard(
-            title: '先搭好学习节奏',
-            subtitle: '现在可以先看计划页，但真正的复习推荐会在你录入错题之后按数据生成。',
-            tag: '空白起点',
-            icon: Icons.insights_rounded,
-            actionLabel: '查看计划',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LearningPlanScreen()),
+            SizedBox(width: spacing),
+            Expanded(
+              child: _homeActionTile(
+                icon: _FlatHomeIconKind.quiz,
+                color: _flatPeach,
+                title: '智能组卷',
+                subtitle: store.totalErrors == 0 ? '先录入错题' : '从档案出题',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SmartQuizScreen()),
+                ),
+              ),
             ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAiAssistantCard(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(26),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiChatScreen()),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+          decoration: BoxDecoration(
+            color: AppPalette.paper.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: AppPalette.inkBlue.withOpacity(0.06)),
+            boxShadow: [
+              BoxShadow(
+                color: AppPalette.inkBlue.withOpacity(0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
+          child: const Row(
+            children: [
+              _FlatHomeIcon(
+                kind: _FlatHomeIconKind.assistant,
+                size: 58,
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI 助教',
+                      style: TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      '用对话拆题、复盘错因、安排下一次练习',
+                      style: TextStyle(
+                        color: AppPalette.textSecondary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 12),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppPalette.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _homeActionTile({
+    required _FlatHomeIconKind icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 150),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _flatInk.withOpacity(0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _FlatHomeIcon(kind: icon, size: 54),
+              const SizedBox(height: 22),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _flatInk,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xB3111A3A),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -326,14 +495,14 @@ class _HomeScreenState extends State<HomeScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: AppPalette.textPrimary,
+              color: _flatInk,
               fontSize: 46,
               fontWeight: FontWeight.w800,
               height: 1.04,
             ),
           ),
         ),
-        if (store.hasAnalysisTasks) ...[
+        if (store.hasBackgroundTasks) ...[
           const SizedBox(width: 14),
           _buildAnalysisQueueLauncher(context, store),
         ],
@@ -350,25 +519,25 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/images/auth_bg.png',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.low,
-              excludeFromSemantics: true,
+            Container(
+              decoration: const BoxDecoration(color: AppPalette.inkBlue),
             ),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppPalette.kombuGreen.withValues(alpha: 0.90),
-                      AppPalette.pineGreen.withValues(alpha: 0.86),
-                    ],
-                  ),
-                ),
+            Positioned(
+              top: 70,
+              right: -34,
+              child: FlatShape(
+                width: 118,
+                height: 90,
+                color: AppPalette.mint.withOpacity(0.22),
+              ),
+            ),
+            Positioned(
+              bottom: 124,
+              left: -28,
+              child: FlatShape(
+                width: 96,
+                height: 86,
+                color: AppPalette.peach.withOpacity(0.22),
               ),
             ),
             SafeArea(
@@ -385,8 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
-                                color: AppPalette.pastelGrey
-                                    .withValues(alpha: 0.18)),
+                                color: AppPalette.pastelGrey.withOpacity(0.18)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -401,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 store.userName,
                                 style: const TextStyle(
-                                  color: AppPalette.textPrimary,
+                                  color: AppPalette.almondCream,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -410,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'ID: ${store.userId}',
                                 style: const TextStyle(
-                                  color: AppPalette.textSecondary,
+                                  color: Color(0xB3FFF7EA),
                                   fontSize: 13,
                                 ),
                               ),
@@ -424,7 +592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppPalette.almondCream.withValues(alpha: 0.12),
+                        color: AppPalette.almondCream.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -440,7 +608,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     AppPanel(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 16),
-                      color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+                      color: AppPalette.pastelGrey.withOpacity(0.06),
                       child: Row(
                         children: [
                           Expanded(
@@ -462,20 +630,48 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           _drawerItem(
                             context,
+                            icon: Icons.workspace_premium_rounded,
+                            title: '我的成就',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AchievementsScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
+                            icon: Icons.favorite_rounded,
+                            title: '我的收藏',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const FavoritesScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
+                            icon: Icons.security_rounded,
+                            title: '隐私与安全',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PrivacySecurityScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
+                            icon: Icons.auto_awesome_rounded,
+                            title: 'AI 助教',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AiChatScreen()),
+                            ),
+                          ),
+                          _drawerItem(
+                            context,
                             icon: Icons.restore_from_trash_rounded,
                             title: '\u9519\u9898\u56de\u6536\u7ad9',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                   builder: (_) => const RecycleBinScreen()),
-                            ),
-                          ),
-                          _drawerItem(
-                            context,
-                            icon: Icons.insert_chart_outlined_rounded,
-                            title: '\u5b66\u4e60\u6570\u636e\u770b\u677f',
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => const DataDashboardScreen()),
                             ),
                           ),
                           _drawerItem(
@@ -521,15 +717,14 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           value,
           style: const TextStyle(
-            color: AppPalette.textPrimary,
+            color: AppPalette.almondCream,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 4),
         Text(label,
-            style:
-                const TextStyle(color: AppPalette.textSecondary, fontSize: 12)),
+            style: const TextStyle(color: Color(0xB3FFF7EA), fontSize: 12)),
       ],
     );
   }
@@ -545,8 +740,8 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: isDanger
-            ? Colors.redAccent.withValues(alpha: 0.10)
-            : AppPalette.pastelGrey.withValues(alpha: 0.08),
+            ? Colors.redAccent.withOpacity(0.10)
+            : AppPalette.pastelGrey.withOpacity(0.08),
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -559,14 +754,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               children: [
                 Icon(icon,
-                    color: isDanger ? Colors.redAccent : AppPalette.matchaMist),
+                    color: isDanger ? AppPalette.blush : AppPalette.matchaMist),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
                       color:
-                          isDanger ? Colors.redAccent : AppPalette.textPrimary,
+                          isDanger ? AppPalette.blush : AppPalette.almondCream,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -574,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (!isDanger)
                   const Icon(Icons.chevron_right_rounded,
-                      color: AppPalette.textSecondary),
+                      color: Color(0x99FFF7EA)),
               ],
             ),
           ),
@@ -586,9 +781,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomAppBar() {
     return BottomAppBar(
       height: 48,
-      color: const Color(0xFF1E211F),
-      elevation: 18,
-      shadowColor: Colors.black.withValues(alpha: 0.36),
+      color: AppPalette.paper,
+      elevation: 0,
+      shadowColor: AppPalette.inkBlue.withOpacity(0.08),
       shape: const CircularNotchedRectangle(),
       notchMargin: 6,
       padding: EdgeInsets.zero,
@@ -623,8 +818,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
   }) {
     final isSelected = _currentIndex == index;
-    const selectedColor = Colors.white;
-    const unselectedColor = Color(0xFF757575);
+    const selectedColor = AppPalette.moodBlue;
+    const unselectedColor = AppPalette.textSecondary;
     final contentColor = isSelected ? selectedColor : unselectedColor;
 
     return Material(
@@ -677,157 +872,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCenterAddButton(BuildContext context) {
     return FloatingActionButton(
       onPressed: () => _showAddActionSheet(context),
-      elevation: 10,
-      highlightElevation: 12,
-      backgroundColor: const Color(0xFFFCD9A8),
-      foregroundColor: const Color(0xFF121212),
+      elevation: 4,
+      highlightElevation: 6,
+      backgroundColor: AppPalette.inkBlue,
+      foregroundColor: Colors.white,
       shape: const CircleBorder(),
       child: const Icon(Icons.add_rounded, size: 32),
-    );
-  }
-
-  Widget _quickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppPalette.kombuGreen, AppPalette.pineGreen],
-                ),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Icon(icon, color: Colors.white, size: 30),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppPalette.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _featureCard({
-    required String title,
-    required String subtitle,
-    required String tag,
-    required IconData icon,
-    required String actionLabel,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppPalette.pineGreen,
-                AppPalette.kombuGreen,
-                AppPalette.artichoke
-              ],
-            ),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          color: AppPalette.almondCream,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppPalette.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppPalette.textSecondary,
-                        fontSize: 14,
-                        height: 1.55,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppPalette.almondCream,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        actionLabel,
-                        style: const TextStyle(
-                          color: AppPalette.night,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                width: 92,
-                height: 92,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: AppPalette.textPrimary, size: 44),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -842,16 +892,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAnalysisQueueLauncher(BuildContext context, AppStore store) {
-    final completedCount = store.completedAnalysisTaskCount;
-    final failedCount = store.failedAnalysisTaskCount;
-    final totalCount = store.analysisTasks.length;
+    final completedCount = store.completedBackgroundTaskCount;
+    final failedCount = store.failedBackgroundTaskCount;
+    final activeCount = store.activeBackgroundTaskCount;
+    final totalCount = store.totalBackgroundTaskCount;
     final hasFailure = failedCount > 0;
     final hasCompleted = completedCount > 0;
+    final hasActive = activeCount > 0;
     final tint = hasFailure
-        ? Colors.redAccent
-        : hasCompleted
-            ? AppPalette.matchaMist
-            : AppPalette.almondCream;
+        ? _queueDanger
+        : hasActive
+            ? AppPalette.moodBlue
+            : hasCompleted
+                ? _queueSuccess
+                : AppPalette.textSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -861,12 +915,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: AppPalette.night.withValues(alpha: 0.88),
+            color: AppPalette.paper.withOpacity(0.96),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: tint.withValues(alpha: 0.32)),
+            border: Border.all(color: tint.withOpacity(0.18)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.24),
+                color: AppPalette.inkBlue.withOpacity(0.10),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -875,13 +929,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                hasFailure
-                    ? Icons.error_outline_rounded
-                    : Icons.file_download_rounded,
-                color: tint,
-                size: 21,
-              ),
+              hasActive && !hasFailure
+                  ? const _ActiveDownloadIndicator()
+                  : Icon(
+                      hasFailure
+                          ? Icons.error_outline_rounded
+                          : Icons.pending_actions_rounded,
+                      color: tint,
+                      size: 21,
+                    ),
               const SizedBox(width: 8),
               Text(
                 '$totalCount',
@@ -912,14 +968,30 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         final store = AppStateScope.of(context);
         final tasks = store.analysisTasks;
+        final paperTasks = store.practicePaperTasks;
+        final taskCards = <Widget>[
+          ...tasks.map(
+            (task) => _buildAnalysisTaskTile(sheetContext, store, task),
+          ),
+          ...paperTasks.map(
+            (task) => _buildPracticePaperTaskTile(sheetContext, store, task),
+          ),
+        ];
         return Container(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.76,
           ),
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           decoration: const BoxDecoration(
-            color: AppPalette.night,
+            color: _queueSheetSurface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x24111A3A),
+                blurRadius: 28,
+                offset: Offset(0, -10),
+              ),
+            ],
           ),
           child: SafeArea(
             top: false,
@@ -932,7 +1004,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppPalette.textSecondary.withValues(alpha: 0.22),
+                      color: AppPalette.inkBlue.withOpacity(0.14),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -944,12 +1016,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppPalette.almondCream.withValues(alpha: 0.12),
+                        color: AppPalette.moodBlue.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
-                        Icons.file_download_rounded,
-                        color: AppPalette.almondCream,
+                        Icons.pending_actions_rounded,
+                        color: AppPalette.moodBlue,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -958,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            '\u540e\u53f0\u9519\u9898\u6574\u7406',
+                            '后台学习任务',
                             style: TextStyle(
                               color: AppPalette.textPrimary,
                               fontSize: 19,
@@ -980,25 +1052,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 Flexible(
-                  child: tasks.isEmpty
+                  child: taskCards.isEmpty
                       ? const Center(
                           child: Text(
-                            '\u6682\u65e0\u540e\u53f0\u6574\u7406\u4efb\u52a1',
+                            '暂无后台学习任务',
                             style: TextStyle(color: AppPalette.textSecondary),
                           ),
                         )
                       : ListView.separated(
                           shrinkWrap: true,
-                          itemCount: tasks.length,
+                          itemCount: taskCards.length,
                           separatorBuilder: (context, index) =>
                               const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            return _buildAnalysisTaskTile(
-                              sheetContext,
-                              store,
-                              tasks[index],
-                            );
-                          },
+                          itemBuilder: (context, index) => taskCards[index],
                         ),
                 ),
               ],
@@ -1010,19 +1076,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _queueSummary(AppStore store) {
-    final active = store.activeAnalysisTaskCount;
-    final completed = store.completedAnalysisTaskCount;
-    final failed = store.failedAnalysisTaskCount;
+    final active = store.activeBackgroundTaskCount;
+    final completed = store.completedBackgroundTaskCount;
+    final failed = store.failedBackgroundTaskCount;
     if (active > 0) {
-      return '\u6b63\u5728\u6574\u7406 $active \u9053\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+      return '正在后台处理 $active 个任务，$completed 个已完成';
     }
     if (failed > 0) {
-      return '$failed \u9053\u9700\u8981\u91cd\u8bd5\uff0c$completed \u9053\u5f85\u786e\u8ba4';
+      return '$failed 个任务需要重试，$completed 个已完成';
     }
     if (completed > 0) {
-      return '$completed \u9053\u5df2\u6574\u7406\u597d\uff0c\u7b49\u4f60\u786e\u8ba4\u5165\u6863';
+      return '$completed 个任务已完成，等你打开确认';
     }
-    return '\u62cd\u5b8c\u9898\u540e\u4f1a\u81ea\u52a8\u5728\u8fd9\u91cc\u6392\u961f';
+    return '拍题解析和智能组卷都会在这里排队';
   }
 
   Widget _buildAnalysisTaskTile(
@@ -1031,6 +1097,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BackgroundAnalysisTask task,
   ) {
     final status = _analysisTaskStatus(task);
+    final queuePosition = store.analysisTaskQueuePosition(task.id);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1038,7 +1105,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         child: AppPanel(
           padding: const EdgeInsets.all(12),
-          color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+          color: _queueTaskSurface,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1052,11 +1119,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: AppPalette.pineGreen,
+                        color: AppPalette.pastelGrey.withOpacity(0.45),
                         alignment: Alignment.center,
                         child: const Icon(
                           Icons.image_rounded,
-                          color: AppPalette.textPrimary,
+                          color: AppPalette.textSecondary,
                         ),
                       );
                     },
@@ -1080,6 +1147,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                         const Spacer(),
                         Text(
                           _formatTaskTime(task.createdAt),
@@ -1094,6 +1172,101 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildTaskPreviewText(task, status.note),
                     const SizedBox(height: 10),
                     _buildAnalysisTaskActions(sheetContext, store, task),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPracticePaperTaskTile(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundPracticePaperTask task,
+  ) {
+    final status = _practicePaperTaskStatus(task);
+    final queuePosition = store.practicePaperTaskQueuePosition(task.id);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _practicePaperTaskTap(sheetContext, task),
+        borderRadius: BorderRadius.circular(24),
+        child: AppPanel(
+          padding: const EdgeInsets.all(12),
+          color: _queueTaskSurface,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: AppPalette.moodBlue.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppPalette.moodBlue.withOpacity(0.14),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_stories_rounded,
+                  color: AppPalette.moodBlue,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(status.icon, color: status.color, size: 17),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            color: status.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (task.isActive && queuePosition > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            queuePosition == 1 ? '当前执行' : '队列第 $queuePosition',
+                            style: const TextStyle(
+                              color: AppPalette.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _formatTaskTime(task.createdAt),
+                          style: const TextStyle(
+                            color: AppPalette.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _practicePaperTaskPreviewText(task, status.note),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppPalette.textPrimary,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildPracticePaperTaskActions(sheetContext, store, task),
                   ],
                 ),
               ),
@@ -1120,13 +1293,32 @@ class _HomeScreenState extends State<HomeScreen> {
         _openFailedAnalysisTask(task);
       };
     }
+    if (task.isActive) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openWaitingAnalysisTask(task);
+      };
+    }
+    return null;
+  }
+
+  VoidCallback? _practicePaperTaskTap(
+    BuildContext sheetContext,
+    BackgroundPracticePaperTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.paper != null) {
+      return () {
+        Navigator.pop(sheetContext);
+        _openCompletedPracticePaperTask(task);
+      };
+    }
     return null;
   }
 
   Widget _buildTaskPreviewText(BackgroundAnalysisTask task, String fallback) {
     final content = task.isCompleted && task.extractedText.trim().isNotEmpty
         ? task.extractedText.trim()
-        : task.errorMessage ?? fallback;
+        : task.errorMessage ?? task.statusMessage ?? fallback;
 
     if (!task.isCompleted) {
       return Text(
@@ -1159,13 +1351,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _practicePaperTaskPreviewText(
+    BackgroundPracticePaperTask task,
+    String fallback,
+  ) {
+    final paper = task.paper;
+    if (task.isCompleted && paper != null) {
+      final title = paper.title.trim().isEmpty ? '专题针对性练习' : paper.title;
+      return '$title · ${paper.questions.length} 题';
+    }
+    return task.errorMessage ?? task.statusMessage ?? fallback;
+  }
+
   Widget _buildAnalysisTaskActions(
     BuildContext sheetContext,
     AppStore store,
     BackgroundAnalysisTask task,
   ) {
     if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
-      return Row(
+      final hasPartialWarning = (task.errorMessage ?? '').trim().isNotEmpty;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
         children: [
           TextButton.icon(
             onPressed: () {
@@ -1175,11 +1382,20 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.fact_check_rounded, size: 17),
             label: const Text('\u786e\u8ba4\u5165\u6863'),
             style: TextButton.styleFrom(
-              foregroundColor: AppPalette.almondCream,
+              foregroundColor: AppPalette.moodBlue,
               padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 12),
+          if (hasPartialWarning)
+            TextButton.icon(
+              onPressed: () => store.retryAnalysisTask(task.id),
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+              label: const Text('重试详解'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppPalette.textPrimary,
+                padding: EdgeInsets.zero,
+              ),
+            ),
           TextButton(
             onPressed: () => store.dismissAnalysisTask(task.id),
             style: TextButton.styleFrom(
@@ -1200,7 +1416,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.refresh_rounded, size: 17),
             label: const Text('\u91cd\u8bd5'),
             style: TextButton.styleFrom(
-              foregroundColor: AppPalette.almondCream,
+              foregroundColor: _queueDanger,
               padding: EdgeInsets.zero,
             ),
           ),
@@ -1235,18 +1451,98 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 18,
           height: 18,
           decoration: BoxDecoration(
-            color: AppPalette.almondCream.withValues(alpha: 0.14),
+            color: AppPalette.moodBlue.withOpacity(0.10),
             shape: BoxShape.circle,
           ),
           child: const Icon(
             Icons.file_download_rounded,
-            color: AppPalette.almondCream,
+            color: AppPalette.moodBlue,
             size: 13,
           ),
         ),
         const SizedBox(width: 8),
         const Text(
           '\u4f60\u53ef\u4ee5\u7ee7\u7eed\u62cd\u4e0b\u4e00\u9898',
+          style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPracticePaperTaskActions(
+    BuildContext sheetContext,
+    AppStore store,
+    BackgroundPracticePaperTask task,
+  ) {
+    if (task.status == AnalysisTaskStatus.completed && task.paper != null) {
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _openCompletedPracticePaperTask(task);
+            },
+            icon: const Icon(Icons.open_in_new_rounded, size: 17),
+            label: const Text('打开试卷'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.moodBlue,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          TextButton(
+            onPressed: () => store.dismissPracticePaperTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    if (task.status == AnalysisTaskStatus.failed) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => store.retryPracticePaperTask(task.id),
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('重试'),
+            style: TextButton.styleFrom(
+              foregroundColor: _queueDanger,
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => store.dismissPracticePaperTask(task.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppPalette.textSecondary,
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text('移除'),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: task.progress > 0 ? task.progress / 100 : null,
+            strokeWidth: 2,
+            color: AppPalette.moodBlue,
+            backgroundColor: AppPalette.moodBlue.withOpacity(0.12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          '可以先回主页继续学习',
           style: TextStyle(color: AppPalette.textSecondary, fontSize: 12),
         ),
       ],
@@ -1267,23 +1563,69 @@ class _HomeScreenState extends State<HomeScreen> {
       case AnalysisTaskStatus.analyzing:
         return (
           icon: Icons.file_download_rounded,
-          color: AppPalette.almondCream,
+          color: AppPalette.moodBlue,
           label: '\u6b63\u5728\u6574\u7406',
-          note: '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
+          note:
+              '\u6b63\u5728\u8bc6\u522b\u9898\u5e72\u5e76\u751f\u6210\u9519\u9898\u5206\u6790',
         );
       case AnalysisTaskStatus.completed:
+        if ((task.errorMessage ?? '').trim().isNotEmpty) {
+          return (
+            icon: Icons.fact_check_rounded,
+            color: _queueWarning,
+            label: '基础结果',
+            note: '已保留识别结果，可先入档或重试详解',
+          );
+        }
         return (
           icon: Icons.check_circle_rounded,
-          color: AppPalette.matchaMist,
+          color: _queueSuccess,
           label: '\u5df2\u5b8c\u6210',
           note: '\u70b9\u51fb\u786e\u8ba4\u540e\u5c31\u80fd\u5165\u6863',
         );
       case AnalysisTaskStatus.failed:
         return (
           icon: Icons.error_outline_rounded,
-          color: Colors.redAccent,
+          color: _queueDanger,
           label: '\u9700\u8981\u91cd\u8bd5',
-          note: '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
+          note:
+              '\u8fd9\u9053\u9898\u6ca1\u6709\u4e22\uff0c\u53ef\u4ee5\u91cd\u8bd5\u6216\u624b\u52a8\u6574\u7406',
+        );
+    }
+  }
+
+  ({IconData icon, Color color, String label, String note})
+      _practicePaperTaskStatus(
+    BackgroundPracticePaperTask task,
+  ) {
+    switch (task.status) {
+      case AnalysisTaskStatus.queued:
+        return (
+          icon: Icons.schedule_rounded,
+          color: AppPalette.textSecondary,
+          label: '等待组卷',
+          note: '已收到智能组卷任务',
+        );
+      case AnalysisTaskStatus.analyzing:
+        return (
+          icon: Icons.auto_awesome_rounded,
+          color: AppPalette.moodBlue,
+          label: '正在组卷',
+          note: 'AI 正在编排练习题、答案和打印讲义',
+        );
+      case AnalysisTaskStatus.completed:
+        return (
+          icon: Icons.check_circle_rounded,
+          color: _queueSuccess,
+          label: '试卷已生成',
+          note: '点击打开试卷即可开始练习',
+        );
+      case AnalysisTaskStatus.failed:
+        return (
+          icon: Icons.error_outline_rounded,
+          color: _queueDanger,
+          label: '组卷失败',
+          note: '可以重试生成智能试卷',
         );
     }
   }
@@ -1304,7 +1646,28 @@ class _HomeScreenState extends State<HomeScreen> {
           imagePath: task.imagePath,
           initialText: task.extractedText,
           initialAnalysis: analysis,
-          onArchived: () => store.dismissAnalysisTask(task.id),
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
+        ),
+      ),
+    );
+  }
+
+  void _openCompletedPracticePaperTask(BackgroundPracticePaperTask task) {
+    final paper = task.paper;
+    if (paper == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PracticePaperEntryScreen(
+          paper: paper,
+          selectedSubjects: task.selectedSubjects,
+          strategyLabel: paper.strategyLabel.isEmpty
+              ? task.strategyLabel
+              : paper.strategyLabel,
         ),
       ),
     );
@@ -1317,8 +1680,21 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => ErrorEditScreen(
           imagePath: task.imagePath,
           initialText: task.extractedText,
-          onArchived: () => store.dismissAnalysisTask(task.id),
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
         ),
+      ),
+    );
+  }
+
+  void _openWaitingAnalysisTask(BackgroundAnalysisTask task) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AnalysisTaskWaitingScreen(taskId: task.id),
       ),
     );
   }
@@ -1342,7 +1718,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 34),
           decoration: const BoxDecoration(
-            color: AppPalette.night,
+            color: AppPalette.paper,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: SafeArea(
@@ -1354,16 +1730,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppPalette.textSecondary.withValues(alpha: 0.20),
+                    color: AppPalette.textSecondary.withOpacity(0.20),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
                 const SizedBox(height: 18),
                 _sheetAction(
                   icon: Icons.camera_alt_rounded,
-                  title: '\u62cd\u7167\u5f55\u5165',
-                  subtitle:
-                      '\u62cd\u4e00\u5f20\u9898\u76ee\u7167\u7247\uff0c\u81ea\u52a8\u8bc6\u522b\u8fdb\u5165\u9884\u89c8\u3002',
+                  title: '拍照录入',
+                  subtitle: '拍一张题目照片，自动识别进入预览。',
                   filled: true,
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -1373,9 +1748,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _sheetAction(
                   icon: Icons.photo_library_rounded,
-                  title: '\u4ece\u76f8\u518c\u5bfc\u5165',
-                  subtitle:
-                      '\u9009\u62e9\u5df2\u6709\u8bd5\u5377\u6216\u622a\u56fe\u5bfc\u5165\u9519\u9898\u6d41\u8f6c\u3002',
+                  title: '从相册导入',
+                  subtitle: '选择已有试卷或截图导入错题流转。',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _pickImage(ImageSource.gallery);
@@ -1384,9 +1758,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _sheetAction(
                   icon: Icons.edit_note_rounded,
-                  title: '\u624b\u52a8\u8bb0\u5f55',
-                  subtitle:
-                      '\u9002\u5408\u5f55\u5165\u516c\u5f0f\u9898\u3001\u4e3b\u89c2\u9898\u548c\u8865\u5145\u7b14\u8bb0\u3002',
+                  title: '手动记录',
+                  subtitle: '适合录入公式题、主观题和补充笔记。',
                   onTap: () {
                     Navigator.pop(sheetContext);
                     Navigator.of(context).push(
@@ -1410,14 +1783,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
     bool filled = false,
   }) {
-    final background = filled
-        ? AppPalette.matchaMist
-        : AppPalette.pastelGrey.withValues(alpha: 0.08);
-    final titleColor = filled ? AppPalette.night : AppPalette.textPrimary;
+    final background = filled ? AppPalette.mint : AppPalette.cream;
+    final titleColor = AppPalette.textPrimary;
     final subtitleColor = filled
-        ? AppPalette.night.withValues(alpha: 0.70)
+        ? AppPalette.textPrimary.withOpacity(0.72)
         : AppPalette.textSecondary;
-    final iconColor = filled ? AppPalette.night : AppPalette.matchaMist;
+    final iconColor = AppPalette.textPrimary;
 
     return Material(
       color: background,
@@ -1433,7 +1804,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: filled ? 0.14 : 0.12),
+                  color: filled
+                      ? AppPalette.paper.withOpacity(0.68)
+                      : AppPalette.peach.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: iconColor),
@@ -1503,5 +1876,501 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Icon(Icons.person_rounded,
           color: AppPalette.textPrimary, size: iconSize),
     );
+  }
+}
+
+enum _FlatHomeIconKind { archive, quiz, capture, assistant }
+
+class _FlatHomeIcon extends StatelessWidget {
+  const _FlatHomeIcon({required this.kind, this.size = 54});
+
+  final _FlatHomeIconKind kind;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _FlatHomeIconPainter(kind),
+    );
+  }
+}
+
+class _FlatHomeIconPainter extends CustomPainter {
+  const _FlatHomeIconPainter(this.kind);
+
+  final _FlatHomeIconKind kind;
+
+  static const _ink = AppPalette.inkBlue;
+  static const _paper = AppPalette.paper;
+  static const _mint = AppPalette.mint;
+  static const _peach = AppPalette.peach;
+  static const _blue = AppPalette.moodBlue;
+  static const _coral = AppPalette.coral;
+  static const _captureAccent = Color(0xFFFFC25F);
+  static const _captureLens = Color(0xFFFF9F8A);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.shortestSide;
+    canvas.save();
+    canvas.translate((size.width - s) / 2, (size.height - s) / 2);
+
+    final fill = Paint()..style = PaintingStyle.fill;
+
+    fill.color = _baseFor(kind);
+    canvas.drawRRect(_rr(s, 0.08, 0.08, 0.84, 0.84, 0.24), fill);
+
+    fill.color = _accentFor(kind);
+    canvas.drawCircle(Offset(s * 0.76, s * 0.24), s * 0.105, fill);
+
+    switch (kind) {
+      case _FlatHomeIconKind.archive:
+        _paintArchive(canvas, s, fill);
+      case _FlatHomeIconKind.quiz:
+        _paintQuiz(canvas, s, fill);
+      case _FlatHomeIconKind.capture:
+        _paintCapture(canvas, s, fill);
+      case _FlatHomeIconKind.assistant:
+        _paintAssistant(canvas, s, fill);
+    }
+
+    canvas.restore();
+  }
+
+  Color _baseFor(_FlatHomeIconKind kind) {
+    return switch (kind) {
+      _FlatHomeIconKind.archive => const Color(0xFFFFFBF3),
+      _FlatHomeIconKind.quiz => const Color(0xFFFFF0D7),
+      _FlatHomeIconKind.capture => const Color(0xFFEAF0FF),
+      _FlatHomeIconKind.assistant => const Color(0xFFFFF3DF),
+    };
+  }
+
+  Color _accentFor(_FlatHomeIconKind kind) {
+    return switch (kind) {
+      _FlatHomeIconKind.archive => _peach,
+      _FlatHomeIconKind.quiz => _coral.withAlpha(92),
+      _FlatHomeIconKind.capture => _captureAccent,
+      _FlatHomeIconKind.assistant => _peach,
+    };
+  }
+
+  RRect _rr(
+    double s,
+    double x,
+    double y,
+    double width,
+    double height,
+    double radius,
+  ) {
+    return RRect.fromRectAndRadius(
+      Rect.fromLTWH(s * x, s * y, s * width, s * height),
+      Radius.circular(s * radius),
+    );
+  }
+
+  void _paintArchive(Canvas canvas, double s, Paint fill) {
+    fill.color = _ink;
+    canvas.drawRRect(
+      _rr(s, 0.22, 0.36, 0.56, 0.34, 0.09),
+      fill,
+    );
+    fill.color = _mint;
+    canvas.drawRRect(
+      _rr(s, 0.25, 0.29, 0.29, 0.15, 0.06),
+      fill,
+    );
+
+    fill.color = _paper;
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.48, 0.40, 0.06, 0.03),
+      fill,
+    );
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.58, 0.27, 0.06, 0.03),
+      fill,
+    );
+  }
+
+  void _paintQuiz(Canvas canvas, double s, Paint fill) {
+    fill.color = _paper;
+    canvas.drawRRect(
+      _rr(s, 0.30, 0.23, 0.40, 0.56, 0.08),
+      fill,
+    );
+
+    fill.color = _coral;
+    canvas.drawRRect(
+      _rr(s, 0.39, 0.18, 0.22, 0.12, 0.045),
+      fill,
+    );
+
+    fill.color = _ink;
+    _drawCheck(canvas, s, 0.39, 0.40, fill);
+    canvas.drawRRect(_rr(s, 0.50, 0.41, 0.15, 0.045, 0.022), fill);
+    _drawCheck(canvas, s, 0.39, 0.56, fill);
+    canvas.drawRRect(_rr(s, 0.50, 0.57, 0.13, 0.045, 0.022), fill);
+  }
+
+  void _paintCapture(Canvas canvas, double s, Paint fill) {
+    fill.color = _blue;
+    canvas.drawRRect(
+      _rr(s, 0.22, 0.34, 0.56, 0.36, 0.10),
+      fill,
+    );
+    fill.color = _blue;
+    canvas.drawRRect(
+      _rr(s, 0.33, 0.26, 0.22, 0.12, 0.045),
+      fill,
+    );
+    fill.color = _paper;
+    canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.13, fill);
+    fill.color = _captureLens;
+    canvas.drawCircle(Offset(s * 0.50, s * 0.52), s * 0.075, fill);
+    fill.color = _paper;
+    canvas.drawCircle(Offset(s * 0.67, s * 0.43), s * 0.032, fill);
+  }
+
+  void _paintAssistant(Canvas canvas, double s, Paint fill) {
+    fill.color = _ink;
+    canvas.drawRRect(
+      _rr(s, 0.22, 0.30, 0.58, 0.38, 0.12),
+      fill,
+    );
+    final tail = Path()
+      ..moveTo(s * 0.36, s * 0.66)
+      ..lineTo(s * 0.28, s * 0.78)
+      ..lineTo(s * 0.52, s * 0.66)
+      ..close();
+    canvas.drawPath(tail, fill);
+
+    fill.color = _paper;
+    canvas.drawRRect(_rr(s, 0.34, 0.43, 0.34, 0.055, 0.026), fill);
+    canvas.drawRRect(_rr(s, 0.34, 0.54, 0.24, 0.055, 0.026), fill);
+  }
+
+  void _drawCheck(
+    Canvas canvas,
+    double s,
+    double x,
+    double y,
+    Paint fill,
+  ) {
+    final path = Path()
+      ..moveTo(s * x, s * y)
+      ..lineTo(s * (x + 0.035), s * (y + 0.035))
+      ..lineTo(s * (x + 0.11), s * (y - 0.055))
+      ..lineTo(s * (x + 0.14), s * (y - 0.025))
+      ..lineTo(s * (x + 0.04), s * (y + 0.085))
+      ..lineTo(s * (x - 0.03), s * (y + 0.015))
+      ..close();
+    canvas.drawPath(path, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlatHomeIconPainter oldDelegate) {
+    return oldDelegate.kind != kind;
+  }
+}
+
+class _ActiveDownloadIndicator extends StatefulWidget {
+  const _ActiveDownloadIndicator();
+
+  @override
+  State<_ActiveDownloadIndicator> createState() =>
+      _ActiveDownloadIndicatorState();
+}
+
+class _ActiveDownloadIndicatorState extends State<_ActiveDownloadIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _dropAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+    _dropAnimation = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: -2, end: 3), weight: 50),
+        TweenSequenceItem(tween: Tween(begin: 3, end: -2), weight: 50),
+      ],
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 27,
+      height: 27,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RotationTransition(
+            turns: _controller,
+            child: const CustomPaint(
+              size: Size.square(27),
+              painter: _DownloadRingPainter(color: AppPalette.moodBlue),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _dropAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _dropAnimation.value),
+                child: child,
+              );
+            },
+            child: const Icon(
+              Icons.file_download_rounded,
+              color: AppPalette.moodBlue,
+              size: 17,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AnalysisTaskWaitingScreen extends StatefulWidget {
+  const AnalysisTaskWaitingScreen({
+    super.key,
+    required this.taskId,
+  });
+
+  final String taskId;
+
+  @override
+  State<AnalysisTaskWaitingScreen> createState() =>
+      _AnalysisTaskWaitingScreenState();
+}
+
+class _AnalysisTaskWaitingScreenState extends State<AnalysisTaskWaitingScreen> {
+  AppStore? _store;
+  bool _isNavigating = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextStore = AppStateScope.of(context);
+    if (_store == nextStore) {
+      return;
+    }
+    _store?.removeListener(_handleStoreChanged);
+    _store = nextStore;
+    _store?.addListener(_handleStoreChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleStoreChanged());
+  }
+
+  @override
+  void dispose() {
+    _store?.removeListener(_handleStoreChanged);
+    super.dispose();
+  }
+
+  void _handleStoreChanged() {
+    if (!mounted || _isNavigating) {
+      return;
+    }
+    final task = _taskForCurrentStore();
+    if (task == null) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    if (task.status == AnalysisTaskStatus.completed && task.analysis != null) {
+      _replaceWithEditScreen(task);
+    } else if (task.status == AnalysisTaskStatus.failed) {
+      _replaceWithEditScreen(task);
+    }
+  }
+
+  void _replaceWithEditScreen(BackgroundAnalysisTask task) {
+    final store = _store;
+    if (store == null) return;
+    final initialAnalysis =
+        task.status == AnalysisTaskStatus.completed ? task.analysis : null;
+    _isNavigating = true;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ErrorEditScreen(
+          imagePath: task.imagePath,
+          initialText: task.extractedText,
+          initialAnalysis: initialAnalysis,
+          onArchived: () => store.dismissAnalysisTask(
+            task.id,
+            cleanupGeneratedContent: false,
+          ),
+          onAnalysisUpdated: (analysis) =>
+              store.updateAnalysisTaskAnalysis(task.id, analysis),
+        ),
+      ),
+    );
+  }
+
+  BackgroundAnalysisTask? _taskForCurrentStore() {
+    final store = _store;
+    if (store == null) {
+      return null;
+    }
+    for (final task in store.analysisTasks) {
+      if (task.id == widget.taskId) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final task = _taskForCurrentStore();
+    final isQueued = task?.status == AnalysisTaskStatus.queued;
+
+    return Scaffold(
+      backgroundColor: AppPalette.cream,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+        title: const Text(
+          'AI 正在整理',
+          style: TextStyle(
+            color: AppPalette.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: AppSurface(
+        topSafe: false,
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 28),
+        child: Center(
+          child: AppPanel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (task != null) ...[
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.34,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppPalette.kombuGreen,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppPalette.pastelGrey.withOpacity(0.08),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(task.imagePath),
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const SizedBox(
+                            height: 160,
+                            child: Icon(
+                              Icons.image_rounded,
+                              color: AppPalette.textPrimary,
+                              size: 42,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                ],
+                const RoseThreeLoader(size: 142),
+                const SizedBox(height: 24),
+                Text(
+                  isQueued ? '正在排队等待整理...' : '知芽 AI 正在深度分析题目...',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppPalette.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                const Text(
+                  '识别题干、定位知识点、生成错因诊断和复习建议。完成后会自动进入确认入档页面。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppPalette.textSecondary,
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppPalette.almondCream.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isQueued ? '已加入后台队列' : '正在生成错题分析',
+                    style: const TextStyle(
+                      color: AppPalette.almondCream,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadRingPainter extends CustomPainter {
+  const _DownloadRingPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 2.1;
+    final rect = Offset.zero & size;
+    final arcRect = rect.deflate(strokeWidth / 2);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      arcRect,
+      -1.35,
+      4.75,
+      false,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DownloadRingPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

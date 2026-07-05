@@ -142,6 +142,7 @@ class ErrorRecord(Base):
     date_label: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     my_answer: Mapped[str] = mapped_column(Text, default="", nullable=False)
     ai_analysis: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    rich_artifacts_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_mastered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

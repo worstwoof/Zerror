@@ -7,6 +7,12 @@ from pydantic import BaseModel, Field
 
 ArtifactType = Literal[
     "interactive_html",
+    "physics_scene_spec",
+    "geogebra_scene",
+    "manim_job",
+    "manim_video",
+    "text_explanation",
+    "image_analysis",
     "chart_spec",
     "code_snippet",
     "study_card",
@@ -67,6 +73,29 @@ class ImageAnalysisResponse(AnalysisResponse):
     ocr: OCRResponse
 
 
+AnalysisJobStatus = Literal[
+    "pending",
+    "processing",
+    "partial_success",
+    "completed",
+    "failed",
+    "need_retry",
+]
+
+
+class ImageAnalysisJobResponse(BaseModel):
+    job_id: str
+    status: AnalysisJobStatus
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = ""
+    error: str = ""
+    created_at: float
+    updated_at: float
+    ocr: Optional[OCRResponse] = None
+    result: Optional[ImageAnalysisResponse] = None
+    partial_result: Optional[ImageAnalysisResponse] = None
+
+
 class PhysicsAnimationRequest(BaseModel):
     cleaned_question: str = Field(..., min_length=1)
     scene_brief: str = ""
@@ -81,3 +110,106 @@ class PhysicsAnimationResponse(BaseModel):
     artifact: Optional[RichArtifact] = None
     generated: bool = False
     reason: str = ""
+
+
+class PracticePaperSourceError(BaseModel):
+    id: str
+    subject: str = ""
+    topic: str = ""
+    question: str = ""
+    reason: str = ""
+    tags: List[str] = Field(default_factory=list)
+    my_answer: str = ""
+    ai_analysis: str = ""
+
+
+class PracticePaperRequest(BaseModel):
+    errors: List[PracticePaperSourceError] = Field(default_factory=list)
+    question_count: int = Field(default=10, ge=3, le=50)
+    selected_subjects: List[str] = Field(default_factory=list)
+    strategy_label: str = "薄弱点突破"
+    include_answer_key: bool = True
+
+
+class PracticeQuestion(BaseModel):
+    id: str
+    type: str = "简答题"
+    subject: str = ""
+    topic: str = ""
+    stem: str
+    options: List[str] = Field(default_factory=list)
+    answer: str
+    answer_index: Optional[int] = None
+    solution_outline: str = ""
+    solution_steps: List[str] = Field(default_factory=list)
+    diagram_svg: str = ""
+    diagram_caption: str = ""
+    reason_hint: str = ""
+    difficulty: str = "中等"
+    estimated_minutes: int = Field(default=4, ge=1, le=30)
+    source_error_ids: List[str] = Field(default_factory=list)
+
+
+class PracticePaperResponse(BaseModel):
+    title: str
+    subtitle: str = ""
+    subject_focus: List[str] = Field(default_factory=list)
+    topic_focus: List[str] = Field(default_factory=list)
+    strategy_label: str
+    estimated_minutes: int = Field(default=20, ge=1)
+    handout_overview: str
+    learning_targets: List[str] = Field(default_factory=list)
+    warmup_notes: List[str] = Field(default_factory=list)
+    concept_review: List[str] = Field(default_factory=list)
+    formula_cards: List[str] = Field(default_factory=list)
+    method_models: List[str] = Field(default_factory=list)
+    worked_examples: List[str] = Field(default_factory=list)
+    common_traps: List[str] = Field(default_factory=list)
+    questions: List[PracticeQuestion] = Field(default_factory=list)
+    answer_key: List[str] = Field(default_factory=list)
+    printable_html: str = ""
+    raw_model_output: str = ""
+
+
+AssistantMode = Literal[
+    "quick_answer",
+    "error_memory",
+    "knowledge_link",
+    "exam_sprint",
+]
+
+
+class AssistantMemoryContext(BaseModel):
+    total_errors: int = 0
+    pending_review_count: int = 0
+    mastered_count: int = 0
+    weakest_subject: str = ""
+    weakest_topic: str = ""
+    weakest_subject_pending_count: int = 0
+    weakest_topic_pending_count: int = 0
+    subject_distribution: Dict[str, int] = Field(default_factory=dict)
+
+
+class AssistantChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    mode: AssistantMode = "quick_answer"
+    context: AssistantMemoryContext = Field(default_factory=AssistantMemoryContext)
+    errors: List[PracticePaperSourceError] = Field(default_factory=list)
+
+
+class AssistantChatSection(BaseModel):
+    title: str
+    body: str = ""
+    bullets: List[str] = Field(default_factory=list)
+
+
+class AssistantChatResponse(BaseModel):
+    mode: AssistantMode
+    title: str
+    summary: str
+    sections: List[AssistantChatSection] = Field(default_factory=list)
+    linked_knowledge: List[str] = Field(default_factory=list)
+    follow_up_prompts: List[str] = Field(default_factory=list)
+    sprint_minutes: int = Field(default=0, ge=0, le=180)
+    fallback: bool = False
+    raw_model_output: str = ""

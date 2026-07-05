@@ -15,6 +15,8 @@ from backend.app.schemas.card_schema import (
     RichArtifact,
     SimilarQuestion,
 )
+from backend.app.rendering.geogebra_renderer import build_geogebra_scene
+from backend.app.services.render_jobs import create_manim_job
 
 from .ocr_parser import normalize_ocr_text
 from .subject_extensions import (
@@ -30,12 +32,26 @@ logger = logging.getLogger(__name__)
 
 
 SUBJECT_EXTENSION_HINTS: Dict[str, str] = {
-    "物理": "可以额外返回一个 rich_artifacts 项，artifact_type 用 interactive_html，内容为一个可直接嵌入 WebView 的单文件 HTML 动画页面，必须围绕这道题的具体物理情景来做，不要套泛化模板。",
+    "物理": "不要返回 interactive_html。物理题的动画由后端 Manim 视频任务统一生成，rich_artifacts 默认留空即可。",
     "化学": "可以额外返回一个 rich_artifacts 项，展示反应流程、实验步骤或分子结构变化，可用 interactive_html 或 chart_spec。",
-    "数学": "可以额外返回一个 rich_artifacts 项，artifact_type 用 chart_spec；content 必须是可解析 JSON，定位为学生错题复盘卡，不要返回渲染器配置或可交互参数。",
+    "数学": "数学题不要返回 chart_spec；需要图形时由系统生成 GeoGebra 交互图和 Manim 讲解视频，不要在 rich_artifacts 中写解题步骤、核心思路、易错提醒或复习清单。",
     "编程": "可以额外返回一个 rich_artifacts 项，提供 code_snippet 类型，展示关键代码、执行轨迹或输入输出示例。",
     "生物": "可以额外返回一个 rich_artifacts 项，展示 timeline 或 interactive_html，演示过程流转如代谢、遗传或生态循环。",
 }
+
+ANALYSIS_FIELD_GUIDANCE = """
+前端展示顺序固定为：破题关键与最终结论 → 详细推导步骤 → 学科拓展（仅物理动画或真正高质量可视化）→ 举一反三。
+
+必须严格分工，禁止同一内容在多个字段重复出现：
+- solution_summary：只写“破题关键 + 最终结论”。单问控制在 60-120 字；多小问可放宽到 100-180 字。必须覆盖每个小问的最终答案、轨迹方程、结论或核心判断。不要写详细推导过程。
+- mistake_diagnosis：字段仅为兼容旧 schema 保留，前端不展示。除非用户明确提供了错误答案或自述错因，否则返回空字符串；不要生成独立错因板块。
+- review_plan.focus：字段仅为兼容旧 schema 保留，前端不展示。默认返回空字符串；不要生成独立复习建议板块。
+- solution_steps：只写详细推导步骤。先判断题目是否含有（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等多小问信号；如果有，必须保留“小问标签”，按第(1)问、第(2)问……顺序分别求解，禁止把多个小问合并成一段总计算。单问建议 6-9 步，多小问建议 8-14 步，每个小问至少 2-3 步。每一步控制在 90-220 字，必须写清“为什么这样做”、条件来源、关键等式、代换依据和该步结论。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配一句简短文字讲解。不要把错因、复习建议、拓展知识写进步骤里。
+- similar_questions：最多返回 1 个变式题。prompt 控制在 60 字以内，answer_outline 控制在 80 字以内。不要返回多道相似题。
+- rich_artifacts：默认返回空数组。只有当能提供真正可视化内容时才返回，例如函数图像、几何图、物理动画、化学流程图。不要返回 study_card 类型的纯文字知识卡片。不要把“学科拓展说明”“知识点总结”“关键联系”塞进 rich_artifacts。如果没有高质量图表或交互内容，必须返回 []。
+如果题目要求“说明它表示什么曲线/物理含义/化学意义”，这个解释属于 solution_summary 的结尾，不属于 rich_artifacts。
+整体输出要适合手机端分段阅读，但复杂题以讲清楚优先；不要为了短而省略关键推导、小问答案或物理量方向判断。
+""".strip()
 
 
 class DiagnosticService:
@@ -122,6 +138,7 @@ class DiagnosticService:
         knowledge_points = [str(item) for item in parsed.get("knowledge_points", []) if str(item).strip()]
         solution_steps = [str(item) for item in parsed.get("solution_steps", []) if str(item).strip()]
         solution_summary = str(parsed.get("solution_summary", "请结合详细步骤继续完善解析。"))
+        model_scene_spec = parsed.get("scene_spec") if isinstance(parsed.get("scene_spec"), dict) else None
 
         scene_brief_source = "model"
         if not scene_brief:
@@ -130,6 +147,7 @@ class DiagnosticService:
                 cleaned_question=cleaned_question,
                 knowledge_points=knowledge_points,
                 solution_summary=solution_summary,
+                subject=subject,
             )
         logger.info(
             "analysis response scene_brief source=%s len=%s preview=%r",
@@ -176,7 +194,8 @@ class DiagnosticService:
             ]
         physics_html_elapsed = 0.0
         if request.enable_subject_extensions:
-            if "物理" not in subject:
+            should_auto_build_extension = "物理" not in subject
+            if should_auto_build_extension:
                 rich_artifacts.extend(
                     build_subject_extension_artifacts(
                         subject=subject,
@@ -186,6 +205,18 @@ class DiagnosticService:
                         existing_artifacts=rich_artifacts,
                     )
                 )
+            rich_artifacts.extend(
+                self._build_structured_render_artifacts(
+                    subject=subject,
+                    cleaned_question=cleaned_question,
+                    scene_brief=scene_brief,
+                    knowledge_points=knowledge_points,
+                    solution_summary=solution_summary,
+                    solution_steps=solution_steps,
+                    existing_artifacts=rich_artifacts,
+                    model_scene_spec=model_scene_spec,
+                )
+            )
 
         response = AnalysisResponse(
             question_text=request.question_text,
@@ -214,6 +245,246 @@ class DiagnosticService:
         )
         return response
 
+    def analyze_text_quality(self, request: AnalysisRequest) -> AnalysisResponse:
+        """Generate the second-stage explanation with the quality model.
+
+        The upload path can use a faster model or OCR-only fallback to avoid
+        mobile request timeouts. This method is intentionally reserved for
+        background jobs where we can spend more time to recover formula quality.
+        """
+
+        started_at = time.perf_counter()
+        cleaned_question = normalize_ocr_text(request.question_text)
+        prompt = self._build_text_prompt(request, cleaned_question)
+        model_started_at = time.perf_counter()
+        raw_output = self.client.chat_completion(
+            prompt,
+            model_name=self.client.settings.vivo_quality_text_model,
+            thinking_mode=self.client.settings.vivo_quality_text_thinking_mode,
+            reasoning_effort=self.client.settings.vivo_quality_text_reasoning_effort,
+            max_tokens=self.client.settings.vivo_quality_max_tokens,
+            timeout_seconds=self.client.settings.vivo_quality_timeout_seconds,
+        )
+        logger.info(
+            "analysis text quality model=%s subject=%s elapsed=%.2fs",
+            self.client.settings.vivo_quality_text_model,
+            request.subject,
+            time.perf_counter() - model_started_at,
+        )
+        try:
+            response = self._build_response(
+                request=request,
+                raw_output=raw_output,
+                default_cleaned_question=cleaned_question,
+                source="text",
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning(
+                "analysis text quality json parse failed; requesting json repair error=%s preview=%r",
+                exc,
+                self._log_preview(raw_output, limit=500),
+            )
+            repair_prompt = self._build_json_repair_prompt(raw_output)
+            repair_started_at = time.perf_counter()
+            repaired_output = self.client.chat_completion(
+                repair_prompt,
+                model_name=self.client.settings.vivo_quality_text_model,
+                thinking_mode=self.client.settings.vivo_quality_text_thinking_mode,
+                reasoning_effort=self.client.settings.vivo_quality_text_reasoning_effort,
+                max_tokens=self.client.settings.vivo_quality_max_tokens,
+                timeout_seconds=self.client.settings.vivo_quality_timeout_seconds,
+            )
+            logger.info(
+                "analysis text quality json repair model=%s subject=%s elapsed=%.2fs",
+                self.client.settings.vivo_quality_text_model,
+                request.subject,
+                time.perf_counter() - repair_started_at,
+            )
+            response = self._build_response(
+                request=request,
+                raw_output=repaired_output,
+                default_cleaned_question=cleaned_question,
+                source="text",
+            )
+        logger.info(
+            "analysis text quality total subject=%s elapsed=%.2fs",
+            response.subject,
+            time.perf_counter() - started_at,
+        )
+        return response
+
+    def _build_structured_render_artifacts(
+        self,
+        *,
+        subject: str,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+        existing_artifacts: List[RichArtifact],
+        model_scene_spec: Dict[str, Any] | None = None,
+    ) -> List[RichArtifact]:
+        # TODO: 待确认是否仍需保留所有旧 HTML/GeoGebra/Manim 辅助分支。当前
+        # 静态搜索显示这些分支仍可能被学科扩展、物理动画和数学渲染动态触发，
+        # 因此本轮只补注释，不做删除。
+        normalized_subject = subject or ""
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                normalized_subject,
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        normalized_context = combined_context.lower()
+        is_supported_subject = any(
+            marker in normalized_context
+            for marker in [
+                "数学",
+                "物理",
+                "解析几何",
+                "圆锥曲线",
+                "椭圆",
+                "抛物线",
+                "双曲线",
+                "焦点",
+                "磁场",
+                "电场",
+                "洛伦兹",
+                "鏁板",
+                "鐗╃悊",
+                "math",
+                "physics",
+                "ellipse",
+                "parabola",
+                "hyperbola",
+                "conic",
+            ]
+        )
+        if not is_supported_subject:
+            return []
+
+        existing_types = {artifact.artifact_type for artifact in existing_artifacts}
+        subject_hint = str(subject or "").lower()
+        requested_math = "math" in subject_hint or "\u6570\u5b66" in subject_hint
+        requested_physics = "physics" in subject_hint or "\u7269\u7406" in subject_hint
+        looks_like_math = self._looks_like_math_scene_context(normalized_context)
+        looks_like_physics = self._looks_like_physics_scene_context(normalized_context)
+        scene_subject = (
+            "math"
+            if requested_math or (looks_like_math and not requested_physics)
+            else "physics"
+            if requested_physics or looks_like_physics
+            else "math"
+        )
+        if scene_subject == "physics":
+            # Keep batch image analysis lightweight. Manim rendering is queued
+            # only from the explicit /analysis/physics-animation action.
+            return []
+        deterministic_math_spec = None
+        if scene_subject == "math":
+            deterministic_math_spec = self._build_scene_spec_from_context(
+                subject=scene_subject,
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+        scene_spec = (
+            deterministic_math_spec
+            if deterministic_math_spec
+            else dict(model_scene_spec)
+            if model_scene_spec
+            else self._build_scene_spec_from_context(
+                subject=scene_subject,
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+        )
+        scene_spec.setdefault("subject", scene_subject)
+        raw_render_targets = scene_spec.get("render_targets", ["geogebra"])
+        if isinstance(raw_render_targets, str):
+            raw_render_targets = [raw_render_targets]
+        scene_spec["render_targets"] = [
+            str(target)
+            for target in raw_render_targets
+            if str(target).lower() != "manim"
+        ] or ["geogebra"]
+        scene_spec.setdefault("fallback_text", solution_summary)
+        artifacts: List[RichArtifact] = []
+
+        if "geogebra" in scene_spec.get("render_targets", []) and "geogebra_scene" not in existing_types:
+            geogebra_payload = build_geogebra_scene(scene_spec)
+            if geogebra_payload.get("commands"):
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="geogebra_scene",
+                        title=str(scene_spec.get("title") or "GeoGebra 交互图"),
+                        description=str(scene_spec.get("fallback_text") or "已生成可拖动查看的 GeoGebra 交互图。"),
+                        mime_type="application/json",
+                        content=json.dumps(geogebra_payload, ensure_ascii=False),
+                    )
+                )
+
+        if "manim" in scene_spec.get("render_targets", []) and "manim_job" not in existing_types:
+            job = create_manim_job(scene_spec)
+            if job.get("status") == "succeeded" and job.get("video_url"):
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="manim_video",
+                        title="Manim 讲解视频",
+                        description="已生成 Manim 讲解视频，可直接播放或复习。",
+                        mime_type="application/json",
+                        content=json.dumps(
+                            {
+                                "url": job.get("video_url"),
+                                "video_url": job.get("video_url"),
+                                "job_id": job.get("job_id"),
+                                "status": job.get("status"),
+                                "progress": job.get("progress"),
+                                "message": job.get("message"),
+                                "error": job.get("error"),
+                                "updated_at": job.get("updated_at"),
+                                "diagnostics": job.get("diagnostics"),
+                                "duration": job.get("duration"),
+                                "thumbnail_url": job.get("thumbnail_url"),
+                            },
+                            ensure_ascii=False,
+                        ),
+                    )
+                )
+            else:
+                artifacts.append(
+                    RichArtifact(
+                        artifact_type="manim_job",
+                        title="Manim 讲解视频生成中",
+                        description="后台正在生成 Manim 讲解视频。",
+                        mime_type="application/json",
+                        content=json.dumps(job, ensure_ascii=False),
+                    )
+                )
+
+        if not artifacts and scene_spec.get("fallback_text") and "text_explanation" not in existing_types:
+            artifacts.append(
+                RichArtifact(
+                    artifact_type="text_explanation",
+                    title="补充说明",
+                    description="当前题目暂时不适合生成可靠图形，先展示文字说明。",
+                    mime_type="text/plain",
+                    content=str(scene_spec.get("fallback_text") or ""),
+                )
+            )
+        return artifacts
+
     def generate_physics_animation(
         self,
         *,
@@ -224,8 +495,72 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> RichArtifact | None:
-        normalized_subject = subject or "物理"
-        if "物理" not in normalized_subject:
+        subject_context = str(subject or "").lower()
+        content_context = " ".join(
+            [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+        ).lower()
+        is_physics = (
+            "physics" in subject_context
+            or "物理" in subject_context
+            or "鐗╃悊" in subject_context
+            or self._looks_like_physics_scene_context(content_context)
+        )
+        is_math = not is_physics and (
+            "math" in subject_context
+            or "数学" in subject_context
+            or "鏁板" in subject_context
+            or self._looks_like_math_scene_context(content_context)
+        )
+
+        if is_math:
+            scene_spec = self._build_scene_spec_from_context(
+                subject="math",
+                cleaned_question=cleaned_question,
+                scene_brief=scene_brief,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            scene_spec["subject"] = "math"
+            scene_spec["render_targets"] = ["manim"]
+            scene_spec.setdefault("fallback_text", solution_summary or cleaned_question)
+            job = create_manim_job(scene_spec)
+            content = {
+                "url": job.get("video_url"),
+                "video_url": job.get("video_url"),
+                "job_id": job.get("job_id"),
+                "status": job.get("status"),
+                "progress": job.get("progress"),
+                "message": job.get("message"),
+                "error": job.get("error"),
+                "updated_at": job.get("updated_at"),
+                "diagnostics": job.get("diagnostics"),
+                "duration": job.get("duration"),
+                "thumbnail_url": job.get("thumbnail_url"),
+            }
+            if job.get("status") == "succeeded" and job.get("video_url"):
+                return RichArtifact(
+                    artifact_type="manim_video",
+                    title="Manim 数学讲解视频",
+                    description="已生成黑板风格数学讲解视频。",
+                    mime_type="application/json",
+                    content=json.dumps(content, ensure_ascii=False),
+                )
+            return RichArtifact(
+                artifact_type="manim_job",
+                title="Manim 数学讲解视频",
+                description="后台 Manim 正在生成数学讲解视频。",
+                mime_type="application/json",
+                content=json.dumps(content, ensure_ascii=False),
+            )
+
+        if not is_physics:
             return None
         scene_type = self._physics_scene_type_from_context(
             cleaned_question=cleaned_question,
@@ -235,8 +570,7 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         logger.info("physics animation scene_type=%s", scene_type)
-        logger.info("physics animation attempting direct html generation")
-        artifact = self._generate_physics_html_artifact(
+        artifact = self._build_physics_manim_artifact(
             cleaned_question=cleaned_question,
             scene_brief=scene_brief,
             knowledge_points=knowledge_points,
@@ -244,51 +578,1215 @@ class DiagnosticService:
             solution_steps=solution_steps,
         )
         if artifact is not None:
-            logger.info("physics animation used direct html generation")
+            logger.info("physics animation used manim video job")
             return artifact
 
-        if scene_type == "circuit":
-            artifact = self._generate_circuit_scene_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to circuit scene spec renderer")
-                return artifact
-        if scene_type == "electromagnetism":
-            artifact = self._generate_electromagnetism_scene_artifact(
-                cleaned_question=cleaned_question,
-                scene_brief=scene_brief,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to electromagnetism scene spec renderer")
-                return artifact
-        if scene_type == "circuit":
-            artifact = self._build_physics_template_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to local circuit template")
-                return artifact
-        if scene_type == "electromagnetism":
-            artifact = self._build_electromagnetism_template_artifact(
-                cleaned_question=cleaned_question,
-                knowledge_points=knowledge_points,
-                solution_summary=solution_summary,
-                solution_steps=solution_steps,
-            )
-            if artifact is not None:
-                logger.info("physics animation fell back to local electromagnetism template")
-                return artifact
+        logger.info("physics animation skipped because manim job could not be created")
         return None
+
+    def _build_physics_manim_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        scene_spec = self._build_physics_manim_scene_spec(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        job = create_manim_job(scene_spec)
+        content = {
+            "url": job.get("video_url"),
+            "video_url": job.get("video_url"),
+            "job_id": job.get("job_id"),
+            "status": job.get("status"),
+            "progress": job.get("progress"),
+            "message": job.get("message"),
+            "error": job.get("error"),
+            "updated_at": job.get("updated_at"),
+            "diagnostics": job.get("diagnostics"),
+            "duration": job.get("duration"),
+            "thumbnail_url": job.get("thumbnail_url"),
+        }
+        if job.get("status") == "succeeded" and job.get("video_url"):
+            return RichArtifact(
+                artifact_type="manim_video",
+                title="Manim 物理动画视频",
+                description="Manim 已生成物理动画视频。",
+                mime_type="application/json",
+                content=json.dumps(content, ensure_ascii=False),
+            )
+        return RichArtifact(
+            artifact_type="manim_job",
+            title="Manim 物理动画视频",
+            description="后台 Manim 正在生成物理动画视频。",
+            mime_type="application/json",
+            content=json.dumps(content, ensure_ascii=False),
+        )
+
+    def _build_physics_manim_scene_spec(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> Dict[str, Any]:
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        wave_context = " ".join(
+            [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+        ).lower()
+        if scene_type == "unknown" and any(
+            keyword in wave_context
+            for keyword in ["波", "波长", "频率", "驻波", "波速", "wave", "standing wave", "wavelength", "frequency"]
+        ):
+            scene_type = "wave"
+        if scene_type == "unknown":
+            scene_type = "mechanics"
+        title_map = {
+            "board_block": "木板-物块相对运动",
+            "incline": "斜面运动过程",
+            "projectile": "抛体运动过程",
+            "collision": "碰撞过程",
+            "circuit": "电路过程",
+            "electromagnetism": "电磁场中的运动",
+            "optics": "光路变化过程",
+            "mechanics": "受力与运动过程",
+        }
+        focus_points = [
+            self._display_plain_text(str(item), limit=18)
+            for item in knowledge_points[:4]
+            if str(item).strip()
+        ]
+        fallback_text = (
+            self._display_plain_text(scene_brief, limit=72)
+            or self._display_plain_text(solution_summary, limit=72)
+            or "用 Manim 展示题目中的物理对象、受力方向和运动变化。"
+        )
+        formula_steps = self._extract_physics_formula_steps(solution_steps)
+        narration_steps = self._build_physics_animation_steps(
+            scene_type=scene_type,
+            knowledge_points=focus_points,
+            solution_steps=solution_steps,
+            solution_summary=solution_summary,
+        )
+        scene_spec = {
+            "schema_version": 2,
+            "subject": "physics",
+            "scene_type": scene_type,
+            "title": title_map.get(scene_type, "物理动画视频"),
+            "objects": [],
+            "relations": [],
+            "parameters": {
+                "question_excerpt": self._display_plain_text(cleaned_question, limit=140),
+                "focus_points": focus_points,
+                "solution_outline": [
+                    self._display_plain_text(step, limit=90)
+                    for step in solution_steps[:8]
+                    if str(step).strip()
+                ],
+                "target_duration_seconds": 65,
+            },
+            "formula_steps": formula_steps,
+            "steps": narration_steps,
+            "render_targets": ["manim"],
+            "fallback_text": fallback_text,
+            "show_title": True,
+            "show_summary": True,
+        }
+        if scene_type == "board_block":
+            scene_spec.update(
+                {
+                    "board_label": "木板 A",
+                    "block_label": "物块 B",
+                    "initial_velocity_direction": "left",
+                    "force_target": "block",
+                    "force_direction": "right",
+                    "friction_on_block_direction": "right",
+                    "friction_on_board_direction": "left",
+                }
+            )
+        return scene_spec
+
+    def _extract_physics_formula_steps(self, solution_steps: List[str]) -> List[str]:
+        formulas: List[str] = []
+        for step in solution_steps:
+            for match in re.findall(r"\$\$(.+?)\$\$", step, flags=re.S):
+                formula = self._display_plain_text(match, limit=72)
+                if formula and formula not in formulas:
+                    formulas.append(formula)
+            if len(formulas) >= 8:
+                break
+        return formulas[:8]
+
+    def _build_physics_animation_steps(
+        self,
+        *,
+        scene_type: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+        solution_summary: str,
+    ) -> List[str]:
+        scene_intro = {
+            "board_block": "先分清木板和物块两个研究对象",
+            "incline": "先把斜面方向和垂直斜面方向拆开",
+            "projectile": "先把运动分解为水平和竖直两个方向",
+            "collision": "先抓住碰撞前后的动量与能量关系",
+            "circuit": "先标出电流方向和关键元件关系",
+            "electromagnetism": "先确定速度、磁场和受力方向",
+            "mechanics": "先画出研究对象和主要受力",
+        }.get(scene_type, "先把题目中的物理对象可视化")
+        steps = [scene_intro]
+        for point in knowledge_points[:2]:
+            if point and point not in steps:
+                steps.append(point)
+        # Manim should narrate the same reasoning shown in the detail card, so
+        # keep more steps and preserve labels such as "第(1)问" for multi-part
+        # physics problems. The renderer will pace these into a longer video.
+        for step in solution_steps[:8]:
+            cleaned = re.sub(r"\$\$.+?\$\$", "", step, flags=re.S)
+            text = self._display_plain_text(cleaned, limit=64)
+            if text and text not in steps:
+                steps.append(text)
+        summary = self._display_plain_text(solution_summary, limit=72)
+        if summary and summary not in steps:
+            steps.append(summary)
+        return steps[:10]
+
+    def _generate_geogebra_scene_artifact(
+        self,
+        *,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> RichArtifact | None:
+        scene_spec = self._build_scene_spec_from_context(
+            subject="physics",
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        payload = build_geogebra_scene(scene_spec)
+        if not payload.get("commands"):
+            return None
+        return RichArtifact(
+            artifact_type="geogebra_scene",
+            title=str(scene_spec.get("title") or "GeoGebra 交互图"),
+            description=str(scene_spec.get("fallback_text") or "已生成可拖动查看的 GeoGebra 交互图。"),
+            mime_type="application/json",
+            content=json.dumps(payload, ensure_ascii=False),
+        )
+
+        scene_type = self._physics_scene_type_from_context(
+            cleaned_question=cleaned_question,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                solution_summary,
+                " ".join(knowledge_points),
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        if scene_type != "electromagnetism" and not self._looks_like_electromagnetism(
+            combined_context
+        ):
+            return None
+
+        subtype = self._guess_electromagnetism_subtype(combined_context)
+        field_type = self._guess_electromagnetism_field_type(
+            cleaned_question=combined_context,
+            knowledge_points=[],
+        )
+        if subtype != "charged_particle":
+            return None
+
+        field_marker = self._infer_electromagnetism_field_marker(
+            combined_context=combined_context,
+            field_type=field_type,
+        )
+        charge_sign = self._infer_electromagnetism_charge_sign(combined_context)
+        velocity_direction = self._infer_electromagnetism_velocity_direction(
+            combined_context,
+            subtype,
+        )
+        force_direction = self._infer_electromagnetism_force_direction(combined_context)
+        focus_points = self._build_electromagnetism_focus_points(
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        title = self._guess_electromagnetism_title(
+            cleaned_question=combined_context or cleaned_question,
+            subtype=subtype,
+            field_type=field_type,
+        )
+        summary = self._native_physics_scene_summary(
+            subtype=subtype,
+            field_type=field_type,
+        )
+        params = {
+            "a": self._extract_named_number(combined_context, "a"),
+            "b": self._extract_named_number(combined_context, "b"),
+            "L": self._extract_named_number(combined_context, "L"),
+            "R": "mv0/(eB)",
+        }
+        spec = {
+            "version": 1,
+            "engine": "geogebra",
+            "template_id": "charged_particle_field",
+            "scene_type": "electromagnetism",
+            "subtype": subtype,
+            "field_type": field_type,
+            "title": title,
+            "summary": summary,
+            "field": {
+                "marker": field_marker,
+                "direction_label": self._field_marker_label(field_marker),
+            },
+            "particle": {
+                "label": self._particle_label(charge_sign),
+                "charge_sign": charge_sign,
+                "velocity_direction": velocity_direction,
+                "force_direction": force_direction,
+            },
+            "geometry": {
+                "start_label": "P",
+                "target_label": "Q",
+                "start_point": {"x": "0", "y": "a"},
+                "target_point": {"x": "b", "y": "0"},
+                "field_width": "L",
+                "radius": "R",
+            },
+            "parameters": {key: value for key, value in params.items() if value},
+            "formula_steps": [
+                {"label": "圆周半径", "formula": "r = mv0/(eB)"},
+                {"label": "情形一：r > L", "formula": "x1 = b - L - [a - r(1 - cos theta)] cot theta"},
+                {"label": "转角关系", "formula": "theta = arcsin(eBL/mv0)"},
+                {"label": "情形二：r <= L", "formula": "x2 = b - sqrt(2mv0a/(eB) - a^2)"},
+            ],
+            "focus_points": focus_points[:4],
+            "geogebra": {
+                "app_name": "classic",
+                "commands": self._build_charged_particle_geogebra_commands(
+                    params=params,
+                ),
+                "caption": "拖动 P、Q 或调节 a、b、L，观察磁场边界与轨迹关系。",
+            },
+            "manim": {
+                "status": "available_later",
+                "message": "讲解视频将由 Manim 异步生成。",
+            },
+        }
+        return RichArtifact(
+            artifact_type="geogebra_scene",
+            title=f"{title} · 交互图",
+            description="使用 GeoGebra 渲染的交互式物理几何图。",
+            mime_type="application/json",
+            content=json.dumps(spec, ensure_ascii=False),
+        )
+
+    def _build_scene_spec_from_context(
+        self,
+        *,
+        subject: str,
+        cleaned_question: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> Dict[str, Any]:
+        combined_context = " ".join(
+            part.strip()
+            for part in [
+                cleaned_question,
+                scene_brief,
+                " ".join(knowledge_points),
+                solution_summary,
+                " ".join(solution_steps),
+            ]
+            if part and part.strip()
+        )
+        if "math" in subject.lower() or "数学" in subject or "鏁板" in subject:
+            return self._build_math_scene_spec(
+                combined_context,
+                cleaned_question=cleaned_question,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+        return self._build_physics_scene_spec(
+            combined_context=combined_context,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+        )
+
+    def _build_math_scene_spec(
+        self,
+        text: str,
+        *,
+        cleaned_question: str = "",
+        knowledge_points: List[str] | None = None,
+        solution_summary: str = "",
+        solution_steps: List[str] | None = None,
+    ) -> Dict[str, Any]:
+        knowledge_points = knowledge_points or []
+        solution_steps = solution_steps or []
+        v2_spec = self._build_math_scene_spec_v2(text)
+        if v2_spec:
+            self._enrich_math_manim_spec(
+                v2_spec,
+                cleaned_question=cleaned_question or text,
+                knowledge_points=knowledge_points,
+                solution_summary=solution_summary,
+                solution_steps=solution_steps,
+            )
+            return v2_spec
+
+        lowered = text.lower()
+        objects: List[Dict[str, Any]] = []
+        relations: List[Dict[str, Any]] = []
+        commands: List[str] = []
+        title = "GeoGebra 交互图"
+        scene_type = "geometry"
+
+        point_matches = re.findall(
+            r"([A-Z])\s*[\(（]\s*([\-0-9.]+)\s*[,，]\s*([\-0-9.]+)\s*[\)）]",
+            text,
+        )
+        for label, x_value, y_value in point_matches[:8]:
+            objects.append({"type": "point", "id": label, "label": label, "x": x_value, "y": y_value})
+
+        if "椭圆" in text or "ellipse" in lowered or "阿波罗尼斯" in text:
+            scene_type = "conic"
+            title = "圆锥曲线交互图"
+        if "抛物线" in text or "parabola" in lowered:
+            scene_type = "conic"
+            title = "抛物线交互图"
+        if "双曲线" in text or "hyperbola" in lowered:
+            scene_type = "conic"
+            title = "双曲线交互图"
+
+        equations = re.findall(
+            r"([xy][^，。；;\n]{0,60}=[^，。；;\n]{1,60})",
+            text,
+            flags=re.IGNORECASE,
+        )
+        for index, equation in enumerate(equations[:4], start=1):
+            cleaned = (
+                equation.replace("$", "")
+                .replace("\\", "")
+                .replace("{", "")
+                .replace("}", "")
+                .replace(" ", "")
+            )
+            cleaned = cleaned.replace("²", "^2").replace("＋", "+").replace("－", "-")
+            if "x" in cleaned.lower() and "y" in cleaned.lower():
+                relations.append({"type": "conic", "id": f"c{index}", "equation": cleaned})
+            elif "y=" in cleaned.lower():
+                objects.append({"type": "function", "id": f"f{index}", "expression": cleaned.split("=", 1)[1]})
+
+        if not objects and not relations:
+            commands = [
+                "A = (-2, 0)",
+                "B = (2, 0)",
+                "c: x^2 / 4 + y^2 = 1",
+                "M = Point(c)",
+                "Tangent(M, c)",
+            ]
+            scene_type = "conic"
+            title = "圆锥曲线交互图"
+
+        scene_spec = {
+            "subject": "math",
+            "scene_type": scene_type,
+            "title": title,
+            "objects": objects,
+            "relations": relations,
+            "steps": [],
+            "parameters": {},
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "可拖动点或调节参数观察点、曲线与切线关系。",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": "拖动图上的点观察几何关系。",
+            },
+        }
+        self._enrich_math_manim_spec(
+            scene_spec,
+            cleaned_question=cleaned_question or text,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+            solution_steps=solution_steps,
+        )
+        return scene_spec
+
+    def _enrich_math_manim_spec(
+        self,
+        scene_spec: Dict[str, Any],
+        *,
+        cleaned_question: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+        solution_steps: List[str],
+    ) -> None:
+        focus_points = [
+            self._display_plain_text(str(item), limit=22)
+            for item in knowledge_points[:5]
+            if str(item).strip()
+        ]
+        formula_steps = self._extract_physics_formula_steps(solution_steps)
+        narration_steps = self._build_math_animation_steps(
+            scene_type=str(scene_spec.get("scene_type") or "geometry"),
+            knowledge_points=focus_points,
+            solution_steps=solution_steps,
+            solution_summary=solution_summary,
+        )
+        parameters = scene_spec.get("parameters") if isinstance(scene_spec.get("parameters"), dict) else {}
+        parameters.update(
+            {
+                "question_excerpt": self._display_plain_text(cleaned_question, limit=140),
+                "focus_points": focus_points,
+                "solution_outline": [
+                    self._display_plain_text(step, limit=90)
+                    for step in solution_steps[:8]
+                    if str(step).strip()
+                ],
+                "target_duration_seconds": 65,
+            }
+        )
+        scene_spec["parameters"] = parameters
+        scene_spec["steps"] = narration_steps
+        scene_spec["formula_steps"] = formula_steps
+        scene_spec["show_title"] = True
+        scene_spec["show_summary"] = True
+        scene_spec["fallback_text"] = (
+            self._display_plain_text(solution_summary, limit=92)
+            or str(scene_spec.get("fallback_text") or "用 Manim 展示数学对象、图形关系和推导步骤。")
+        )
+
+    def _build_math_animation_steps(
+        self,
+        *,
+        scene_type: str,
+        knowledge_points: List[str],
+        solution_steps: List[str],
+        solution_summary: str,
+    ) -> List[str]:
+        intro = {
+            "conic": "先把圆锥曲线、焦点、弦和关键点放到同一坐标系里",
+            "function_graph": "先画出函数图像，再把交点、单调性或极值放到图上",
+            "geometry": "先还原几何对象和辅助线，明确已知量与求解目标",
+        }.get(scene_type, "先把数学对象转成可观察的图形关系")
+        steps = [intro]
+        for point in knowledge_points[:3]:
+            if point and point not in steps:
+                steps.append(point)
+        for step in solution_steps[:8]:
+            cleaned = re.sub(r"\$\$.+?\$\$", "", step, flags=re.S)
+            text = self._display_plain_text(cleaned, limit=68)
+            if text and text not in steps:
+                steps.append(text)
+        summary = self._display_plain_text(solution_summary, limit=72)
+        if summary and summary not in steps:
+            steps.append(summary)
+        return steps[:10]
+
+    def _build_physics_scene_spec(
+        self,
+        *,
+        combined_context: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+    ) -> Dict[str, Any]:
+        v2_spec = self._build_physics_scene_spec_v2(
+            combined_context=combined_context,
+            scene_brief=scene_brief,
+            solution_summary=solution_summary,
+        )
+        if v2_spec:
+            return v2_spec
+
+        scene_type = _physics_scene_type(combined_context)
+        if scene_type == "electromagnetism" or self._looks_like_electromagnetism(combined_context):
+            params = {
+                "a": self._extract_named_number(combined_context, "a") or "3",
+                "b": self._extract_named_number(combined_context, "b") or "10",
+                "L": self._extract_named_number(combined_context, "L") or "2",
+            }
+            return {
+                "subject": "physics",
+                "scene_type": "electromagnetism",
+                "title": "Charged particle in field",
+                "objects": [
+                    {"type": "point", "id": "P", "label": "P", "x": 0, "y": params["a"]},
+                    {"type": "point", "id": "Q", "label": "Q", "x": params["b"], "y": 0},
+                    {"type": "point", "id": "S", "label": "S", "x": f"{params['b']} - {params['L']}", "y": params["a"]},
+                    {"type": "point", "id": "T", "label": "T", "x": f"{params['b']} - {params['L']}", "y": 0},
+                ],
+                "relations": [
+                    {"type": "segment", "points": ["P", "S"]},
+                    {"type": "segment", "points": ["S", "T"]},
+                    {"type": "segment", "points": ["T", "Q"]},
+                    {"type": "circle", "center": "S", "radius": 4},
+                    {"type": "text", "text": "magnetic field", "at": {"x": f"{params['b']} - {params['L']} + 0.2", "y": 1}},
+                ],
+                "steps": [
+                    {"label": "radius", "formula": "r = mv0/(eB)"},
+                    {"label": "case 1", "formula": "x1 = b - L - [a - r(1 - cos(theta))]cot(theta)"},
+                    {"label": "case 2", "formula": "x2 = b - sqrt(2mv0a/(eB) - a^2)"},
+                ],
+                "parameters": params,
+                "render_targets": ["geogebra", "manim"],
+                "fallback_text": solution_summary or scene_brief or "可拖动点或调节参数观察粒子轨迹关系。",
+                "geogebra": {
+                    "app_name": "classic",
+                    "caption": "拖动 P 或 Q，观察磁场边界与轨迹关系。",
+                },
+            }
+        return self._build_mechanics_geogebra_scene_spec(
+            scene_type=scene_type,
+            scene_brief=scene_brief,
+            knowledge_points=knowledge_points,
+            solution_summary=solution_summary,
+        )
+
+    def _build_mechanics_geogebra_scene_spec(
+        self,
+        *,
+        scene_type: str,
+        scene_brief: str,
+        knowledge_points: List[str],
+        solution_summary: str,
+    ) -> Dict[str, Any]:
+        focus = " / ".join(
+            str(point).strip() for point in knowledge_points[:2] if str(point).strip()
+        )
+        fallback_text = (
+            solution_summary
+            or scene_brief
+            or "用 GeoGebra 查看物体受力、加速度和位移之间的关系。"
+        )
+        caption = focus or "拖动 F 和 m，观察 a = F / m 与位移变化。"
+        return {
+            "schema_version": 2,
+            "subject": "physics",
+            "scene_type": scene_type if scene_type != "unknown" else "generic",
+            "title": "牛顿第二定律 GeoGebra 图",
+            "objects": [
+                {"type": "slider", "id": "F", "min": 1, "max": 8, "step": 0.5},
+                {"type": "slider", "id": "m", "min": 1, "max": 6, "step": 0.5},
+                {"type": "point", "id": "O", "label": "O", "x": 0, "y": 0},
+                {"type": "point", "id": "X", "label": "X", "x": 8, "y": 0},
+                {"type": "point", "id": "A", "label": "A", "x": 1.2, "y": 0.35},
+                {"type": "point", "id": "B", "label": "B", "x": 2.8, "y": 0.35},
+                {"type": "point", "id": "C", "label": "C", "x": 2.8, "y": 1.25},
+                {"type": "point", "id": "D", "label": "D", "x": 1.2, "y": 1.25},
+                {"type": "vector", "id": "F_net", "start": "B", "end": {"x": "2.8 + F / 2", "y": 0.35}},
+                {"type": "vector", "id": "accel", "start": "C", "end": {"x": "2.8 + F / m", "y": 1.25}},
+                {"type": "trajectory", "id": "trace", "x": "1.2 + F * t^2 / (2 * m)", "y": "-0.35", "t_min": 0, "t_max": 3},
+                {"type": "text", "text": "F = ma", "at": {"x": 0.2, "y": 2.3}},
+                {"type": "text", "text": "a = F / m", "at": {"x": 0.2, "y": 1.85}},
+                {"type": "text", "text": "合力 F", "at": {"x": "3.1 + F / 2", "y": 0.55}},
+                {"type": "text", "text": "加速度 a", "at": {"x": "3.1 + F / m", "y": 1.45}},
+            ],
+            "relations": [
+                {"type": "segment", "points": ["O", "X"]},
+                {"type": "segment", "points": ["A", "B"]},
+                {"type": "segment", "points": ["B", "C"]},
+                {"type": "segment", "points": ["C", "D"]},
+                {"type": "segment", "points": ["D", "A"]},
+                {"type": "text", "text": "水平面", "at": {"x": 6.6, "y": -0.35}},
+            ],
+            "steps": [],
+            "parameters": {},
+            "render_targets": ["geogebra"],
+            "fallback_text": fallback_text,
+            "geogebra": {
+                "app_name": "classic",
+                "caption": caption,
+            },
+        }
+
+    def _build_charged_particle_geogebra_commands(self, *, params: Dict[str, str]) -> List[str]:
+        a_value = params.get("a") or "3"
+        b_value = params.get("b") or "10"
+        l_value = params.get("L") or "2"
+        return [
+            f"a = {a_value}",
+            f"b = {b_value}",
+            f"L = {l_value}",
+            "r = 4",
+            "P = (0, a)",
+            "Q = (b, 0)",
+            "S = (b - L, a)",
+            "T = (b - L, 0)",
+            "Segment((0, 0), (b + 1, 0))",
+            "Segment((0, 0), (0, a + 1))",
+            "Segment(P, S)",
+            "Segment(S, T)",
+            "Segment(T, Q)",
+            "Circle(S, r)",
+            "Text(\"P\", P + (0.2, 0.2))",
+            "Text(\"Q\", Q + (0.2, -0.4))",
+            "Text(\"磁场左边界\", T + (-0.6, -0.5))",
+        ]
+
+    def _looks_like_electromagnetism(self, text: str) -> bool:
+        if self._looks_like_electromagnetism_v2(text):
+            return True
+
+        lowered = text.lower()
+        return any(
+            token in lowered
+            for token in [
+                "磁场",
+                "电场",
+                "带电",
+                "电子",
+                "电荷",
+                "洛伦兹",
+                "安培力",
+                "电磁",
+                "感应电流",
+                "磁通量",
+                "导体棒",
+                "线圈",
+            ]
+        )
+
+    def _build_math_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        apollonius_tangent_spec = self._build_tangent_apollonius_scene_spec_v2(text)
+        if apollonius_tangent_spec is not None:
+            return apollonius_tangent_spec
+
+        ellipse_focus_chord_spec = self._build_ellipse_focus_chord_scene_spec_v2(text)
+        if ellipse_focus_chord_spec is not None:
+            return ellipse_focus_chord_spec
+
+        objects: List[Dict[str, Any]] = []
+        relations: List[Dict[str, Any]] = []
+        formula_steps: List[Dict[str, str]] = []
+        scene_type = "geometry"
+        title = "GeoGebra 交互图"
+
+        for label, x_value, y_value in self._extract_points_v2(text)[:8]:
+            objects.append(
+                {
+                    "type": "point",
+                    "id": label,
+                    "label": label,
+                    "x": x_value,
+                    "y": y_value,
+                }
+            )
+
+        equations = self._extract_math_equations_v2(text)
+        for index, equation in enumerate(equations[:5], start=1):
+            object_type = self._guess_conic_object_type_v2(equation)
+            if object_type:
+                scene_type = "conic"
+                title = self._math_scene_title_v2(object_type, text)
+                objects.append(
+                    {
+                        "type": object_type,
+                        "id": "c" if index == 1 else f"c{index}",
+                        "label": "c" if index == 1 else f"c{index}",
+                        "equation": equation,
+                    }
+                )
+            elif equation.lower().startswith("y="):
+                scene_type = "function_graph"
+                title = "函数图像"
+                objects.append(
+                    {
+                        "type": "function",
+                        "id": f"f{index}",
+                        "expression": equation.split("=", 1)[1],
+                    }
+                )
+
+        if self._looks_like_apollonius_problem_v2(text):
+            scene_type = "conic"
+            title = "阿波罗尼斯圆"
+            objects = [
+                {"type": "point", "id": "O", "label": "O", "x": 0, "y": 0},
+                {"type": "point", "id": "Q", "label": "Q", "x": 2, "y": 0},
+                {
+                    "type": "circle",
+                    "id": "c",
+                    "label": "c",
+                    "equation": "(x - 2)^2 + y^2 = 4",
+                },
+                {"type": "moving_point", "id": "M", "path": "c"},
+            ]
+            relations = [
+                {"type": "segment", "points": ["M", "Q"]},
+                {"type": "tangent", "point": "M", "curve": "c", "id": "t"},
+            ]
+            formula_steps = [
+                {"label": "距离比", "formula": "|MQ| / |MN| = lambda"},
+                {"label": "轨迹", "formula": "(x - 2)^2 + y^2 = 4"},
+            ]
+        elif self._looks_like_tangent_locus_v2(text) and any(
+            item.get("type") in {"circle", "ellipse", "hyperbola", "parabola"}
+            for item in objects
+        ):
+            scene_type = "locus_tangent"
+            curve_id = next(
+                str(item.get("id") or "c")
+                for item in objects
+                if item.get("type") in {"circle", "ellipse", "hyperbola", "parabola"}
+            )
+            objects.append({"type": "moving_point", "id": "M", "path": curve_id})
+            relations.append({"type": "tangent", "point": "M", "curve": curve_id, "id": "t"})
+            formula_steps.extend(
+                [
+                    {"label": "动点", "formula": "M in c"},
+                    {"label": "切线", "formula": "t = Tangent(M, c)"},
+                ]
+            )
+
+        if not objects and not relations:
+            return {
+                "schema_version": 2,
+                "subject": "math",
+                "scene_type": "generic",
+                "title": "数学图形",
+                "objects": [],
+                "relations": [],
+                "parameters": {},
+                "formula_steps": [],
+                "render_targets": ["manim"],
+                "fallback_text": "题目中的图形条件还不完整，暂不生成可能误导的 GeoGebra 图。",
+                "geogebra": {"app_name": "classic", "commands": []},
+            }
+
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": scene_type,
+            "title": title,
+            "objects": objects,
+            "relations": relations,
+            "parameters": {},
+            "formula_steps": formula_steps,
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "用 GeoGebra 检查点、曲线、动点和切线关系。",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": [],
+                "caption": "拖动图中的点或滑块，观察几何关系变化。",
+            },
+        }
+
+    def _build_tangent_apollonius_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        normalized = (
+            text.replace(" ", "")
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("＝", "=")
+            .replace("²", "^2")
+        )
+        lowered = normalized.lower()
+        has_unit_circle = (
+            "x^2+y^2=1" in lowered
+            or "x^2+y^2-1=0" in lowered
+            or "圆c" in normalized.lower()
+        )
+        has_q = "Q(2,0)" in normalized or "点Q" in normalized
+        has_tangent_ratio = (
+            ("切线长" in normalized or "tangent" in lowered or "MQ" in normalized)
+            and ("MQ" in normalized or "|MQ|" in normalized)
+            and ("λ" in normalized or "lambda" in lowered or "比" in normalized or "ratio" in lowered)
+        )
+        if not (has_unit_circle and has_q and has_tangent_ratio):
+            return None
+
+        commands = [
+            "k = Slider(0.35, 1.8, 0.01)",
+            "SetValue(k, 0.75)",
+            "O = (0, 0)",
+            "Q = (2, 0)",
+            "C: x^2 + y^2 = 1",
+            "L: (1 - k^2) * (x^2 + y^2) + 4 * k^2 * x - (1 + 4 * k^2) = 0",
+            "M = Point(L)",
+            "MQ = Segment(M, Q)",
+            "OM = Segment(O, M)",
+            "SetColor(C, 0.19, 0.26, 0.23)",
+            "SetLineThickness(C, 4)",
+            "SetColor(L, 0, 0.38, 0.47)",
+            "SetLineThickness(L, 6)",
+            "SetColor(M, 0.80, 0.21, 0.18)",
+            "SetColor(Q, 0, 0.44, 0.59)",
+            "SetColor(O, 0.35, 0.40, 0.94)",
+            "SetColor(MQ, 0.75, 0.24, 0.20)",
+            "SetLineThickness(MQ, 4)",
+            "SetColor(OM, 0.46, 0.35, 0.10)",
+            "SetLineThickness(OM, 3)",
+            "SetPointSize(M, 7)",
+            "SetPointSize(Q, 7)",
+            "SetPointSize(O, 7)",
+            "SetPointStyle(M, 0)",
+            "SetPointStyle(Q, 0)",
+            "SetPointStyle(O, 0)",
+            "SetLabelMode(M, 1)",
+            "SetLabelMode(Q, 1)",
+            "SetLabelMode(O, 1)",
+        ]
+        hint = (
+            "底部拖动 λ 滑块，观察轨迹如何随切线长 / |MQ| 的比值变化；"
+            "灰色小圆是原圆 C，Q 是固定点 (2,0)，红点 M 在轨迹上。"
+            "λ=1 时轨迹退化为直线 x=5/4。"
+        )
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": "conic",
+            "title": "切线长比值轨迹图",
+            "objects": [],
+            "relations": [],
+            "parameters": {},
+            "formula_steps": [],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": hint,
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": hint,
+            },
+        }
+
+    def _build_ellipse_focus_chord_scene_spec_v2(self, text: str) -> Dict[str, Any] | None:
+        normalized = text.replace(" ", "")
+        normalized_ascii = (
+            normalized.replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("锛圿", "(")
+            .replace("锛塢", ")")
+            .replace("锛宂", ",")
+        )
+        lowered = normalized.lower()
+        has_ellipse = any(token in normalized for token in ["椭圆", "妞渾"]) or "ellipse" in lowered
+        has_focus = any(token in normalized for token in ["焦点", "鐒︾偣"]) or "focus" in lowered
+        has_focus_point = "F(1,0)" in normalized_ascii
+        has_intersections = "A" in normalized and "B" in normalized and any(
+            token in normalized for token in ["交于", "交於", "浜や簬", "intersect"]
+        )
+        has_chord_condition = "OA" in normalized and "OB" in normalized and "AB" in normalized
+        has_ellipse_equation = "x^2" in lowered and "y^2" in lowered and (
+            "a^2" in lowered or "b^2" in lowered
+        )
+        has_ellipse = has_ellipse or any(
+            token in normalized for token in ["椭圆", "圆锥曲线"]
+        )
+        has_focus = has_focus or any(
+            token in normalized for token in ["焦点", "焦点F"]
+        )
+        has_focus_point = has_focus_point or bool(
+            re.search(r"F\((-?1(?:\.0+)?),0(?:\.0+)?\)", normalized_ascii)
+        )
+        has_intersections = has_intersections or (
+            "A" in normalized
+            and "B" in normalized
+            and any(token in normalized for token in ["交于", "相交", "交点"])
+        )
+        has_chord_condition = has_chord_condition or (
+            (
+                ("OA" in normalized and "OB" in normalized)
+                or "OAB" in normalized
+                or "△OAB" in normalized
+                or "三角形OAB" in normalized
+            )
+            and ("AB" in normalized or has_intersections)
+        )
+        looks_like_focus_chord = (
+            (has_focus_point or has_focus)
+            and has_chord_condition
+            and (has_ellipse or has_ellipse_equation)
+        )
+        if not looks_like_focus_chord and has_ellipse_equation and has_focus and has_intersections:
+            looks_like_focus_chord = True
+        if not looks_like_focus_chord:
+            return None
+
+        commands = [
+            "a = Slider(1.15, 5, 0.01)",
+            "m = Slider(-4, 4, 0.01)",
+            "SetValue(a, 5)",
+            "SetValue(m, 1.77)",
+            "b = sqrt(a^2 - 1)",
+            "O = (0, 0)",
+            "F = (1, 0)",
+            "F_prime = (-1, 0)",
+            "C: x^2 / a^2 + y^2 / b^2 = 1",
+            "l: y = m * (x - 1)",
+            "A = Intersect(C, l, 1)",
+            "B = Intersect(C, l, 2)",
+            "OA = Segment(O, A)",
+            "OB = Segment(O, B)",
+            "AB = Segment(A, B)",
+            "tri = Polygon(O, A, B)",
+            "SetColor(C, 0.19, 0.26, 0.23)",
+            "SetLineThickness(C, 4)",
+            "SetColor(l, 0.34, 0.36, 0.38)",
+            "SetLineThickness(l, 3)",
+            "SetLineStyle(l, 1)",
+            "SetColor(A, 0.87, 0.31, 0.26)",
+            "SetColor(B, 0.11, 0.75, 0.75)",
+            "SetColor(F, 0.35, 0.40, 0.94)",
+            "SetColor(F_prime, 0.35, 0.40, 0.94)",
+            "SetColor(OA, 0.25, 0.37, 0.70)",
+            "SetLineThickness(OA, 4)",
+            "SetColor(OB, 0.25, 0.37, 0.70)",
+            "SetLineThickness(OB, 4)",
+            "SetColor(AB, 0.25, 0.37, 0.70)",
+            "SetLineThickness(AB, 4)",
+            "SetColor(tri, 0.35, 0.49, 0.88)",
+            "SetFilling(tri, 0.12)",
+            "SetPointSize(A, 6)",
+            "SetPointSize(B, 6)",
+            "SetPointSize(F, 5)",
+            "SetPointSize(F_prime, 5)",
+            "SetLabelMode(A, 1)",
+            "SetLabelMode(B, 1)",
+            "SetLabelMode(F, 1)",
+            "SetLabelMode(F_prime, 1)",
+        ]
+        return {
+            "schema_version": 2,
+            "subject": "math",
+            "scene_type": "conic",
+            "title": "椭圆焦点弦 GeoGebra 图",
+            "objects": [],
+            "relations": [],
+            "parameters": {},
+            "formula_steps": [],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": "拖动 a 和 m，观察过焦点直线与椭圆的交点 A、B，以及 OAB 的几何关系。",
+            "geogebra": {
+                "app_name": "classic",
+                "commands": commands,
+                "caption": "拖动 a 和 m，观察椭圆焦点弦 AB、交点 A/B 和三角形 OAB。",
+            },
+        }
+
+    def _build_physics_scene_spec_v2(
+        self,
+        *,
+        combined_context: str,
+        scene_brief: str,
+        solution_summary: str,
+    ) -> Dict[str, Any] | None:
+        if not self._looks_like_electromagnetism_v2(combined_context):
+            return None
+        params = {
+            "a": self._extract_named_number(combined_context, "a") or "4",
+            "b": self._extract_named_number(combined_context, "b") or "10",
+            "L": self._extract_named_number(combined_context, "L") or "3",
+        }
+        return {
+            "schema_version": 2,
+            "subject": "physics",
+            "scene_type": "charged_particle_magnetic_field",
+            "title": "磁场中圆周偏转",
+            "objects": [
+                {"type": "point", "id": "P", "label": "P", "x": 0, "y": params["a"]},
+                {"type": "point", "id": "Q", "label": "Q", "x": params["b"], "y": 0},
+                {"type": "magnetic_field", "id": "B", "direction": "into_page"},
+                {"type": "vector", "id": "v0", "start": "P", "end": {"x": "b - L", "y": params["a"]}},
+            ],
+            "relations": [
+                {"type": "text", "text": "磁场垂直纸面向里", "at": {"x": "b - L", "y": "a + 1.6"}},
+            ],
+            "parameters": params,
+            "formula_steps": [
+                {"label": "圆周半径", "formula": "R = mv0/(eB)"},
+                {"label": "情形一", "formula": "r > L"},
+                {"label": "情形二", "formula": "r <= L"},
+            ],
+            "scene_variants": [
+                {
+                    "id": "case_r_gt_l",
+                    "title": "甲  r > L",
+                    "condition": "粒子在磁场中转过不足四分之一圆弧后出场",
+                    "left_boundary_x": "b - L",
+                },
+                {
+                    "id": "case_r_le_l",
+                    "title": "乙  r <= L",
+                    "condition": "粒子在较窄半径条件下从右边界附近出场",
+                    "left_boundary_x": "b - L/2",
+                },
+            ],
+            "steps": [],
+            "render_targets": ["geogebra", "manim"],
+            "fallback_text": solution_summary
+            or scene_brief
+            or "用 GeoGebra 分别查看两种磁场边界位置与粒子轨迹。",
+            "geogebra": {
+                "app_name": "classic",
+                "caption": "上下切换两种情形，分别查看 P、Q、磁场边界和粒子轨迹。",
+            },
+        }
+
+    def _extract_points_v2(self, text: str) -> List[tuple[str, str, str]]:
+        results: List[tuple[str, str, str]] = []
+        seen = set()
+        for label, x_value, y_value in re.findall(
+            r"([A-Z])\s*[\(（]\s*([\-0-9.]+)\s*[,，]\s*([\-0-9.]+)\s*[\)）]",
+            text,
+        ):
+            key = (label, x_value, y_value)
+            if key not in seen:
+                seen.add(key)
+                results.append(key)
+        return results
+
+    def _extract_math_equations_v2(self, text: str) -> List[str]:
+        normalized = text
+        normalized = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", normalized)
+        normalized = normalized.replace("\\left", "").replace("\\right", "")
+        normalized = normalized.replace("{", "").replace("}", "")
+        normalized = normalized.replace("$", "")
+        normalized = normalized.replace("²", "^2").replace("＋", "+").replace("－", "-")
+        candidates = re.findall(
+            r"([xy0-9+\-*/^().\s]+=[xy0-9+\-*/^().\s]+)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        equations: List[str] = []
+        for candidate in candidates:
+            cleaned = re.sub(r"\s+", "", candidate)
+            if 3 <= len(cleaned) <= 96 and any(token in cleaned for token in ["x", "y"]):
+                equations.append(cleaned)
+        return equations[:8]
+
+    def _guess_conic_object_type_v2(self, equation: str) -> str:
+        lowered = equation.lower()
+        if "x^2" not in lowered and "y^2" not in lowered:
+            return ""
+        if "x^2" in lowered and "y^2" in lowered:
+            if re.search(r"x\^2[^=]*-\s*y\^2|y\^2[^=]*-\s*x\^2", lowered):
+                return "hyperbola"
+            if "/" in lowered:
+                return "ellipse"
+            return "circle"
+        return "parabola"
+
+    def _math_scene_title_v2(self, object_type: str, text: str) -> str:
+        if self._looks_like_apollonius_problem_v2(text):
+            return "阿波罗尼斯圆"
+        return {
+            "circle": "圆与轨迹",
+            "ellipse": "椭圆图形",
+            "hyperbola": "双曲线图形",
+            "parabola": "抛物线图形",
+        }.get(object_type, "圆锥曲线")
+
+    def _looks_like_tangent_locus_v2(self, text: str) -> bool:
+        return any(token in text for token in ["切线", "动点", "轨迹", "tangent", "locus", "MQ", "MN"])
+
+    def _looks_like_apollonius_problem_v2(self, text: str) -> bool:
+        return any(token in text for token in ["阿波罗尼斯", "Apollonius"]) or (
+            "切线" in text and "比" in text and "轨迹" in text
+        )
+
+    def _looks_like_electromagnetism_v2(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            token in lowered
+            for token in [
+                "磁场",
+                "电场",
+                "带电",
+                "电子",
+                "电荷",
+                "洛伦兹",
+                "安培力",
+                "电磁",
+                "感应电流",
+                "磁通量",
+                "导体棒",
+                "线圈",
+                "magnetic",
+                "electric",
+            ]
+        )
+
+    def _native_physics_scene_summary(self, *, subtype: str, field_type: str) -> str:
+        if subtype == "electromagnetic_induction":
+            return "按导体棒、磁场方向和回路位置展示电磁感应过程。"
+        if field_type == "electric":
+            return "按入射方向、场区边界和受力方向展示带电粒子的偏转过程。"
+        if field_type == "mixed":
+            return "按速度方向、电场力和洛伦兹力展示复合场中的粒子运动。"
+        return "按题图展示粒子从 P 水平射出、进入磁场并到达 Q 的两种可能情形。"
+
+    def _extract_named_number(self, text: str, name: str) -> str:
+        if not text:
+            return ""
+        pattern = re.compile(
+            rf"(?<![A-Za-z]){re.escape(name)}\s*[=＝]\s*([0-9]+(?:\.[0-9]+)?)",
+            re.IGNORECASE,
+        )
+        match = pattern.search(text)
+        if not match:
+            return ""
+        return match.group(1)
+
+    def _field_marker_label(self, marker: str) -> str:
+        if marker == "dot":
+            return "磁场垂直纸面向外"
+        if marker == "cross":
+            return "磁场垂直纸面向里"
+        return "电场方向"
+
+    def _particle_label(self, charge_sign: str) -> str:
+        if charge_sign == "negative":
+            return "电子"
+        if charge_sign == "positive":
+            return "带正电粒子"
+        return "带电粒子"
 
     def _should_generate_physics_html(
         self,
@@ -327,8 +1825,8 @@ class DiagnosticService:
         solution_summary: str,
         solution_steps: List[str],
     ) -> str:
-        normalized_subject = subject or "é—â•ƒæ‚Š"
-        if "é—â•ƒæ‚Š" not in normalized_subject:
+        normalized_subject = subject or "物理"
+        if "物理" not in normalized_subject:
             return "当前题目未被识别为物理题，暂不支持生成物理动画演示。"
 
         scene_type = self._physics_scene_type_from_context(
@@ -365,13 +1863,102 @@ class DiagnosticService:
         )
         return _physics_scene_type(scene_source)
 
+    def _looks_like_math_scene_context(self, text: str) -> bool:
+        normalized = str(text or "").lower().replace(" ", "")
+        return any(
+            marker in normalized
+            for marker in [
+                "数学",
+                "解析几何",
+                "圆锥曲线",
+                "椭圆",
+                "抛物线",
+                "双曲线",
+                "焦点",
+                "切线长",
+                "轨迹方程",
+                "阿波罗尼斯",
+                "坐标",
+                "方程",
+                "x^2",
+                "y^2",
+                "x²",
+                "y²",
+                "math",
+                "ellipse",
+                "parabola",
+                "hyperbola",
+                "conic",
+                "鏁板",
+                "妞渾",
+                "鐒︾偣",
+            ]
+        )
+
+    def _looks_like_physics_scene_context(self, text: str) -> bool:
+        normalized = str(text or "").lower().replace(" ", "")
+        return any(
+            marker in normalized
+            for marker in [
+                "物理",
+                "磁场",
+                "电场",
+                "洛伦兹",
+                "带电粒子",
+                "受力",
+                "速度方向",
+                "加速度",
+                "physics",
+                "鐗╃悊",
+                "纾佸満",
+                "鐢靛満",
+            ]
+        )
+
     def _fallback_scene_brief(
         self,
         *,
         cleaned_question: str,
         knowledge_points: List[str],
         solution_summary: str,
+        subject: str = "",
     ) -> str:
+        combined = " ".join(
+            part.strip()
+            for part in [
+                subject,
+                cleaned_question,
+                " ".join(knowledge_points),
+                solution_summary,
+            ]
+            if part and part.strip()
+        )
+        subject_hint = subject.lower()
+        if (
+            "math" in subject_hint
+            or "数学" in subject
+            or "鏁板" in subject
+            or self._looks_like_math_scene_context(combined)
+        ) and not (
+            ("physics" in subject_hint or "物理" in subject or "鐗╃悊" in subject)
+            and not self._looks_like_math_scene_context(combined)
+        ):
+            question_excerpt = self._display_plain_text(cleaned_question, limit=72)
+            focus_points = [
+                self._display_plain_text(item, limit=14)
+                for item in knowledge_points[:3]
+                if str(item).strip()
+            ]
+            focus_text = "、".join(item for item in focus_points if item)
+            summary_excerpt = self._display_plain_text(solution_summary, limit=48)
+            parts = ["画面重点放在坐标系、曲线、动点、距离关系和轨迹方程推导。"]
+            if question_excerpt:
+                parts.append(f"题目片段：{question_excerpt}")
+            if focus_text:
+                parts.append(f"关注：{focus_text}")
+            if summary_excerpt:
+                parts.append(f"解析提示：{summary_excerpt}")
+            return " ".join(parts)
         scene_type = _physics_scene_type(
             " ".join(
                 part.strip()
@@ -438,51 +2025,59 @@ class DiagnosticService:
 - 用户答案：{request.user_answer or "未提供"}
 - 用户自述错因：{request.wrong_reason_hint or "未提供"}
 
+字段职责与前端展示顺序：
+{ANALYSIS_FIELD_GUIDANCE}
+
 输出 JSON 字段要求：
 {{
   "cleaned_question": "清洗后的题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "100字以内总结",
-  "solution_steps": ["步骤1", "步骤2", "步骤3"],
-  "mistake_diagnosis": "对错因的简明诊断",
+  "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
+  "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
+  "scene_spec": {{
+    "subject": "math|physics|other",
+    "scene_type": "conic|function_graph|geometry|electromagnetism|mechanics|generic",
+    "objects": [],
+    "relations": [],
+    "steps": [],
+    "render_targets": ["geogebra", "manim"],
+    "fallback_text": "fallback text when the graph cannot be rendered reliably"
+  }},
+  "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "本次复习重点",
+    "focus": "",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
     {{
-      "prompt": "变式题1",
-      "answer_outline": "答案提纲"
-    }},
-    {{
-      "prompt": "变式题2",
-      "answer_outline": "答案提纲"
+      "prompt": "1道变式题，60字以内",
+      "answer_outline": "答案提纲，80字以内"
     }}
   ],
-  "rich_artifacts": [
-    {{
-      "artifact_type": "interactive_html",
-      "title": "扩展展示标题",
-      "description": "给前端的简短说明",
-      "mime_type": "text/html",
-      "content": "<html>...</html>"
-    }}
-  ]
+  "rich_artifacts": []
 }}
 
 要求：
 1. 所有字段必须返回，没有内容时返回空数组或空字符串。
-2. solution_steps 要可读、分步清晰，适合学生复盘。
-3. similar_questions 最多返回 2 个。
-4. rich_artifacts 默认可为空数组。
-5. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-6. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-7. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
-8. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 可返回空数组。"}
-9. {extension_detail or "如果没有把握生成高质量扩展内容，可以让 rich_artifacts 返回空数组。"}
-10. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
+2. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+3. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
+4. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+5. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+6. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+7. similar_questions 最多返回 1 个。
+8. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+9. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+10. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+11. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+12. 即使整段是中文说明，只要其中出现数学表达式，也请把数学表达式单独写成 LaTeX。
+13. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+14. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+15. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+16. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+17. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+18. 如果题目信息不完整，也尽量给出合理分析并指出缺失点。
 """.strip()
 
     def _build_vision_prompt(self, request: AnalysisRequest, cleaned_ocr_draft: str) -> str:
@@ -513,52 +2108,51 @@ class DiagnosticService:
 - 用户答案：{request.user_answer or "未提供"}
 - 用户自述错因：{request.wrong_reason_hint or "未提供"}
 
+字段职责与前端展示顺序：
+{ANALYSIS_FIELD_GUIDANCE}
+
 输出 JSON 字段要求：
 {{
   "cleaned_question": "根据图片纠正后的完整题目文本",
   "subject": "学科名",
   "knowledge_points": ["知识点1", "知识点2"],
-  "solution_summary": "100字以内总结",
-  "solution_steps": ["步骤1", "步骤2", "步骤3"],
-  "mistake_diagnosis": "对错因的简明诊断",
+  "solution_summary": "破题关键和最终结论；多小问要概括每一问结论",
+  "solution_steps": ["第(1)问：先说明本问要求和使用的条件。\\n$$核心公式1$$\\n解释公式来源、代换依据和本步结论。", "第(1)问：继续推导并得到本问结果。\\n$$核心公式2$$\\n说明为什么能这样化简。", "第(2)问：承接第(1)问结论，建立新的物理或数学关系。\\n$$核心公式3$$\\n解释条件来源。"],
+  "mistake_diagnosis": "",
   "review_plan": {{
     "next_review_in_days": 1,
-    "focus": "本次复习重点",
+    "focus": "",
     "schedule": [1, 3, 7, 15]
   }},
   "similar_questions": [
     {{
-      "prompt": "变式题1",
-      "answer_outline": "答案提纲"
-    }},
-    {{
-      "prompt": "变式题2",
-      "answer_outline": "答案提纲"
+      "prompt": "1道变式题，60字以内",
+      "answer_outline": "答案提纲，80字以内"
     }}
   ],
-  "rich_artifacts": [
-    {{
-      "artifact_type": "interactive_html",
-      "title": "扩展展示标题",
-      "description": "给前端的简短说明",
-      "mime_type": "text/html",
-      "content": "<html>...</html>"
-    }}
-  ]
+  "rich_artifacts": []
 }}
 
 要求：
 1. 只输出 JSON，不要加 Markdown 代码块。
 2. cleaned_question 必须尽量还原图片里的原题；如果仍有局部不确定，可保守表达但不要照搬明显错误的 OCR。
 3. 如果是数学、物理、化学题，优先纠正公式、符号、单位和结构。
-4. solution_steps 要分步清晰，适合学生复盘。
-5. similar_questions 最多返回 2 个。
-6. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
-7. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
-8. rich_artifacts 默认可为空数组。
-9. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 可返回空数组。"}
-10. {extension_detail or "如果没有把握生成高质量扩展内容，可以让 rich_artifacts 返回空数组。"}
-11. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
+4. 禁止把同一段推导、结论、错因或复习建议重复写进多个字段。
+5. solution_summary 只写关键突破口和最终结论；单问 60-120 字，多小问 100-180 字，并覆盖每个小问的结论。
+6. mistake_diagnosis 和 review_plan.focus 默认返回空字符串，不要生成独立错因诊断或复习建议。
+7. solution_steps 要先识别是否存在多小问；遇到（1）（2）、①②、“第一问/第二问”、“分别求”“并求”等信号时，必须保留“小问标签”，按小问顺序分别推导，禁止合并成一问。
+8. 单问建议 6-9 步，多小问建议 8-14 步；每个小问至少 2-3 步，每步 90-220 字，只写推导；必须写出关键等式、代换依据和条件来源。每个核心公式必须单独用 $$...$$ 包裹并独占一行，公式前后配简短文字讲解。
+9. similar_questions 最多返回 1 个。
+10. rich_artifacts 默认返回空数组；禁止返回纯文字 study_card。
+11. 只有真正需要函数图像、几何示意、物理动画、化学流程图时，才返回 rich_artifacts；数学 rich_artifacts 只能用于坐标图或几何图，不要写二次解析文字。
+12. 凡是公式、方程、积分、根号、分式、上下标、区间、向量、希腊字母，请优先使用 LaTeX 形式表达。
+13. 行内公式请用 $...$ 包裹，独立大公式可用 $$...$$ 包裹。
+14. 分式必须写成 \\frac{{分子}}{{分母}}，禁止写成 frac、rac、racmv_0eB 这类丢反斜杠的形式。
+15. 希腊字母必须写成 \\theta、\\alpha、\\beta、\\omega 等标准 LaTeX 命令，禁止裸写 theta/alpha 表示公式符号。
+16. JSON 字符串中反斜杠要正确转义，例如输出 "\\\\frac{{mv_0}}{{eB}}"，不要让反斜杠丢失。
+17. {extension_hint or "本题无需额外生成复杂扩展内容，rich_artifacts 必须返回空数组。"}
+18. {extension_detail or "如果没有把握生成高质量可视化扩展内容，rich_artifacts 必须返回空数组。"}
+19. 如果图片信息仍不足，也要在 solution_summary 或 mistake_diagnosis 中明确说明不确定点。
 """.strip()
 
     def _parse_json(self, raw_output: str) -> dict:
@@ -577,23 +2171,131 @@ class DiagnosticService:
                 raise ValueError(f"模型输出不是合法 JSON：{raw_output}")
             return self._load_json_with_repairs(match.group(0))
 
+    def _build_json_repair_prompt(self, raw_output: str) -> str:
+        return f"""
+请把下面的模型输出修复成严格合法的 JSON 对象。
+
+要求：
+1. 只输出 JSON，不要 Markdown 代码块，不要解释。
+2. 保留原有解题内容、公式和字段含义，不要重新解题，不要缩写。
+3. 缺失字段用合理空值补齐：knowledge_points、solution_steps、similar_questions、rich_artifacts 用数组，mistake_diagnosis 用空字符串。
+4. 字符串里的反斜杠、换行和英文双引号必须正确转义。
+5. 顶层字段至少包含 cleaned_question、scene_brief、subject、knowledge_points、solution_summary、solution_steps、mistake_diagnosis、review_plan、similar_questions、rich_artifacts。
+6. review_plan 必须包含 next_review_in_days、focus、schedule。
+
+原始输出：
+{raw_output}
+""".strip()
+
     def _load_json_with_repairs(self, text: str) -> dict:
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return parsed
-            raise ValueError("模型输出不是 JSON 对象。")
-        except json.JSONDecodeError:
-            repaired = self._repair_common_json_issues(text)
-            parsed = json.loads(repaired)
-            if isinstance(parsed, dict):
-                return parsed
-            raise ValueError("模型输出不是 JSON 对象。")
+        last_error: json.JSONDecodeError | None = None
+        for candidate in self._json_repair_candidates(text):
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+                raise ValueError("模型输出不是 JSON 对象。")
+            except json.JSONDecodeError as exc:
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise ValueError("模型输出不是 JSON 对象。")
+
+    def _json_repair_candidates(self, text: str) -> List[str]:
+        candidates: List[str] = []
+        for candidate in [
+            text,
+            self._repair_common_json_issues(text),
+            self._repair_json_iteratively(self._repair_common_json_issues(text)),
+        ]:
+            if candidate not in candidates:
+                candidates.append(candidate)
+        return candidates
 
     def _repair_common_json_issues(self, text: str) -> str:
         repaired = self._escape_invalid_backslashes_in_json_strings(text)
+        repaired = self._escape_control_characters_in_json_strings(repaired)
         repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
         return repaired
+
+    def _repair_json_iteratively(self, text: str) -> str:
+        repaired = text
+        for _ in range(8):
+            try:
+                json.loads(repaired)
+                return repaired
+            except json.JSONDecodeError as exc:
+                updated = self._repair_json_decode_error(repaired, exc)
+                if updated == repaired:
+                    return repaired
+                repaired = self._repair_common_json_issues(updated)
+        return repaired
+
+    def _repair_json_decode_error(self, text: str, exc: json.JSONDecodeError) -> str:
+        if exc.msg != "Expecting ',' delimiter":
+            return text
+
+        pos = exc.pos
+        if pos < 0 or pos >= len(text):
+            return text
+
+        value_pos = pos
+        while value_pos < len(text) and text[value_pos].isspace():
+            value_pos += 1
+        prev_pos = pos - 1
+        while prev_pos >= 0 and text[prev_pos].isspace():
+            prev_pos -= 1
+
+        if value_pos >= len(text) or prev_pos < 0:
+            return text
+        if not self._looks_like_json_value_start(text[value_pos]):
+            return text
+        if text[prev_pos] not in {'"', "}", "]"} and not text[prev_pos].isdigit():
+            return text
+
+        return text[:pos] + "," + text[pos:]
+
+    def _looks_like_json_value_start(self, char: str) -> bool:
+        return char in {'"', "{", "[", "-", "t", "f", "n"} or char.isdigit()
+
+    def _escape_control_characters_in_json_strings(self, text: str) -> str:
+        result: List[str] = []
+        in_string = False
+        escape_active = False
+
+        for char in text:
+            if not in_string:
+                result.append(char)
+                if char == '"':
+                    in_string = True
+                    escape_active = False
+                continue
+
+            if escape_active:
+                result.append(char)
+                escape_active = False
+                continue
+
+            if char == "\\":
+                result.append(char)
+                escape_active = True
+                continue
+
+            if char == '"':
+                result.append(char)
+                in_string = False
+                continue
+
+            if char == "\n":
+                result.append("\\n")
+            elif char == "\r":
+                result.append("\\r")
+            elif char == "\t":
+                result.append("\\t")
+            else:
+                result.append(char)
+
+        return "".join(result)
 
     def _escape_invalid_backslashes_in_json_strings(self, text: str) -> str:
         result: List[str] = []
@@ -773,28 +2475,12 @@ class DiagnosticService:
     def _subject_extension_detail(self, subject_name: str) -> str:
         if subject_name == "物理":
             return (
-                "如果返回 interactive_html，请严格满足以下要求："
-                "1. 必须是完整单文件 HTML，内联 CSS 和 JavaScript，不依赖外部 CDN、图片或脚本；"
-                "2. 页面主体以动画和交互展示为主，不要大段重复题干，不要把整道题原文塞进页面；"
-                "3. 必须围绕题目里的具体对象和过程来演示，例如木板-物块相对运动、受力方向、速度变化、电路状态或真实光路；"
-                "4. 页面默认适配手机竖屏，建议包含开始/暂停、重置、参数滑块或状态切换；"
-                "5. 如果题目是板块运动、斜面、连接体、摩擦或碰撞，必须优先生成力学情景动画，不能误生成光学模板；"
-                "6. 页面中的标签、按钮和参数说明请直接使用普通文本或 Unicode 字符，不要输出未渲染的 LaTeX 源码；"
-                "7. 只保留简短标题、关键参数和必要标签，重点展示动态过程。"
+                "物理题不要返回 interactive_html，也不要生成 Algodoo 风格页面；"
+                "动画视频由后端 Manim 管线根据 scene_brief、知识点和解析步骤统一异步生成。"
             )
         if subject_name == "数学":
             return (
-                "如果返回 chart_spec，请严格满足以下要求："
-                "1. content 必须是 JSON 字符串，顶层包含 renderer='generic_chart_spec'、version、scene、topic_type、title、knowledge_points、expressions、core_idea、formula_transformations、solution_path、mistake_traps、review_checklist、visual_hint；"
-                "2. scene/topic_type 可取 function、geometry、conic、calculus、statistics、probability、sequence、vector、linear_algebra 或 algebra；"
-                "3. core_idea 用 1 到 2 句话讲清本题最关键的数学思想；"
-                "4. formula_transformations 使用 [{label, detail}]，写关键公式、恒等变形、代换、对称性、分部积分等；"
-                "5. solution_path 使用 [{action, reason}]，最多 4 步，每步说明要做什么以及为什么这样做；"
-                "6. mistake_traps 和 review_checklist 必须和本题强相关，避免泛泛而谈；"
-                "7. 函数题、导数题、圆锥曲线题如果图像能帮助理解，请额外返回 coordinate_graph，包含 title、x_range、y_range、curves[{label,points}]、lines[{label,from,to,style}]、points[{label,x,y}]、student_focus；曲线和辅助线要服务解题步骤，可标出切线、对称轴、焦点、准线、交点、端点或题中给出的坐标；"
-                "8. visual_hint 只在图像或结构图真的有帮助时填写，否则返回空字符串；"
-                "9. 禁止生成 visual_model、controls、可交互参数、plot_suggestions、step_mapping 这类偏渲染实现或重复展示的字段；"
-                "10. 如果是定积分题，必须优先突出对称区间、奇偶性、三角恒等变形、分部积分、换元和上下限符号检查。"
+                "数学题不要返回 chart_spec；图形展示由系统生成 GeoGebra 交互图和 Manim 讲解视频。不要在 rich_artifacts 中承载解题步骤、核心思路、易错提醒或复习清单。"
             )
         if subject_name == "化学":
             return (
@@ -3113,7 +4799,7 @@ class DiagnosticService:
         lowered = f"{cleaned_question} {' '.join(knowledge_points)}".lower()
         has_electric = any(
             token in lowered
-            for token in ["电场", "电势", "电压", "平行板", "极板", "带电", "匀强电场"]
+            for token in ["电场", "电势", "电压", "平行板", "极板", "匀强电场"]
         )
         has_magnetic = any(
             token in lowered
@@ -3332,8 +5018,8 @@ class DiagnosticService:
 生成要求：
 1. 输出必须从 `<!DOCTYPE html>` 开始，到 `</html>` 结束，且 `<body>` 必须包含 `data-scene="{scene_hint}"`。
 2. 只做单文件、最小可运行 HTML：内联 CSS 和 JS，不依赖外部 CDN、图片、字体、脚本。
-3. 页面以动画区域为主，文字极少；只保留短标题、1 句短提示、1 到 2 个必要控件。{control_hint.get(scene_hint, control_hint["mechanics"])}
-4. 动画必须贴合这道题的具体对象、方向、运动、场或连接关系，不要套通用木板/方块模板。
+3. 页面第一屏必须直接是动画区域；不要生成题干卡片、摘要卡片、标签墙或 PHYSICS SCENE hero。只保留动画、必要对象标签和 1 到 2 个必要控件。{control_hint.get(scene_hint, control_hint["mechanics"])}
+4. 动画必须贴合这道题的具体对象、方向、运动、场或连接关系，不要套通用木板/方块模板，并且打开页面后必须自动开始运动。
 5. 不要复述题干，不要展示解题步骤，不要长段说明，不要 LaTeX 源码，不要多余装饰。
 6. 优先用简洁的 SVG、Canvas 或少量 DOM 实现，CSS 和 JS 都尽量短。
 7. 控制整体体量，尽量不超过 250 行，不超过约 6000 个英文字符；宁可简洁，也要保证完整闭合并可运行。
@@ -3419,10 +5105,11 @@ class DiagnosticService:
 5. 不要默认生成“黑色背景 + 中央 canvas + 底部滑块栏”的通用布局，除非这种布局确实最适合当前题目。
 6. 页面可以适当丰富和完整，只要有助于准确呈现题目情景；不要为了极简而牺牲场景还原度。
 7. 可以使用 SVG、Canvas，或 DOM/CSS/JS 的组合，选择最能准确表达该题场景的实现方式。优先保证场景还原和视觉清晰，而不是极端简短。
-8. 必要时加入标签、箭头、坐标轴、点名、场方向标记、区域块、状态卡片或少量控件，但重点仍然是动画和图形本身，不要变成长篇文字解析页。
-9. 不要复述完整题干或完整推导过程，不要输出未渲染的 LaTeX 源码；可以显示简洁的物理量、点名、轴名和参数符号。
-10. 让页面看起来像是专门为这道题设计的，而不是可以套到任何物理动画上的通用模板。
-11. 如果场景结构复杂，可以多花一些布局和细节把真实情景画清楚，不要把复杂题压缩成泛化模板。
+8. 必要时加入标签、箭头、坐标轴、点名、场方向标记、区域块或少量控件，但第一屏必须先展示动画，不要生成题干卡片、摘要卡片、知识点卡片或 PHYSICS SCENE hero。
+9. 页面打开后必须自动开始运动；不要要求用户先滚动到底部或点击按钮才能看到动画。
+10. 不要复述完整题干或完整推导过程，不要输出未渲染的 LaTeX 源码；可以显示简洁的物理量、点名、轴名和参数符号。
+11. 让页面看起来像是专门为这道题设计的，而不是可以套到任何物理动画上的通用模板。
+12. 如果场景结构复杂，可以多花一些布局和细节把真实情景画清楚，不要把复杂题压缩成泛化模板。
 """.strip()
 
     def _extract_html_document(self, raw_output: str) -> str:
@@ -3590,16 +5277,56 @@ class DiagnosticService:
         if not text.strip():
             return text
 
+        text = self._repair_latex_backslashes(text)
         parts = re.split(r"(\$\$.*?\$\$|\$.*?\$)", text, flags=re.DOTALL)
         converted: List[str] = []
         for part in parts:
             if not part:
                 continue
             if part.startswith("$$") or part.startswith("$"):
-                converted.append(part)
+                converted.append(self._repair_latex_backslashes(part, inside_math=True))
                 continue
             converted.append(self._wrap_math_segments(part))
         return "".join(converted)
+
+    def _repair_latex_backslashes(self, text: str, *, inside_math: bool = False) -> str:
+        """Conservatively repair common LaTeX escapes lost by JSON/model output.
+
+        We only fix command names where the intended LaTeX command is unambiguous.
+        Compact fragments such as ``racmv_0eB`` are left untouched because guessing
+        the fraction boundary would risk creating a wrong answer; those cases should
+        be regenerated by the quality stage rather than silently "fixed" incorrectly.
+        """
+
+        repaired = text
+        repaired = re.sub(r"(?<!\\)\brac\s*\{", r"\\frac{", repaired)
+        repaired = re.sub(r"(?<!\\)\bfrac\s*\{", r"\\frac{", repaired)
+        command_names = [
+            "theta",
+            "alpha",
+            "beta",
+            "gamma",
+            "lambda",
+            "mu",
+            "omega",
+            "Delta",
+            "pi",
+            "sqrt",
+            "sin",
+            "cos",
+            "tan",
+            "ln",
+            "log",
+        ]
+        for command in command_names:
+            repaired = re.sub(
+                rf"(?<![\\A-Za-z]){command}\b",
+                rf"\\{command}",
+                repaired,
+            )
+        if inside_math:
+            repaired = repaired.replace("\\\\frac", "\\frac")
+        return repaired
 
     def _wrap_math_segments(self, text: str) -> str:
         pattern = re.compile(r"[A-Za-z0-9π∞α-ωΑ-Ω∫∑√≤≥≠≈±×÷·\-\+\=\^\(\)\[\]\{\}/\\|_,.:%]+")
@@ -3705,3 +5432,4 @@ class DiagnosticService:
         normalized = re.sub(r"(?<!\\)\b([a-zA-Z])\s*\^\s*([-\d]+)", r"\1^\2", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
+

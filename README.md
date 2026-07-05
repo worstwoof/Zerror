@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/AIGC-Education-423B63?style=for-the-badge&logo=openai&logoColor=white&labelColor=1B305D" alt="Zerror Logo" />
 
   <h1 style="font-family: 'Orbitron', sans-serif;">🌱 知芽 Zerror</h1>
 

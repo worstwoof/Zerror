@@ -114,7 +114,7 @@ class _RoseThreePainter extends CustomPainter {
     canvas.translate(-shortest / 2, -shortest / 2);
 
     final pathPaint = Paint()
-      ..color = color.withValues(alpha: 0.11)
+      ..color = color.withOpacity(0.11)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -128,7 +128,7 @@ class _RoseThreePainter extends CustomPainter {
       final point =
           _point(_normalize(progress - tailOffset * _trailSpan), detailScale);
       final fade = math.pow(1 - tailOffset, 0.56).toDouble();
-      particlePaint.color = color.withValues(alpha: 0.04 + fade * 0.96);
+      particlePaint.color = color.withOpacity(0.04 + fade * 0.96);
       canvas.drawCircle(
         Offset(point.dx * scale, point.dy * scale),
         (0.9 + fade * 2.7) * scale,

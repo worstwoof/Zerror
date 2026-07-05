@@ -117,7 +117,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppPalette.kombuGreen,
+        backgroundColor: AppPalette.inkBlue,
       ),
     );
   }
@@ -136,19 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             const DecoratedBox(
               decoration: BoxDecoration(gradient: AppPalette.appBackground),
             ),
-            Image.asset('assets/images/auth_bg.png', fit: BoxFit.cover),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppPalette.pineGreen.withValues(alpha: 0.18),
-                    AppPalette.night.withValues(alpha: 0.72),
-                  ],
-                ),
-              ),
-            ),
+            const SizedBox.shrink(),
             SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -234,13 +222,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                           width: double.infinity,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: AppPalette.almondCream,
+                            color: AppPalette.inkBlue,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: AppPalette.almondCream.withValues(
-                                  alpha: 0.18,
-                                ),
+                                color: AppPalette.almondCream.withOpacity(0.18),
                                 blurRadius: 14,
                                 offset: const Offset(0, 6),
                               ),
@@ -252,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
-                                      color: AppPalette.night,
+                                      color: Colors.white,
                                       strokeWidth: 2.5,
                                     ),
                                   )
@@ -261,7 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
-                                      color: AppPalette.night,
+                                      color: Colors.white,
                                     ),
                                   ),
                           ),
@@ -281,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                           child: const Text(
                             '去登录',
                             style: TextStyle(
-                              color: AppPalette.almondCream,
+                              color: AppPalette.moodBlue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -320,16 +306,16 @@ class _RegisterScreenState extends State<RegisterScreen>
           fontSize: 15,
         ),
         floatingLabelStyle: const TextStyle(
-          color: AppPalette.almondCream,
+          color: AppPalette.warmAccentText,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Icon(icon, color: AppPalette.textSecondary, size: 22),
         enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0x66F8F3EA), width: 1),
+          borderSide: BorderSide(color: AppPalette.fieldBorder, width: 1.2),
         ),
         focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: AppPalette.honeyOrange, width: 2),
+          borderSide: BorderSide(color: AppPalette.moodBlue, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),

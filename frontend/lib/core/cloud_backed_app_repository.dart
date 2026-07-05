@@ -16,7 +16,9 @@ class CloudBackedAppRepository implements AppRepository {
   final LocalAppRepository _local;
   final RemoteAppRepository _remote;
 
-  static Future<CloudBackedAppRepository> create(AuthSessionStore sessionStore) async {
+  static Future<CloudBackedAppRepository> create(
+    AuthSessionStore sessionStore,
+  ) async {
     final local = await LocalAppRepository.create(
       snapshotKeyProvider: () => AppConstants.snapshotStorageKey(
         sessionStore.currentSession?.syncUserId,
@@ -31,20 +33,28 @@ class CloudBackedAppRepository implements AppRepository {
 
   @override
   Future<AppPersistenceSnapshot?> loadSnapshot() async {
+    AppPersistenceSnapshot? localSnapshot;
     try {
       final remoteSnapshot = await _remote.loadSnapshot();
       if (remoteSnapshot != null) {
-        await _local.saveSnapshot(remoteSnapshot);
-        return remoteSnapshot;
+        localSnapshot = await _local.loadSnapshot();
+        final mergedSnapshot = _mergePracticePaperTasks(
+          remoteSnapshot,
+          localSnapshot,
+        );
+        await _local.saveSnapshot(mergedSnapshot);
+        return mergedSnapshot;
       }
     } catch (error) {
-      debugPrint('Cloud snapshot load failed, falling back to local cache: $error');
+      debugPrint(
+        'Cloud snapshot load failed, falling back to local cache: $error',
+      );
     }
 
-    final localSnapshot = await _local.loadSnapshot();
+    localSnapshot ??= await _local.loadSnapshot();
     if (localSnapshot != null) {
       try {
-        await _remote.saveSnapshot(localSnapshot);
+        await _remote.saveSnapshot(_stripPracticePaperTasks(localSnapshot));
       } catch (error) {
         debugPrint('Initial cloud sync from local cache failed: $error');
       }
@@ -55,6 +65,42 @@ class CloudBackedAppRepository implements AppRepository {
   @override
   Future<void> saveSnapshot(AppPersistenceSnapshot snapshot) async {
     await _local.saveSnapshot(snapshot);
-    await _remote.saveSnapshot(snapshot);
+    await _remote.saveSnapshot(_stripPracticePaperTasks(snapshot));
+  }
+
+  AppPersistenceSnapshot _mergePracticePaperTasks(
+    AppPersistenceSnapshot remote,
+    AppPersistenceSnapshot? local,
+  ) {
+    final localTasks =
+        local?.practicePaperTasks ?? const <Map<String, dynamic>>[];
+    if (localTasks.isEmpty) {
+      return remote;
+    }
+    return AppPersistenceSnapshot(
+      favoriteIds: remote.favoriteIds,
+      masteredIds: remote.masteredIds,
+      avatarPath: remote.avatarPath,
+      profile: remote.profile,
+      passwordUpdatedAt: remote.passwordUpdatedAt,
+      devices: remote.devices,
+      errors: remote.errors,
+      practicePaperTasks: localTasks,
+    );
+  }
+
+  AppPersistenceSnapshot _stripPracticePaperTasks(
+    AppPersistenceSnapshot snapshot,
+  ) {
+    return AppPersistenceSnapshot(
+      favoriteIds: snapshot.favoriteIds,
+      masteredIds: snapshot.masteredIds,
+      avatarPath: snapshot.avatarPath,
+      profile: snapshot.profile,
+      passwordUpdatedAt: snapshot.passwordUpdatedAt,
+      devices: snapshot.devices,
+      errors: snapshot.errors,
+      practicePaperTasks: const [],
+    );
   }
 }

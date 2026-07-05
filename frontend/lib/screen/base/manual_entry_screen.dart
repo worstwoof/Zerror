@@ -47,7 +47,8 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text('手动录入题目', style: TextStyle(color: AppPalette.textPrimary, fontSize: 18)),
+        title: const Text('手动录入题目',
+            style: TextStyle(color: AppPalette.textPrimary, fontSize: 18)),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded, color: AppPalette.textPrimary),
           onPressed: () => Navigator.pop(context),
@@ -71,7 +72,8 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                   controller: _textController,
                   maxLines: null,
                   autofocus: true,
-                  style: const TextStyle(color: AppPalette.textPrimary, fontSize: 16, height: 1.7),
+                  style: const TextStyle(
+                      color: AppPalette.textPrimary, fontSize: 16, height: 1.7),
                   decoration: const InputDecoration(
                     hintText: '在这里输入或粘贴题目内容...\n\n支持 LaTeX 公式、条件、图形描述等完整信息。',
                     border: InputBorder.none,

@@ -154,12 +154,14 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       final cropped = await picture.toImage(targetWidth, targetHeight);
 
       try {
-        final byteData = await cropped.toByteData(format: ui.ImageByteFormat.png);
+        final byteData =
+            await cropped.toByteData(format: ui.ImageByteFormat.png);
         if (byteData == null) {
           throw const FormatException('Missing PNG bytes');
         }
         final pngBytes = byteData.buffer.asUint8List();
-        final outputPath = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        final outputPath =
+            '${Directory.systemTemp.path}${Platform.pathSeparator}'
             'zerror-crop-${DateTime.now().microsecondsSinceEpoch}.png';
         await File(outputPath).writeAsBytes(pngBytes, flush: true);
         return outputPath;
@@ -278,7 +280,8 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
         return;
     }
 
-    if (nextRect.width < _minSelectionEdge || nextRect.height < _minSelectionEdge) {
+    if (nextRect.width < _minSelectionEdge ||
+        nextRect.height < _minSelectionEdge) {
       return;
     }
 
@@ -348,14 +351,14 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
     double? bottom,
     required Rect imageRect,
   }) {
-    final nextLeft =
-        (left ?? rect.left).clamp(imageRect.left, rect.right - _minSelectionEdge);
+    final nextLeft = (left ?? rect.left)
+        .clamp(imageRect.left, rect.right - _minSelectionEdge);
     final nextTop =
         (top ?? rect.top).clamp(imageRect.top, rect.bottom - _minSelectionEdge);
-    final nextRight =
-        (right ?? rect.right).clamp(rect.left + _minSelectionEdge, imageRect.right);
-    final nextBottom =
-        (bottom ?? rect.bottom).clamp(rect.top + _minSelectionEdge, imageRect.bottom);
+    final nextRight = (right ?? rect.right)
+        .clamp(rect.left + _minSelectionEdge, imageRect.right);
+    final nextBottom = (bottom ?? rect.bottom)
+        .clamp(rect.top + _minSelectionEdge, imageRect.bottom);
 
     return Rect.fromLTRB(nextLeft, nextTop, nextRight, nextBottom);
   }
@@ -391,177 +394,184 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
       fit: StackFit.expand,
       children: [
         Scaffold(
-      backgroundColor: AppPalette.night,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppPalette.textPrimary),
-        title: const Text(
-          '图片框选',
-          style: TextStyle(
-            color: AppPalette.textPrimary,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.10),
-                ),
-              ),
-              child: const Text(
-                '在图片上拖动框选题目区域。分析时只会上传框内小图，不会把整张原图发到云端。',
-                style: TextStyle(
-                  color: AppPalette.textSecondary,
-                  fontSize: 13,
-                  height: 1.45,
-                ),
+          backgroundColor: AppPalette.cream,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: AppPalette.textPrimary),
+            title: const Text(
+              '图片框选',
+              style: TextStyle(
+                color: AppPalette.textPrimary,
+                fontSize: 18,
               ),
             ),
           ),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              decoration: BoxDecoration(
-                color: AppPalette.kombuGreen,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.08),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppPalette.pastelGrey.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: AppPalette.pastelGrey.withOpacity(0.10),
+                    ),
+                  ),
+                  child: const Text(
+                    '在图片上拖动框选题目区域。分析时只会上传框内小图，不会把整张原图发到云端。',
+                    style: TextStyle(
+                      color: AppPalette.textSecondary,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
                 ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final canvasSize = Size(
-                    constraints.maxWidth,
-                    constraints.maxHeight,
-                  );
-                  final imageRect = _computeImageRect(canvasSize);
-                  final selectionRect = _selectionRectForPaint(imageRect);
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  decoration: BoxDecoration(
+                    color: AppPalette.inkBlue,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: AppPalette.pastelGrey.withOpacity(0.08),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final canvasSize = Size(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      );
+                      final imageRect = _computeImageRect(canvasSize);
+                      final selectionRect = _selectionRectForPaint(imageRect);
 
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanStart: (details) => _handlePanStart(details, imageRect),
-                    onPanUpdate: (details) => _handlePanUpdate(details, imageRect),
-                    onPanEnd: (_) => _handlePanEnd(),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.file(
-                          File(widget.imagePath),
-                          fit: BoxFit.contain,
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanStart: (details) =>
+                            _handlePanStart(details, imageRect),
+                        onPanUpdate: (details) =>
+                            _handlePanUpdate(details, imageRect),
+                        onPanEnd: (_) => _handlePanEnd(),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.file(
+                              File(widget.imagePath),
+                              fit: BoxFit.contain,
+                            ),
+                            CustomPaint(
+                              painter: _SelectionOverlayPainter(
+                                imageRect: imageRect,
+                                selectionRect: selectionRect,
+                              ),
+                            ),
+                          ],
                         ),
-                        CustomPaint(
-                          painter: _SelectionOverlayPainter(
-                            imageRect: imageRect,
-                            selectionRect: selectionRect,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
+                decoration: BoxDecoration(
+                  color: AppPalette.paper,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppPalette.inkBlue.withOpacity(0.06),
+                    ),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isBusy ? null : _resetSelection,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppPalette.textPrimary,
+                              side: BorderSide(
+                                color: AppPalette.inkBlue
+                                    .withOpacity(0.12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            icon: const Icon(Icons.crop_free_rounded, size: 18),
+                            label: const Text('重置框选'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                _isBusy ? null : () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppPalette.textPrimary,
+                              side: BorderSide(
+                                color: AppPalette.inkBlue
+                                    .withOpacity(0.12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text('重新选择'),
                           ),
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
-            decoration: BoxDecoration(
-              color: AppPalette.night.withValues(alpha: 0.94),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: AppPalette.pastelGrey.withValues(alpha: 0.08),
-                ),
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isBusy ? null : _resetSelection,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppPalette.textPrimary,
-                          side: BorderSide(
-                            color: AppPalette.pastelGrey.withValues(alpha: 0.18),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isBusy || _sourceImageSize == null
+                            ? null
+                            : _startOCR,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppPalette.inkBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        icon: const Icon(Icons.crop_free_rounded, size: 18),
-                        label: const Text('重置框选'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isBusy ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppPalette.textPrimary,
-                          side: BorderSide(
-                            color: AppPalette.pastelGrey.withValues(alpha: 0.18),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text('重新选择'),
+                        child: _isRecognizing
+                            ? const Text(
+                                '正在收进后台整理',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : const Text(
+                                '加入后台整理',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed:
-                        _isBusy || _sourceImageSize == null ? null : _startOCR,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppPalette.almondCream,
-                      foregroundColor: AppPalette.night,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isRecognizing
-                        ? const Text(
-                            '正在收进后台整理',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : const Text(
-                            '加入后台整理',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
         ),
         if (_isRecognizing) _buildRecognizingOverlay(),
         if (_isMinimizing) _buildMinimizingOverlay(),
@@ -587,7 +597,8 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                 duration: const Duration(milliseconds: 540),
                 curve: Curves.easeInOutCubic,
                 builder: (context, value, child) {
-                  final startSize = (constraints.maxWidth - 72).clamp(180.0, 260.0);
+                  final startSize =
+                      (constraints.maxWidth - 72).clamp(180.0, 260.0);
                   final size = ui.lerpDouble(startSize, 58, value)!;
                   final top = ui.lerpDouble(
                     constraints.maxHeight * 0.34,
@@ -605,7 +616,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                     children: [
                       Positioned.fill(
                         child: Container(
-                          color: Colors.black.withValues(alpha: overlayOpacity),
+                          color: Colors.black.withOpacity(overlayOpacity),
                         ),
                       ),
                       Positioned(
@@ -620,13 +631,13 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                               ui.lerpDouble(28, 18, value)!,
                             ),
                             border: Border.all(
-                              color: AppPalette.almondCream.withValues(
-                                alpha: ui.lerpDouble(0.50, 0.18, value)!,
+                              color: AppPalette.almondCream.withOpacity(
+                                ui.lerpDouble(0.50, 0.18, value)!,
                               ),
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.26),
+                                color: Colors.black.withOpacity(0.26),
                                 blurRadius: ui.lerpDouble(28, 12, value)!,
                                 offset: Offset(0, ui.lerpDouble(14, 6, value)!),
                               ),
@@ -650,8 +661,8 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                                 },
                               ),
                               Container(
-                                color: AppPalette.night.withValues(
-                                  alpha: ui.lerpDouble(0.04, 0.26, value)!,
+                                color: AppPalette.night.withOpacity(
+                                  ui.lerpDouble(0.04, 0.26, value)!,
                                 ),
                               ),
                               Align(
@@ -692,7 +703,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
         child: Material(
           color: Colors.transparent,
           child: Container(
-            color: Colors.black.withValues(alpha: 0.58),
+            color: Colors.black.withOpacity(0.58),
             alignment: Alignment.center,
             child: const Column(
               mainAxisSize: MainAxisSize.min,
@@ -702,7 +713,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                 Text(
                   '正在收进后台整理',
                   style: TextStyle(
-                    color: AppPalette.textPrimary,
+                    color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     decoration: TextDecoration.none,
@@ -712,7 +723,7 @@ class _ErrorPreviewScreenState extends State<ErrorPreviewScreen> {
                 Text(
                   '回到首页后，AI 会在右上角继续整理',
                   style: TextStyle(
-                    color: AppPalette.textSecondary,
+                    color: Color(0xDDEFF2FF),
                     fontSize: 13,
                     decoration: TextDecoration.none,
                   ),
@@ -747,14 +758,13 @@ class _SelectionOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final overlayPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.46);
+    final overlayPaint = Paint()..color = Colors.black.withOpacity(0.46);
     final framePaint = Paint()
       ..color = AppPalette.almondCream
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
     final guidePaint = Paint()
-      ..color = AppPalette.almondCream.withValues(alpha: 0.22)
+      ..color = AppPalette.almondCream.withOpacity(0.22)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final handlePaint = Paint()..color = AppPalette.almondCream;

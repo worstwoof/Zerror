@@ -26,8 +26,13 @@ htmlcov/
 
 # Logs and runtime output
 *.log
+*.db
+*.swp
 server.err
 server.out
+static/media/manim/
+static/uploads/
+backend/static/media/manim/
 
 # IDE and OS files
 .idea/
@@ -62,3 +67,6 @@ x86/
 
 # Bundles / archives generated locally
 *.bundle
+
+# Local syntax-check scratch files
+.compile_check/

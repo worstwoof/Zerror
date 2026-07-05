@@ -174,12 +174,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: AppPalette.almondCream.withValues(alpha: 0.30),
+                              color: AppPalette.almondCream
+                                  .withOpacity(0.30),
                               width: 2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppPalette.honeyOrange.withValues(alpha: 0.12),
+                                color: AppPalette.honeyOrange
+                                    .withOpacity(0.12),
                                 blurRadius: 14,
                                 spreadRadius: 2,
                               ),
@@ -187,7 +189,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           child: CircleAvatar(
                             radius: 52,
-                            backgroundColor: Colors.black26,
+                            backgroundColor: AppPalette.paper,
                             child: _buildAvatarPreview(avatarPath),
                           ),
                         ),
@@ -196,7 +198,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           decoration: BoxDecoration(
                             gradient: AppPalette.heroGradient,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppPalette.night, width: 2),
+                            border:
+                                Border.all(color: AppPalette.night, width: 2),
                           ),
                           child: const Icon(
                             Icons.camera_alt_rounded,
@@ -351,17 +354,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               vertical: 16,
             ),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.04),
+            fillColor: AppPalette.paper.withOpacity(0.94),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: AppPalette.pastelGrey.withValues(alpha: 0.06),
+                color: AppPalette.pastelGrey.withOpacity(0.06),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: primaryGreen.withValues(alpha: 0.80),
+                color: primaryGreen.withOpacity(0.80),
                 width: 1.4,
               ),
             ),
