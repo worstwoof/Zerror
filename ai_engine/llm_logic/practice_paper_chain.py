@@ -543,7 +543,9 @@ CRITICAL JSON CONTRACT:
             concept_review=self._string_list(parsed.get("concept_review"))[:6],
             formula_cards=self._string_list(parsed.get("formula_cards"))[:8],
             method_models=self._string_list(parsed.get("method_models"))[:6],
-            worked_examples=self._string_list(parsed.get("worked_examples"))[:4],
+            worked_examples=self._clean_worked_examples(
+                self._string_list(parsed.get("worked_examples"))
+            )[:4],
             common_traps=self._string_list(parsed.get("common_traps"))[:6],
             questions=questions,
             answer_key=answer_key,
@@ -834,13 +836,9 @@ CRITICAL JSON CONTRACT:
             self._question_html(index, question)
             for index, question in enumerate(response.questions)
         )
-        primary_topic = response.topic_focus[0] if response.topic_focus else "本专题"
         examples = self._example_blocks_html(
-            response.worked_examples
-            or [
-                f"例题：围绕“{primary_topic}”设计一道同类例题；解答思路：先列条件，再选模型；步骤/计算过程：分步推导并检查适用条件；答案：写出最终结论。",
-                "例题：从原错题中抽取一个变式情境；解答思路：找出易错入口；步骤/计算过程：写清代入、化简和结论；答案：写出最终答案。",
-            ]
+            response.worked_examples,
+            response.questions,
         )
 
         return f"""<!DOCTYPE html>
@@ -1217,9 +1215,21 @@ CRITICAL JSON CONTRACT:
             return "结合本讲义专题，先回看定义、条件和解题步骤，再进入练习。"
         return "；".join(cleaned[:2])
 
-    def _example_blocks_html(self, examples: list[str]) -> str:
+    def _example_blocks_html(
+        self,
+        examples: list[str],
+        questions: list[PracticeQuestion],
+    ) -> str:
         blocks = []
-        for index, example in enumerate(examples[:2]):
+        example_candidates = self._clean_worked_examples(examples)
+        if len(example_candidates) < 2:
+            example_candidates.extend(
+                self._worked_examples_from_questions(
+                    questions,
+                    limit=2 - len(example_candidates),
+                )
+            )
+        for index, example in enumerate(example_candidates[:2]):
             content = str(example).strip()
             if not content:
                 continue
@@ -1233,14 +1243,69 @@ CRITICAL JSON CONTRACT:
             )
         if blocks:
             return "\n".join(blocks)
-        return """
-<section class="example-card">
-  <div class="example-title">例题 1</div>
-  <div class="example-row"><span class="example-label">例题：</span>围绕本讲义知识点完成一道同类题。</div>
-  <div class="example-row"><span class="example-label">解答思路：</span>先识别条件，再选择模型。</div>
-  <div class="example-row"><span class="example-label">步骤/计算过程：</span>分步推导并检查结论。</div>
-  <div class="example-row"><span class="example-label">答案：</span>写出最终答案。</div>
-</section>"""
+        return ""
+
+    def _clean_worked_examples(self, examples: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for example in examples:
+            content = str(example).strip()
+            if not content:
+                continue
+            if self._looks_like_prompt_leak(content):
+                continue
+            cleaned.append(content)
+        return cleaned
+
+    def _worked_examples_from_questions(
+        self,
+        questions: list[PracticeQuestion],
+        *,
+        limit: int,
+    ) -> list[str]:
+        examples: list[str] = []
+        for question in questions:
+            if len(examples) >= limit:
+                break
+            stem = question.stem.strip()
+            answer = question.answer.strip()
+            if not stem or not answer:
+                continue
+            if self._looks_like_prompt_leak(stem) or self._looks_like_prompt_leak(answer):
+                continue
+            examples.append(self._question_to_worked_example(question))
+        return examples
+
+    def _question_to_worked_example(self, question: PracticeQuestion) -> str:
+        stem = self._clip(question.stem, 260)
+        answer = question.answer.strip()
+        if question.options:
+            option_labels = "ABCD"
+            options = "；".join(
+                f"{option_labels[index]}. {self._clip(option, 80)}"
+                for index, option in enumerate(question.options[:4])
+            )
+            stem = f"{stem}\n{options}"
+        outline = question.solution_outline.strip()
+        if not outline:
+            topic = question.topic.strip() or question.subject.strip() or "本题"
+            outline = f"先抓住“{topic}”的适用条件，再按题目要求选择公式、性质或解题模型。"
+        steps = [
+            step
+            for step in question.solution_steps
+            if step.strip() and not self._looks_like_prompt_leak(step)
+        ][:4]
+        if not steps:
+            steps = [
+                "提取题干中的已知条件、限制范围和求解目标。",
+                "把条件对应到相关定义、公式或性质，排除不满足前提的做法。",
+                "代入计算或完成判断后，回到题意检查范围、符号和结论。",
+            ]
+        return (
+            f"例题：{stem}；"
+            f"解答思路：{outline}；"
+            f"步骤/计算过程：{'；'.join(steps)}；"
+            f"答案：{answer}"
+        )
 
     def _example_rows_html(self, content: str) -> str:
         labels = ("例题", "解答思路", "步骤/计算过程", "答案")
@@ -1496,6 +1561,14 @@ CRITICAL JSON CONTRACT:
             "你是“错题都队”",
             "要求：",
             "错题档案：",
+            "设计一道同类例题",
+            "抽取一个变式情境",
+            "围绕本讲义知识点完成一道同类题",
+            "写出最终结论",
+            "写出最终答案",
+            "具体例题",
+            "关键入口",
+            "分步推导并检查适用条件",
             "questions",
             "answer_index",
             "solution_steps",
