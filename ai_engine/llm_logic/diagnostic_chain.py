@@ -734,6 +734,7 @@ class DiagnosticService:
             "background_music": True,
             "audio": {
                 "voiceover": True,
+                "voiceover_required": True,
                 "narration_outline": narration_outline,
             },
             "show_title": True,

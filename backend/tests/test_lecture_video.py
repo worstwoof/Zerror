@@ -12,7 +12,7 @@ from unittest.mock import patch
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
 from backend.app.rendering import tts_provider
-from backend.app.rendering.manim_renderer import add_background_music
+from backend.app.rendering.manim_renderer import VoiceoverUnavailable, add_background_music
 from backend.app.rendering.tts_provider import TtsSynthesisResult
 from backend.app.schemas.card_schema import (
     LectureVideoRequest,
@@ -118,6 +118,7 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertGreaterEqual(scene_spec["parameters"]["target_duration_seconds"], 150)
         self.assertLessEqual(scene_spec["parameters"]["target_duration_seconds"], 240)
         self.assertTrue(scene_spec["audio"]["voiceover"])
+        self.assertTrue(scene_spec["audio"]["voiceover_required"])
         self.assertTrue(scene_spec["audio"]["narration_outline"])
         self.assertTrue(scene_spec["teaching_stages"][0]["visual_transform"])
         self.assertIn("不要写 Python", service.client.prompts[0])
@@ -170,6 +171,32 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertFalse(diagnostics["voiceover_configured"])
         self.assertFalse(diagnostics["voiceover_generated"])
         self.assertFalse(diagnostics["background_music_added"])
+
+    def test_required_voiceover_fails_when_natural_tts_unconfigured(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            video_path = Path(temporary_dir) / "lesson.mp4"
+            video_path.write_bytes(b"not a real video")
+            with patch("backend.app.rendering.manim_renderer.shutil.which", return_value="ffmpeg"), patch(
+                "backend.app.rendering.manim_renderer.settings",
+                SimpleNamespace(background_music_path=""),
+            ), patch(
+                "backend.app.rendering.tts_provider.settings",
+                self._tts_settings(tts_fallback_provider="none"),
+            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
+                with self.assertRaises(VoiceoverUnavailable) as raised:
+                    add_background_music(
+                        video_path,
+                        scene_spec={
+                            "background_music": True,
+                            "audio": {
+                                "voiceover": True,
+                                "voiceover_required": True,
+                                "narration_outline": ["这一步需要自然语音讲解。"],
+                            },
+                        },
+                    )
+
+        self.assertIn("ZERROR_TTS_SERVICE_URL", str(raised.exception))
 
     def test_cosyvoice_http_provider_chunks_and_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -287,6 +314,7 @@ class LectureVideoServiceTest(unittest.TestCase):
         )
 
         self.assertTrue(scene_spec["audio"]["voiceover"])
+        self.assertTrue(scene_spec["audio"]["voiceover_required"])
         self.assertTrue(scene_spec["audio"]["narration_outline"])
         self.assertIn("木板", " ".join(scene_spec["audio"]["narration_outline"]))
 

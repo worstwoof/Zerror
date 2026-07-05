@@ -179,6 +179,7 @@ class LectureVideoService:
             "audio": {
                 "background_music": True,
                 "voiceover": True,
+                "voiceover_required": True,
                 "narration_outline": voiceover_outline,
             },
             "background_music": True,
