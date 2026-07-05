@@ -17,6 +17,20 @@ class AuthSession {
   final String email;
   final String syncUserId;
 
+  static AuthSession localZander() {
+    return AuthSession(
+      token: 'local-zander-session',
+      tokenType: 'local',
+      expiresAt: DateTime.utc(2100),
+      userId: 1,
+      username: 'zander',
+      email: 'zander@zerror.local',
+      syncUserId: 'zander',
+    );
+  }
+
+  bool get isLocalOnly => tokenType == 'local';
+
   bool get isExpired => expiresAt.isBefore(DateTime.now().toUtc());
 
   Map<String, dynamic> toJson() {

@@ -17,7 +17,6 @@ import 'achievements_screen.dart';
 import 'ai_chat_screen.dart';
 import 'error_archive_screen.dart';
 import 'favorites_screen.dart';
-import 'login_screen.dart';
 import 'manual_entry_screen.dart';
 import 'privacy_security_screen.dart';
 import 'profile_screen.dart';
@@ -688,21 +687,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                    ),
-                    _drawerItem(
-                      context,
-                      icon: Icons.logout_rounded,
-                      title: '\u9000\u51fa\u767b\u5f55',
-                      isDanger: true,
-                      onTap: () async {
-                        await store.signOutUser();
-                        if (!context.mounted) return;
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                              builder: (_) => const LoginScreen()),
-                          (route) => false,
-                        );
-                      },
                     ),
                   ],
                 ),
@@ -2232,13 +2216,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: source);
-    if (!mounted || image == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (_) => ErrorPreviewScreen(imagePath: image.path)),
-    );
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: source,
+        requestFullMetadata: false,
+      );
+      if (!mounted || image == null) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+            builder: (_) => ErrorPreviewScreen(imagePath: image.path)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('图片选择失败：$error')),
+      );
+    }
   }
 
   void _showAddActionSheet(BuildContext context) {
@@ -2316,11 +2310,11 @@ class _HomeScreenState extends State<HomeScreen> {
     bool filled = false,
   }) {
     final background = filled ? AppPalette.mint : AppPalette.cream;
-    final titleColor = AppPalette.textPrimary;
+    const titleColor = AppPalette.textPrimary;
     final subtitleColor = filled
         ? AppPalette.textPrimary.withOpacity(0.72)
         : AppPalette.textSecondary;
-    final iconColor = AppPalette.textPrimary;
+    const iconColor = AppPalette.textPrimary;
 
     return Material(
       color: background,
@@ -2350,7 +2344,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: titleColor,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,

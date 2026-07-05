@@ -27,6 +27,8 @@ class AppConstants {
 
   static String get registerEndpoint => '$apiBaseUrl/api/v1/auth/register';
   static String get loginEndpoint => '$apiBaseUrl/api/v1/auth/login';
+  static String get defaultZanderLoginEndpoint =>
+      '$apiBaseUrl/api/v1/auth/default-zander';
   static String get logoutEndpoint => '$apiBaseUrl/api/v1/auth/logout';
   static String get meEndpoint => '$apiBaseUrl/api/v1/auth/me';
   static String get ocrEndpoint => '$apiBaseUrl/api/v1/ocr/extract';

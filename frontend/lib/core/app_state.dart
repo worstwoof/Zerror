@@ -1216,7 +1216,8 @@ class AppStore extends ChangeNotifier {
   String? get avatarPath => _avatarPath;
   bool get isAuthenticated =>
       _session != null && !(_session?.isExpired ?? true);
-  String? get authToken => _session?.token;
+  String? get authToken =>
+      (_session == null || _session!.isLocalOnly) ? null : _session!.token;
   String? get syncUserId => _session?.syncUserId;
 
   String get passwordUpdatedLabel {

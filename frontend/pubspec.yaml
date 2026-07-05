@@ -13,6 +13,8 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.1
+  image_picker_android: ^0.8.13+17
+  image_picker_platform_interface: ^2.11.1
   http: ^1.2.2
   shared_preferences: ^2.3.2
   latext: ^0.5.1

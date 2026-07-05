@@ -43,6 +43,10 @@ class Settings:
     app_version: str
     database_url: str
     auth_session_days: int
+    default_zander_login_enabled: bool
+    default_zander_username: str
+    default_zander_email: str
+    default_zander_sync_user_id: str
     tencent_cos_secret_id: str
     tencent_cos_secret_key: str
     tencent_cos_region: str
@@ -106,6 +110,27 @@ def get_settings() -> Settings:
             f"sqlite:///{(PROJECT_ROOT / 'backend' / 'app.db').as_posix()}",
         ),
         auth_session_days=int(_get_setting("AUTH_SESSION_DAYS", file_values, "30")),
+        default_zander_login_enabled=_get_setting(
+            "ZERROR_DEFAULT_ZANDER_LOGIN_ENABLED",
+            file_values,
+            "false",
+        ).lower()
+        == "true",
+        default_zander_username=_get_setting(
+            "ZERROR_DEFAULT_ZANDER_USERNAME",
+            file_values,
+            "zander",
+        ),
+        default_zander_email=_get_setting(
+            "ZERROR_DEFAULT_ZANDER_EMAIL",
+            file_values,
+            "zander@zerror.local",
+        ),
+        default_zander_sync_user_id=_get_setting(
+            "ZERROR_DEFAULT_ZANDER_SYNC_USER_ID",
+            file_values,
+            "zander",
+        ),
         tencent_cos_secret_id=_get_setting("TENCENT_COS_SECRET_ID", file_values),
         tencent_cos_secret_key=_get_setting("TENCENT_COS_SECRET_KEY", file_values),
         tencent_cos_region=_get_setting("TENCENT_COS_REGION", file_values),

@@ -12,6 +12,7 @@ from backend.app.core.auth import (
     hash_password,
     verify_password,
 )
+from backend.app.core.config import settings
 from datetime import datetime, timezone
 
 from backend.app.db.models import AuthSession, User, UserProfile
@@ -98,6 +99,24 @@ def login(
     return _build_auth_response(user, session, token)
 
 
+@router.post("/default-zander", response_model=AuthResponse)
+def default_zander_login(
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    if not settings.default_zander_login_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Default account login is not enabled.",
+        )
+
+    user = _get_or_create_default_zander_user(db)
+    session, token = create_auth_session(db, user)
+    db.commit()
+    db.refresh(user)
+    db.refresh(session)
+    return _build_auth_response(user, session, token)
+
+
 @router.get("/me", response_model=UserPayload)
 def me(current_user: User = Depends(get_current_user)) -> UserPayload:
     return _build_user_payload(current_user)
@@ -124,6 +143,51 @@ def _validate_username(username: str) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username can only contain letters, numbers, underscores, and hyphens.",
         )
+
+
+def _get_or_create_default_zander_user(db: Session) -> User:
+    username = (settings.default_zander_username or "zander").strip() or "zander"
+    email = (
+        settings.default_zander_email or "zander@zerror.local"
+    ).strip().lower() or "zander@zerror.local"
+    sync_user_id = (
+        settings.default_zander_sync_user_id or username
+    ).strip() or username
+    _validate_username(username)
+
+    user = (
+        db.query(User)
+        .filter(
+            or_(
+                User.username == username,
+                User.email == email,
+                User.sync_user_id == sync_user_id,
+            )
+        )
+        .first()
+    )
+    if user is None:
+        user = User(
+            username=username,
+            email=email,
+            password_hash=hash_password(f"default-{username}-local-only"),
+            sync_user_id=sync_user_id,
+        )
+        db.add(user)
+        db.flush()
+
+    if user.profile is None:
+        db.add(
+            UserProfile(
+                user_id=user.id,
+                display_name=username,
+                public_user_id=username,
+                motto="从第一道错题开始，慢慢长出自己的知识树。",
+                password_updated_at=datetime.now(timezone.utc),
+            )
+        )
+        db.flush()
+    return user
 
 
 def _build_auth_response(user: User, session: AuthSession, token: str) -> AuthResponse:

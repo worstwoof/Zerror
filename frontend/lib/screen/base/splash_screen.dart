@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../core/app_state.dart';
 import '../../core/theme.dart';
 import 'home_screen.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -58,16 +57,15 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _finishLaunch() async {
     if (!mounted) return;
     final store = AppStateScope.of(context);
-    var authenticated = store.isAuthenticated;
-    if (!authenticated) {
-      authenticated = await store.tryAutoLogin();
+    if (!store.isAuthenticated) {
+      debugPrint('Default zander session was not ready at splash finish.');
     }
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 800),
         pageBuilder: (context, animation, secondaryAnimation) =>
-            authenticated ? const HomeScreen() : const LoginScreen(),
+            const HomeScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

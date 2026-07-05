@@ -41,7 +41,8 @@ class AuthApiClient {
         )
         .timeout(const Duration(seconds: 12));
 
-    return _parseAuthResponse(response, fallbackMessage: 'Registration failed.');
+    return _parseAuthResponse(response,
+        fallbackMessage: 'Registration failed.');
   }
 
   Future<AuthSession> login({
@@ -65,16 +66,28 @@ class AuthApiClient {
     return _parseAuthResponse(response, fallbackMessage: 'Login failed.');
   }
 
+  Future<AuthSession> loginDefaultZander() async {
+    final response = await _httpClient.post(
+      Uri.parse(AppConstants.defaultZanderLoginEndpoint),
+      headers: const {
+        'Accept': 'application/json',
+      },
+    ).timeout(const Duration(seconds: 8));
+
+    return _parseAuthResponse(
+      response,
+      fallbackMessage: 'Default zander login failed.',
+    );
+  }
+
   Future<void> logout(String token) async {
-    final response = await _httpClient
-        .post(
-          Uri.parse(AppConstants.logoutEndpoint),
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        )
-        .timeout(const Duration(seconds: 12));
+    final response = await _httpClient.post(
+      Uri.parse(AppConstants.logoutEndpoint),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(const Duration(seconds: 12));
 
     if (response.statusCode >= 400) {
       final payload = _decodeJson(response);
