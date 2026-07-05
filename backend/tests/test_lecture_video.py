@@ -13,7 +13,6 @@ from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
 from backend.app.rendering import tts_provider
 from backend.app.rendering.manim_renderer import (
-    VoiceoverUnavailable,
     _safe_scene_spec,
     add_background_music,
 )
@@ -176,7 +175,7 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertFalse(diagnostics["voiceover_generated"])
         self.assertFalse(diagnostics["background_music_added"])
 
-    def test_required_voiceover_fails_when_natural_tts_unconfigured(self) -> None:
+    def test_required_voiceover_records_missing_natural_tts_without_failing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_dir:
             video_path = Path(temporary_dir) / "lesson.mp4"
             video_path.write_bytes(b"not a real video")
@@ -187,20 +186,21 @@ class LectureVideoServiceTest(unittest.TestCase):
                 "backend.app.rendering.tts_provider.settings",
                 self._tts_settings(tts_fallback_provider="none"),
             ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
-                with self.assertRaises(VoiceoverUnavailable) as raised:
-                    add_background_music(
-                        video_path,
-                        scene_spec={
-                            "background_music": True,
-                            "audio": {
-                                "voiceover": True,
-                                "voiceover_required": True,
-                                "narration_outline": ["这一步需要自然语音讲解。"],
-                            },
+                diagnostics = add_background_music(
+                    video_path,
+                    scene_spec={
+                        "background_music": True,
+                        "audio": {
+                            "voiceover": True,
+                            "voiceover_required": True,
+                            "narration_outline": ["这一步需要自然语音讲解。"],
                         },
-                    )
+                    },
+                )
 
-        self.assertIn("ZERROR_TTS_SERVICE_URL", str(raised.exception))
+        self.assertTrue(diagnostics["voiceover_required"])
+        self.assertFalse(diagnostics["voiceover_generated"])
+        self.assertEqual("TTS service URL is not configured.", diagnostics["voiceover_error"])
 
     def test_manim_formula_steps_normalize_unicode_math_for_latex(self) -> None:
         safe = _safe_scene_spec(

@@ -92,7 +92,7 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
     voiceover_required = _voiceover_required(scene_spec)
     if not ffmpeg or not video_path.exists():
         if voiceover_required:
-            _raise_voiceover_unavailable(
+            _record_voiceover_unavailable(
                 "ffmpeg is not available, so the narration track cannot be muxed.",
                 diagnostics,
             )
@@ -111,7 +111,7 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
     music_path = _background_music_path()
     has_narration = narration_path is not None and narration_path.exists()
     if voiceover_required and not has_narration:
-        _raise_voiceover_unavailable(
+        _record_voiceover_unavailable(
             str(diagnostics.get("tts_error_summary") or "Voiceover audio was not generated."),
             diagnostics,
         )
@@ -234,7 +234,7 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
             except OSError:
                 pass
     if voiceover_required:
-        _raise_voiceover_unavailable(
+        _record_voiceover_unavailable(
             "Voiceover audio was generated but could not be muxed into the final MP4.",
             diagnostics,
         )
@@ -270,15 +270,9 @@ def _voiceover_required(scene_spec: Dict[str, Any]) -> bool:
     )
 
 
-def _raise_voiceover_unavailable(reason: str, diagnostics: Dict[str, Any]) -> None:
+def _record_voiceover_unavailable(reason: str, diagnostics: Dict[str, Any]) -> None:
     diagnostics["voiceover_required"] = True
     diagnostics["voiceover_error"] = reason
-    raise VoiceoverUnavailable(
-        "自然语音配音未生成："
-        f"{reason} "
-        "请先配置可用的 ZERROR_TTS_SERVICE_URL 指向 CosyVoice/F5/GPT-SoVITS HTTP 服务；"
-        "当前不会回退到旧 Piper 声音。"
-    )
 
 
 def _background_music_path_raw() -> str:
