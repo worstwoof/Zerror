@@ -1,9 +1,13 @@
 package com.example.cuoti_doudui
 
+import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -11,6 +15,7 @@ import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.MediaStore
+import android.util.Size
 import android.webkit.MimeTypeMap
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -25,8 +30,11 @@ class MainActivity : FlutterActivity() {
     private val printChannelName = "zerror/print"
     private val mediaChannelName = "zerror/media"
     private val pickGalleryImageRequestCode = 7301
+    private val galleryPermissionRequestCode = 7302
     private var printWebView: WebView? = null
     private var pendingPickImageResult: MethodChannel.Result? = null
+    private var pendingListGalleryResult: MethodChannel.Result? = null
+    private var pendingGalleryLimit: Int = 200
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -54,6 +62,22 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "pickGalleryImage" -> pickGalleryImage(result)
+                "listGalleryImages" -> listGalleryImages(
+                    call.argument<Int>("limit") ?: 200,
+                    result,
+                )
+                "copyGalleryImageToCache" -> {
+                    val uriText = call.argument<String>("uri").orEmpty()
+                    if (uriText.isBlank()) {
+                        result.error("EMPTY_URI", "No image uri was provided.", null)
+                    } else {
+                        try {
+                            result.success(copyPickedImageToCache(Uri.parse(uriText)))
+                        } catch (error: Exception) {
+                            result.error("COPY_IMAGE_FAILED", error.message, null)
+                        }
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -81,6 +105,127 @@ class MainActivity : FlutterActivity() {
             return
         }
         super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        if (requestCode == galleryPermissionRequestCode) {
+            val result = pendingListGalleryResult ?: return
+            pendingListGalleryResult = null
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                result.error("PERMISSION_DENIED", "Gallery permission was denied.", null)
+                return
+            }
+            try {
+                result.success(queryGalleryImages(pendingGalleryLimit))
+            } catch (error: Exception) {
+                result.error("QUERY_GALLERY_FAILED", error.message, null)
+            }
+            return
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    private fun listGalleryImages(limit: Int, result: MethodChannel.Result) {
+        val safeLimit = limit.coerceIn(1, 500)
+        if (!hasGalleryPermission()) {
+            val permission = requiredGalleryPermission()
+            if (permission == null) {
+                result.error("PERMISSION_UNAVAILABLE", "Gallery permission is unavailable.", null)
+                return
+            }
+            if (pendingListGalleryResult != null) {
+                result.error("PERMISSION_IN_PROGRESS", "Gallery permission is already being requested.", null)
+                return
+            }
+            pendingGalleryLimit = safeLimit
+            pendingListGalleryResult = result
+            requestPermissions(arrayOf(permission), galleryPermissionRequestCode)
+            return
+        }
+
+        try {
+            result.success(queryGalleryImages(safeLimit))
+        } catch (error: Exception) {
+            result.error("QUERY_GALLERY_FAILED", error.message, null)
+        }
+    }
+
+    private fun requiredGalleryPermission(): String? {
+        return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                Manifest.permission.READ_MEDIA_IMAGES
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            else -> null
+        }
+    }
+
+    private fun hasGalleryPermission(): Boolean {
+        val permission = requiredGalleryPermission() ?: return true
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun queryGalleryImages(limit: Int): List<Map<String, Any?>> {
+        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.DATE_MODIFIED,
+        )
+        val sortOrder = "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
+        val images = mutableListOf<Map<String, Any?>>()
+
+        contentResolver.query(collection, projection, null, null, sortOrder)?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
+            while (cursor.moveToNext() && images.size < limit) {
+                val id = cursor.getLong(idColumn)
+                val uri = ContentUris.withAppendedId(collection, id)
+                val dateSeconds = cursor.getLong(dateColumn)
+                images += mapOf(
+                    "uri" to uri.toString(),
+                    "displayName" to cursor.getString(nameColumn).orEmpty(),
+                    "dateMillis" to dateSeconds * 1000L,
+                    "thumbnailPath" to cacheGalleryThumbnail(uri, id),
+                )
+            }
+        }
+        return images
+    }
+
+    private fun cacheGalleryThumbnail(uri: Uri, id: Long): String? {
+        return try {
+            val targetDir = File(cacheDir, "gallery-thumbnails").apply { mkdirs() }
+            val targetFile = File(targetDir, "thumb-$id.jpg")
+            if (targetFile.exists() && targetFile.length() > 0) {
+                return targetFile.absolutePath
+            }
+            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                contentResolver.loadThumbnail(uri, Size(240, 240), null)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaStore.Images.Thumbnails.getThumbnail(
+                    contentResolver,
+                    id,
+                    MediaStore.Images.Thumbnails.MINI_KIND,
+                    null,
+                )
+            } ?: return null
+
+            FileOutputStream(targetFile).use { output ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 78, output)
+            }
+            targetFile.absolutePath
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun pickGalleryImage(result: MethodChannel.Result) {

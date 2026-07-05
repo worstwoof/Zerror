@@ -1,18 +1,17 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_state.dart';
 import '../../core/app_ui.dart';
 import '../../core/latex_text.dart';
 import '../../core/media_utils.dart';
-import '../../core/native_channel.dart';
 import '../../core/rose_three_loader.dart';
 import '../../core/theme.dart';
 import '../capture/error_edit_screen.dart';
 import '../capture/error_preview_screen.dart';
+import '../capture/gallery_image_picker_screen.dart';
 import '../capture/html_artifact_preview_screen.dart';
 import '../capture/manim_video_preview_screen.dart';
 import 'achievements_screen.dart';
@@ -2233,17 +2232,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickGalleryImage() async {
-    try {
-      final nativeImagePath = await NativeChannel.pickGalleryImagePath();
-      if (!mounted || nativeImagePath == null) return;
-      _openImagePreview(nativeImagePath);
-    } on MissingPluginException {
-      await _pickImageWithPlugin(ImageSource.gallery);
-    } on PlatformException catch (error) {
-      debugPrint(
-          'Native gallery picker failed: ${error.code} ${error.message}');
-      await _pickImageWithPlugin(ImageSource.gallery);
-    }
+    final imagePath = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const GalleryImagePickerScreen()),
+    );
+    if (!mounted || imagePath == null) return;
+    _openImagePreview(imagePath);
   }
 
   Future<void> _pickImageWithPlugin(ImageSource source) async {
