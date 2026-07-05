@@ -82,8 +82,8 @@ class LectureVideoService:
 - 数学和物理可以给公式；其他学科公式数组留空。
 - 数学题必须选具体 scene_type：椭圆/双曲线/抛物线/离心率/焦点选 conic；函数/导数/单调/图像选 function_graph；平面几何选 geometry。不要把数学题写成 generic。
 - teaching_stages 必须 8 到 12 条，不能少于 8 条。
-- 每个 teaching_stage 都要包含 visual_action、visual_transform、narration、voiceover、key_conclusion、checkpoint 六个字段。
-- visual_action 写本阶段图像/公式卡如何出现；visual_transform 必须写清楚实际运动/变形/扫过/对比过程，不能写“展示文字”；narration 写底部字幕；voiceover 写讲解语音要说的话；key_conclusion 写学生该记住的二级结论；checkpoint 写易错提醒或自检问题。
+- 每个 teaching_stage 都要包含 visual_action、visual_transform、narration、key_conclusion、checkpoint 五个字段。
+- visual_action 写本阶段图像/公式卡如何出现；visual_transform 必须写清楚实际运动/变形/扫过/对比过程，不能写“展示文字”；narration 写底部字幕；key_conclusion 写学生该记住的二级结论；checkpoint 写易错提醒或自检问题。
 - steps 是 teaching_stages 的短字幕摘要，每条控制在 36 字以内，8 到 12 条。
 - formula_steps 每条只放纯公式或很短的数学/物理关系，不要放长中文。
 - summary 用一句话说明这个视频会讲什么。
@@ -101,7 +101,6 @@ class LectureVideoService:
       "visual_action": "左侧图像/公式/对象如何变化",
       "visual_transform": "具体图形变换、运动轨迹、参数扫过或形状对比",
       "narration": "底部字幕讲解",
-      "voiceover": "讲解语音脚本，口语化但要有信息量",
       "key_conclusion": "本阶段必须学会的结论",
       "checkpoint": "易错提醒或自检问题"
     }}
@@ -143,7 +142,6 @@ class LectureVideoService:
             traps=traps,
         )
         steps = [stage["narration"] for stage in stages]
-        voiceover_outline = self._voiceover_outline(summary=summary, stages=stages)
         target_duration_seconds = max(150, min(240, len(stages) * 18))
         scene_type = self._scene_type(
             raw=str(parsed.get("scene_type") or ""),
@@ -175,12 +173,6 @@ class LectureVideoService:
                 "visual_region": "left",
                 "explanation_region": "right",
                 "caption_region": "bottom",
-            },
-            "audio": {
-                "background_music": True,
-                "voiceover": True,
-                "voiceover_required": True,
-                "narration_outline": voiceover_outline,
             },
             "background_music": True,
             "formula_steps": formulas,
@@ -339,8 +331,7 @@ class LectureVideoService:
                 )
                 key_conclusion = self._clip(str(item.get("key_conclusion") or ""), 56)
                 checkpoint = self._clip(str(item.get("checkpoint") or ""), 56)
-                voiceover = self._clip(str(item.get("voiceover") or ""), 96)
-                if not any([narration, visual_action, visual_transform, key_conclusion, checkpoint, voiceover]):
+                if not any([narration, visual_action, visual_transform, key_conclusion, checkpoint]):
                     continue
                 stages.append(
                     {
@@ -348,7 +339,6 @@ class LectureVideoService:
                         "visual_transform": visual_transform
                         or "让关键点、曲线或箭头发生一次可见移动，并同步高亮不变量。",
                         "narration": narration or key_conclusion or "观察当前阶段的关键变化。",
-                        "voiceover": voiceover or narration or key_conclusion or "观察图形变化和对应结论。",
                         "key_conclusion": key_conclusion or narration or "本阶段抓住一个可复述的判断。",
                         "checkpoint": checkpoint or "停一下检查这一步的前提是否满足。",
                     }
@@ -367,7 +357,6 @@ class LectureVideoService:
                     "visual_action": "左侧图像区同步高亮这一步对应的对象或公式。",
                     "visual_transform": "移动关键点或扫过参数，让图形变化先发生，再读出结论。",
                     "narration": cleaned,
-                    "voiceover": cleaned,
                     "key_conclusion": cleaned,
                     "checkpoint": "回到题干确认这一步用到的条件。",
                 }
@@ -387,7 +376,6 @@ class LectureVideoService:
                 "左侧先放标题和问题对象，右侧列学习目标。",
                 "用镜头从完整图形扫到关键对象，先让学生知道看哪里。",
                 f"先明确「{topic_hint}」到底要解决什么。",
-                f"这一段先不急着套公式，我们先把「{topic_hint}」要观察的对象放到图上。",
                 f"{topic_hint}不是背结论，要知道它回答哪类问题。",
                 "能不能一句话说出本节要判断什么？",
             ),
@@ -395,7 +383,6 @@ class LectureVideoService:
                 "把定义或基础模型放到图像区，并标出关键词。",
                 "让点、线、轴或受力箭头依次出现，建立最小模型。",
                 f"先把{subject_hint}里的{focus_a}放到图上。",
-                f"先看图形里哪个量代表{focus_a}，后面的判断都从这里出发。",
                 "定义是后面判断的出发点，不能跳过。",
                 "题干中哪个条件对应这个定义？",
             ),
@@ -403,7 +390,6 @@ class LectureVideoService:
                 "用箭头连接已知条件和待求目标。",
                 "用高亮线段或轨迹把已知量连接到目标量。",
                 f"看清{focus_b}如何连接题干和结论。",
-                f"注意这条高亮关系，它把题干条件和要判断的结论接起来。",
                 "关键关系负责把文字条件转成可操作判断。",
                 "这一步有没有偷换变量或区间？",
             ),
@@ -411,7 +397,6 @@ class LectureVideoService:
                 "让图像或对象发生一次有目的的移动。",
                 "拖动关键点或参数，从小到大扫一遍，观察结论怎样变。",
                 "观察量变化时，结论为什么跟着变化。",
-                "现在让图形真的动起来，看变化过程中哪些量变、哪些量不变。",
                 "动画里的变化要对应到一个明确判断。",
                 "变化前后保持不变的量是什么？",
             ),
@@ -419,7 +404,6 @@ class LectureVideoService:
                 "右侧公式卡逐行出现，左侧同步高亮来源。",
                 "公式卡只显示一行，左侧同步闪烁公式对应的图形量。",
                 "把图像观察翻译成公式或判定规则。",
-                "这一步把刚才看到的图形变化压缩成一个公式，每一项都能在图上找到。",
                 "公式不是孤立出现，每一项都要有来源。",
                 "公式里的每个符号在题干中代表什么？",
             ),
@@ -427,7 +411,6 @@ class LectureVideoService:
                 "加入一个边界位置或特殊情况做对比。",
                 "把图形切到边界位置，再和普通位置做并排对比。",
                 f"专门检查{focus_c}，避免结论用过头。",
-                f"边界位置经常决定答案是否漏条件，我们把{focus_c}单独拿出来看。",
                 "边界情况常常决定答案是否完整。",
                 "端点、零点、临界值是否要单独讨论？",
             ),
@@ -435,7 +418,6 @@ class LectureVideoService:
                 "展示一条常见错误路径，再用标记划掉。",
                 "让错误路径以灰色虚线出现，再用正确轨迹覆盖。",
                 f"易错提醒：{trap}。",
-                f"这里故意演示一个常见错法，然后看它和正确图形差在哪里。",
                 "识别错法比记住答案更能防止复错。",
                 "这类题最容易漏掉哪一个前提？",
             ),
@@ -443,12 +425,11 @@ class LectureVideoService:
                 "最后把图像、公式和检查点收束成清单。",
                 "依次闪回三个关键图形状态，形成复习路线。",
                 "用三步清单复述：识别、判断、检查。",
-                "最后回放三个画面：对象、变化、边界。能复述出来就说明真的学会了。",
                 "能复述流程，才算真正看懂这个知识点。",
                 "合上视频后能不能独立说出解题路线？",
             ),
         ]
-        for visual_action, visual_transform, narration, voiceover, key_conclusion, checkpoint in templates:
+        for visual_action, visual_transform, narration, key_conclusion, checkpoint in templates:
             if len(stages) >= 8:
                 break
             stages.append(
@@ -456,24 +437,11 @@ class LectureVideoService:
                     "visual_action": self._clip(visual_action, 56),
                     "visual_transform": self._clip(visual_transform, 72),
                     "narration": self._clip(narration, 52),
-                    "voiceover": self._clip(voiceover, 96),
                     "key_conclusion": self._clip(key_conclusion, 56),
                     "checkpoint": self._clip(checkpoint, 56),
                 }
             )
         return stages[:12]
-
-    def _voiceover_outline(self, *, summary: str, stages: list[dict[str, str]]) -> list[str]:
-        lines: list[str] = []
-        if summary:
-            lines.append(summary)
-        for stage in stages:
-            for key in ("voiceover", "narration", "visual_transform", "key_conclusion"):
-                text = self._clip(str(stage.get(key) or ""), 110)
-                if text:
-                    lines.append(text)
-                    break
-        return lines[:14]
 
     def _topic_from_prompt(self, prompt: str) -> str:
         topic = prompt

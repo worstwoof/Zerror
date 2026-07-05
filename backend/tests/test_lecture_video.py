@@ -11,12 +11,10 @@ from unittest.mock import patch
 
 from ai_engine.llm_logic.diagnostic_chain import DiagnosticService
 from ai_engine.llm_logic.lecture_video_chain import LectureVideoService
-from backend.app.rendering import tts_provider
 from backend.app.rendering.manim_renderer import (
     _safe_scene_spec,
     add_background_music,
 )
-from backend.app.rendering.tts_provider import TtsSynthesisResult
 from backend.app.schemas.card_schema import (
     LectureVideoRequest,
     LectureVideoResponse,
@@ -120,87 +118,33 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertGreaterEqual(len(scene_spec["teaching_stages"]), 8)
         self.assertGreaterEqual(scene_spec["parameters"]["target_duration_seconds"], 150)
         self.assertLessEqual(scene_spec["parameters"]["target_duration_seconds"], 240)
-        self.assertTrue(scene_spec["audio"]["voiceover"])
-        self.assertTrue(scene_spec["audio"]["voiceover_required"])
-        self.assertTrue(scene_spec["audio"]["narration_outline"])
+        self.assertNotIn("audio", scene_spec)
         self.assertTrue(scene_spec["teaching_stages"][0]["visual_transform"])
         self.assertIn("不要写 Python", service.client.prompts[0])
         self.assertIn("teaching_stages", service.client.prompts[0])
         self.assertIn("visual_transform", service.client.prompts[0])
-        self.assertIn("讲解语音", service.client.prompts[0])
         self.assertIn("8 到 12", service.client.prompts[0])
         self.assertIn("function_graph/conic/geometry", service.client.prompts[0])
 
-    def test_audio_diagnostics_report_missing_voiceover_config(self) -> None:
+    def test_audio_diagnostics_report_missing_background_music_config(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_dir:
             video_path = Path(temporary_dir) / "lesson.mp4"
             video_path.write_bytes(b"not a real video")
             with patch("backend.app.rendering.manim_renderer.shutil.which", return_value=None), patch(
                 "backend.app.rendering.manim_renderer.settings",
                 SimpleNamespace(
-                    piper_tts_command="",
-                    piper_voice_model="",
-                    piper_voice_config="",
                     background_music_path="",
                 ),
-            ), patch(
-                "backend.app.rendering.tts_provider.settings",
-                self._tts_settings(),
-            ), patch.dict(
-                "os.environ",
-                {
-                    "PIPER_TTS_COMMAND": "",
-                    "PIPER_COMMAND": "",
-                    "PIPER_VOICE_MODEL": "",
-                    "ZERROR_PIPER_VOICE_MODEL": "",
-                    "ZERROR_TTS_PROVIDER": "",
-                    "ZERROR_TTS_SERVICE_URL": "",
-                    "ZERROR_TTS_FALLBACK_PROVIDER": "",
-                },
-                clear=False,
             ):
                 diagnostics = add_background_music(
                     video_path,
-                    scene_spec={
-                        "background_music": True,
-                        "audio": {"voiceover": True},
-                    },
-                )
+                    scene_spec={"background_music": True},
+        )
 
         self.assertTrue(diagnostics["background_music_requested"])
-        self.assertTrue(diagnostics["voiceover_requested"])
         self.assertEqual("none", diagnostics["background_music_source"])
         self.assertFalse(diagnostics["background_music_file_configured"])
-        self.assertFalse(diagnostics["voiceover_configured"])
-        self.assertFalse(diagnostics["voiceover_generated"])
         self.assertFalse(diagnostics["background_music_added"])
-
-    def test_required_voiceover_records_missing_natural_tts_without_failing(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_dir:
-            video_path = Path(temporary_dir) / "lesson.mp4"
-            video_path.write_bytes(b"not a real video")
-            with patch("backend.app.rendering.manim_renderer.shutil.which", return_value="ffmpeg"), patch(
-                "backend.app.rendering.manim_renderer.settings",
-                SimpleNamespace(background_music_path=""),
-            ), patch(
-                "backend.app.rendering.tts_provider.settings",
-                self._tts_settings(tts_fallback_provider="none"),
-            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
-                diagnostics = add_background_music(
-                    video_path,
-                    scene_spec={
-                        "background_music": True,
-                        "audio": {
-                            "voiceover": True,
-                            "voiceover_required": True,
-                            "narration_outline": ["这一步需要自然语音讲解。"],
-                        },
-                    },
-                )
-
-        self.assertTrue(diagnostics["voiceover_required"])
-        self.assertFalse(diagnostics["voiceover_generated"])
-        self.assertEqual("TTS service URL is not configured.", diagnostics["voiceover_error"])
 
     def test_manim_formula_steps_normalize_unicode_math_for_latex(self) -> None:
         safe = _safe_scene_spec(
@@ -223,108 +167,7 @@ class LectureVideoServiceTest(unittest.TestCase):
         self.assertIn(r"\le", joined)
         self.assertIn(r"\times", joined)
 
-    def test_cosyvoice_http_provider_chunks_and_succeeds(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_dir:
-            video_path = Path(temporary_dir) / "lesson.mp4"
-            video_path.write_bytes(b"video")
-
-            def fake_http_chunk(**kwargs: object) -> None:
-                output_path = kwargs["output_path"]
-                assert isinstance(output_path, Path)
-                output_path.write_bytes(b"wav")
-
-            def fake_combine(chunks: list[Path], output_path: Path) -> bool:
-                self.assertGreater(len(chunks), 1)
-                output_path.write_bytes(b"combined")
-                return True
-
-            with patch(
-                "backend.app.rendering.tts_provider.settings",
-                self._tts_settings(
-                    tts_provider="cosyvoice_http",
-                    tts_service_url="http://tts.local:7861",
-                ),
-            ), patch(
-                "backend.app.rendering.tts_provider._http_tts_chunk",
-                side_effect=fake_http_chunk,
-            ), patch(
-                "backend.app.rendering.tts_provider._combine_audio_chunks",
-                side_effect=fake_combine,
-            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
-                result = tts_provider.synthesize_voiceover(
-                    video_path,
-                    text="函数图像先向右移动，再观察切线斜率变化。" * 18,
-                )
-
-            self.assertEqual("cosyvoice_http", result.provider)
-            self.assertFalse(result.fallback_used)
-            self.assertGreater(result.chunk_count, 1)
-            self.assertTrue(result.path and result.path.exists())
-
-    def test_cosyvoice_http_timeout_falls_back_to_piper(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_dir:
-            video_path = Path(temporary_dir) / "lesson.mp4"
-            video_path.write_bytes(b"video")
-
-            def fake_piper(path: Path, *, text: str) -> TtsSynthesisResult:
-                output_path = path.with_name(f"{path.stem}.voice.wav")
-                output_path.write_bytes(b"piper")
-                return TtsSynthesisResult(
-                    path=output_path,
-                    provider="piper",
-                    fallback_used=False,
-                    chunk_count=1,
-                    voice="teacher_female_clear",
-                    elapsed_seconds=0,
-                )
-
-            with patch(
-                "backend.app.rendering.tts_provider.settings",
-                self._tts_settings(
-                    tts_provider="cosyvoice_http",
-                    tts_service_url="http://tts.local:7861",
-                    tts_fallback_provider="piper",
-                ),
-            ), patch(
-                "backend.app.rendering.tts_provider._http_tts_chunk",
-                side_effect=TimeoutError("timeout"),
-            ), patch(
-                "backend.app.rendering.tts_provider._synthesize_piper_voiceover",
-                side_effect=fake_piper,
-            ), patch.dict("os.environ", self._empty_tts_env(), clear=False):
-                result = tts_provider.synthesize_voiceover(video_path, text="讲解一段知识点。")
-
-            self.assertEqual("piper", result.provider)
-            self.assertTrue(result.fallback_used)
-            self.assertEqual(1, result.chunk_count)
-            self.assertTrue(result.path and result.path.exists())
-
-    def test_cosyvoice_http_timeout_does_not_use_piper_when_fallback_disabled(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_dir:
-            video_path = Path(temporary_dir) / "lesson.mp4"
-            video_path.write_bytes(b"video")
-
-            with patch(
-                "backend.app.rendering.tts_provider.settings",
-                self._tts_settings(
-                    tts_provider="cosyvoice_http",
-                    tts_service_url="http://tts.local:7861",
-                    tts_fallback_provider="none",
-                ),
-            ), patch(
-                "backend.app.rendering.tts_provider._http_tts_chunk",
-                side_effect=TimeoutError("timeout"),
-            ), patch(
-                "backend.app.rendering.tts_provider._synthesize_piper_voiceover",
-            ) as piper, patch.dict("os.environ", self._empty_tts_env(), clear=False):
-                result = tts_provider.synthesize_voiceover(video_path, text="讲解一段知识点。")
-
-            self.assertEqual("cosyvoice_http", result.provider)
-            self.assertFalse(result.fallback_used)
-            self.assertIsNone(result.path)
-            piper.assert_not_called()
-
-    def test_physics_manim_scene_requests_natural_voiceover(self) -> None:
+    def test_physics_manim_scene_uses_background_music_without_narration(self) -> None:
         service = DiagnosticService(_FakeClient("{}"))  # type: ignore[arg-type]
 
         scene_spec = service._build_physics_manim_scene_spec(
@@ -338,10 +181,8 @@ class LectureVideoServiceTest(unittest.TestCase):
             ],
         )
 
-        self.assertTrue(scene_spec["audio"]["voiceover"])
-        self.assertTrue(scene_spec["audio"]["voiceover_required"])
-        self.assertTrue(scene_spec["audio"]["narration_outline"])
-        self.assertIn("木板", " ".join(scene_spec["audio"]["narration_outline"]))
+        self.assertTrue(scene_spec["background_music"])
+        self.assertNotIn("audio", scene_spec)
 
     def test_math_conic_request_routes_to_math_conic_scene(self) -> None:
         raw = json.dumps(
@@ -434,36 +275,6 @@ class LectureVideoServiceTest(unittest.TestCase):
                 return job
             time.sleep(0.05)
         self.fail(f"job {job_id} did not reach status {status}")
-
-    def _tts_settings(self, **overrides: object) -> SimpleNamespace:
-        values = {
-            "piper_tts_command": "",
-            "piper_voice_model": "",
-            "piper_voice_config": "",
-            "tts_provider": "cosyvoice_http",
-            "tts_service_url": "",
-            "tts_api_key": "",
-            "tts_voice": "teacher_female_clear",
-            "tts_timeout_seconds": 300,
-            "tts_fallback_provider": "piper",
-        }
-        values.update(overrides)
-        return SimpleNamespace(**values)
-
-    def _empty_tts_env(self) -> dict[str, str]:
-        return {
-            "ZERROR_TTS_PROVIDER": "",
-            "ZERROR_TTS_SERVICE_URL": "",
-            "ZERROR_TTS_API_KEY": "",
-            "ZERROR_TTS_VOICE": "",
-            "ZERROR_TTS_TIMEOUT_SECONDS": "",
-            "ZERROR_TTS_FALLBACK_PROVIDER": "",
-            "PIPER_TTS_COMMAND": "",
-            "PIPER_COMMAND": "",
-            "PIPER_VOICE_MODEL": "",
-            "ZERROR_PIPER_VOICE_MODEL": "",
-        }
-
 
 if __name__ == "__main__":
     unittest.main()

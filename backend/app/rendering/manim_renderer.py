@@ -10,17 +10,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from backend.app.core.config import PROJECT_ROOT, settings
-from backend.app.rendering.tts_provider import (
-    synthesize_voiceover,
-    tts_diagnostics_base,
-)
 
 
 class ManimUnavailable(RuntimeError):
-    pass
-
-
-class VoiceoverUnavailable(RuntimeError):
     pass
 
 
@@ -82,126 +74,50 @@ def render_manim_video(
 
 
 def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
-    """Add a quiet study-music bed and optional narration when ffmpeg is available."""
+    """Add a quiet study-music bed when ffmpeg is available."""
 
     diagnostics = _initial_audio_diagnostics(scene_spec=scene_spec)
     if scene_spec.get("background_music") is False:
         return diagnostics
     ffmpeg = shutil.which("ffmpeg")
     diagnostics["ffmpeg_available"] = bool(ffmpeg)
-    voiceover_required = _voiceover_required(scene_spec)
     if not ffmpeg or not video_path.exists():
-        if voiceover_required:
-            _record_voiceover_unavailable(
-                "ffmpeg is not available, so the narration track cannot be muxed.",
-                diagnostics,
-            )
         return diagnostics
 
     temporary_path = video_path.with_name(f"{video_path.stem}.music{video_path.suffix}")
-    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    narration_path = None
-    if audio_config.get("voiceover"):
-        voiceover_result = synthesize_voiceover(
-            video_path,
-            text=_voiceover_text(scene_spec),
-        )
-        diagnostics.update(voiceover_result.diagnostics())
-        narration_path = voiceover_result.path
     music_path = _background_music_path()
-    has_narration = narration_path is not None and narration_path.exists()
-    if voiceover_required and not has_narration:
-        _record_voiceover_unavailable(
-            str(diagnostics.get("tts_error_summary") or "Voiceover audio was not generated."),
-            diagnostics,
-        )
     has_music = music_path is not None
-    if not has_music and not has_narration:
+    if not has_music:
         return diagnostics
-    if has_music:
-        diagnostics["background_music_file_exists"] = True
-        diagnostics["background_music_source"] = "file"
+    diagnostics["background_music_file_exists"] = True
+    diagnostics["background_music_source"] = "file"
     try:
         if temporary_path.exists():
             temporary_path.unlink()
-        if has_narration and has_music:
-            command = [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(video_path),
-                "-i",
-                str(narration_path),
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(music_path),
-                "-filter_complex",
-                "[1:a]volume=1.18,aresample=44100[narr];"
-                "[2:a]volume=0.11,afade=t=in:st=0:d=1.2,"
-                "afade=t=out:st=99999:d=0.1[bgm];"
-                "[narr][bgm]amix=inputs=2:duration=longest:dropout_transition=2[a]",
-                "-map",
-                "0:v:0",
-                "-map",
-                "[a]",
-                "-shortest",
-                "-c:v",
-                "copy",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "96k",
-                str(temporary_path),
-            ]
-        elif has_narration:
-            command = [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(video_path),
-                "-i",
-                str(narration_path),
-                "-filter_complex",
-                "[1:a]volume=1.18,aresample=44100[a]",
-                "-map",
-                "0:v:0",
-                "-map",
-                "[a]",
-                "-shortest",
-                "-c:v",
-                "copy",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "96k",
-                str(temporary_path),
-            ]
-        else:
-            command = [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(video_path),
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(music_path),
-                "-filter_complex",
-                "[1:a]volume=0.13,afade=t=in:st=0:d=1.2[a]",
-                "-map",
-                "0:v:0",
-                "-map",
-                "[a]",
-                "-shortest",
-                "-c:v",
-                "copy",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "96k",
-                str(temporary_path),
-            ]
+        command = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(video_path),
+            "-stream_loop",
+            "-1",
+            "-i",
+            str(music_path),
+            "-filter_complex",
+            "[1:a]volume=0.13,afade=t=in:st=0:d=1.2[a]",
+            "-map",
+            "0:v:0",
+            "-map",
+            "[a]",
+            "-shortest",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "96k",
+            str(temporary_path),
+        ]
         completed = subprocess.run(
             command,
             cwd=video_path.parent,
@@ -227,22 +143,10 @@ def add_background_music(video_path: Path, *, scene_spec: Dict[str, Any]) -> Dic
                 temporary_path.unlink()
         except OSError:
             pass
-    finally:
-        if narration_path is not None:
-            try:
-                narration_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-    if voiceover_required:
-        _record_voiceover_unavailable(
-            "Voiceover audio was generated but could not be muxed into the final MP4.",
-            diagnostics,
-        )
     return diagnostics
 
 
 def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
-    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
     music_path = _background_music_path()
     return {
         "background_music_requested": scene_spec.get("background_music") is not False,
@@ -253,26 +157,7 @@ def _initial_audio_diagnostics(*, scene_spec: Dict[str, Any]) -> Dict[str, Any]:
         "background_music_file_exists": music_path is not None,
         "audio_muxed": False,
         "ffmpeg_available": False,
-        "voiceover_requested": bool(audio_config.get("voiceover")),
-        **tts_diagnostics_base(),
     }
-
-
-def _voiceover_required(scene_spec: Dict[str, Any]) -> bool:
-    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    return bool(
-        audio_config.get("voiceover")
-        and (
-            audio_config.get("voiceover_required")
-            or audio_config.get("required")
-            or scene_spec.get("voiceover_required")
-        )
-    )
-
-
-def _record_voiceover_unavailable(reason: str, diagnostics: Dict[str, Any]) -> None:
-    diagnostics["voiceover_required"] = True
-    diagnostics["voiceover_error"] = reason
 
 
 def _background_music_path_raw() -> str:
@@ -289,31 +174,6 @@ def _background_music_path() -> Path | None:
         return None
     path = Path(value)
     return path if path.exists() and path.is_file() else None
-
-
-def _voiceover_text(scene_spec: Dict[str, Any]) -> str:
-    audio_config = scene_spec.get("audio") if isinstance(scene_spec.get("audio"), dict) else {}
-    outline = audio_config.get("narration_outline")
-    parts: list[str] = []
-    if isinstance(outline, list):
-        parts.extend(str(item).strip() for item in outline if str(item).strip())
-    stages = scene_spec.get("teaching_stages")
-    if isinstance(stages, list):
-        for item in stages:
-            if not isinstance(item, dict):
-                continue
-            for key in ("narration", "visual_transform", "key_conclusion", "checkpoint"):
-                text = str(item.get(key) or "").strip()
-                if text:
-                    parts.append(text)
-    if not parts:
-        parts.extend(str(item).strip() for item in scene_spec.get("steps") or [] if str(item).strip())
-    cleaned = []
-    for part in parts:
-        value = " ".join(part.replace("\n", " ").split())
-        if value and value not in cleaned:
-            cleaned.append(value)
-    return "。".join(cleaned)[:1800]
 
 
 def optimize_mp4_for_streaming(video_path: Path) -> None:
@@ -557,7 +417,7 @@ class LearningScene(Scene):
         raw_stages = spec.get("teaching_stages") if isinstance(spec.get("teaching_stages"), list) else []
         if index < len(raw_stages) and isinstance(raw_stages[index], dict):
             stage = raw_stages[index]
-            value = str(stage.get("narration") or stage.get("voiceover") or fallback).strip()
+            value = str(stage.get("narration") or fallback).strip()
             return value or fallback
         return fallback
 

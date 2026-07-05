@@ -76,15 +76,6 @@ class Settings:
     vivo_animation_timeout_seconds: int
     vivo_max_tokens: int
     vivo_animation_max_tokens: int
-    piper_tts_command: str
-    piper_voice_model: str
-    piper_voice_config: str
-    tts_provider: str
-    tts_service_url: str
-    tts_api_key: str
-    tts_voice: str
-    tts_timeout_seconds: int
-    tts_fallback_provider: str
     background_music_path: str
     debug: bool
 
@@ -215,41 +206,6 @@ def get_settings() -> Settings:
                 file_values,
                 "8192",
             )
-        ),
-        piper_tts_command=_get_setting(
-            "PIPER_TTS_COMMAND",
-            file_values,
-            _get_setting("PIPER_COMMAND", file_values),
-        ),
-        piper_voice_model=_get_setting(
-            "PIPER_VOICE_MODEL",
-            file_values,
-            _get_setting("ZERROR_PIPER_VOICE_MODEL", file_values),
-        ),
-        piper_voice_config=_get_setting(
-            "PIPER_VOICE_CONFIG",
-            file_values,
-            _get_setting("ZERROR_PIPER_VOICE_CONFIG", file_values),
-        ),
-        tts_provider=_get_setting(
-            "ZERROR_TTS_PROVIDER",
-            file_values,
-            "cosyvoice_http",
-        ),
-        tts_service_url=_get_setting("ZERROR_TTS_SERVICE_URL", file_values),
-        tts_api_key=_get_setting("ZERROR_TTS_API_KEY", file_values),
-        tts_voice=_get_setting(
-            "ZERROR_TTS_VOICE",
-            file_values,
-            "teacher_female_clear",
-        ),
-        tts_timeout_seconds=int(
-            _get_setting("ZERROR_TTS_TIMEOUT_SECONDS", file_values, "300")
-        ),
-        tts_fallback_provider=_get_setting(
-            "ZERROR_TTS_FALLBACK_PROVIDER",
-            file_values,
-            "none",
         ),
         background_music_path=_get_setting(
             "ZERROR_BACKGROUND_MUSIC_PATH",
